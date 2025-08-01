@@ -1,4 +1,4 @@
-package tw.niels.beverage_api_project.modules.product;
+package tw.niels.beverage_api_project.modules.product.entity;
 
 import java.math.BigDecimal;
 
@@ -9,40 +9,34 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import tw.niels.beverage_api_project.modules.brand.entity.Brand;
+
 @Getter
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name="products")
-public class Product {
+@Table(name="product_options")
+public class ProductOption {
     @Id
-    @Column(name="product_id")
     @GeneratedValue(strategy=GenerationType.IDENTITY)
-    private Long productId;
+    @Column(name="option_id")
+    private Long optionId;
 
     @ManyToOne(fetch=FetchType.LAZY)
     @JoinColumn(name="brand_id", nullable=false)
-    private Long brandId;
+    private Brand brandId;
 
-    @Column(name="name", nullable=false, length=100)
-    private String name;
+    @Column(name="option_name", nullable=false, length=50)
+    private String optionName;
 
-    @Lob
-    @Column(name="description")
-    private String description;
+    @Column(name="price_adjustment", nullable=false, precision=10, scale=2)
+    private BigDecimal priceAdjustment;
 
-    @Column(name="base_price", nullable=false, precision=10, scale=2)
-    private BigDecimal basePrice;
-
-    @Column(name="image_url", length=255)
-    private String imageUrl;
-
-    @Column(name="is_available")
-    private Boolean isAvailable;
+    @Column(name="is_default", nullable=false)
+    private boolean isDefault;
 }
