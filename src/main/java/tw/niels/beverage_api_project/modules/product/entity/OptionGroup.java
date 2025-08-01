@@ -38,7 +38,7 @@ public class OptionGroup {
 
     @ManyToOne(fetch=FetchType.LAZY)
     @JoinColumn(name="brand_id", nullable=false)
-    private Brand brandId;
+    private Brand brand;
 
     @Column(name="name", nullable=false, length=50)
     private String name;

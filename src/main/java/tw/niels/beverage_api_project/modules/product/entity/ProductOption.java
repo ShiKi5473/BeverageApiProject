@@ -29,7 +29,7 @@ public class ProductOption {
 
     @ManyToOne(fetch=FetchType.LAZY)
     @JoinColumn(name="brand_id", nullable=false)
-    private Brand brandId;
+    private Brand brand;
 
     @Column(name="option_name", nullable=false, length=50)
     private String optionName;

@@ -30,7 +30,7 @@ public class Category {
 
     @ManyToMany(fetch=FetchType.LAZY)
     @JoinColumn(name="brand_id", nullable=false)
-    private Long brandId;
+    private Long brand;
 
     @Column(name="name", nullable = false, length = 50)
     private String name;
