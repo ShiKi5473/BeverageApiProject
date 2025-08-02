@@ -11,11 +11,13 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToMany;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import tw.niels.beverage_api_project.modules.brand.entity.Brand;
 
 @Getter
 @Setter
@@ -28,9 +30,9 @@ public class Category {
     @Column(name="category_id")
     private Long categoryId;
 
-    @ManyToMany(fetch=FetchType.LAZY)
+    @ManyToOne(fetch=FetchType.LAZY)
     @JoinColumn(name="brand_id", nullable=false)
-    private Long brand;
+    private Brand brand;
 
     @Column(name="name", nullable = false, length = 50)
     private String name;

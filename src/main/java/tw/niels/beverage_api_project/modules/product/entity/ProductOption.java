@@ -39,4 +39,8 @@ public class ProductOption {
 
     @Column(name="is_default", nullable=false)
     private boolean isDefault;
+
+    @ManyToOne(fetch=FetchType.LAZY)
+    @JoinColumn(name="group_id", nullable=false)
+    private OptionGroup optionGroup;
 }

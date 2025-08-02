@@ -4,6 +4,15 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
+
+# 忽略所有以 .env 開頭的檔案 (除了範本檔)
+.env*
+!env.local.example
+!env.cloud.example
+!*.env.example
+
+
+
 ### STS ###
 .apt_generated
 .classpath
@@ -31,3 +40,5 @@ build/
 
 ### VS Code ###
 .vscode/
+.gitignore.bak
+src/main/resources/application.properties.bak

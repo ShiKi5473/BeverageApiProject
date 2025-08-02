@@ -32,7 +32,7 @@ public class Brand {
     @Column(name = "name", nullable = false, length = 100)
     private String name;
 
-    @Column(name = "name", length = 100)
+    @Column(name = "contact_person", length = 100)
     private String contactPerson;
 
     @Enumerated(EnumType.STRING)
