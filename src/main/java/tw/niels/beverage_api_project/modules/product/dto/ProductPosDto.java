@@ -2,10 +2,16 @@ package tw.niels.beverage_api_project.modules.product.dto;
 
 import java.math.BigDecimal;
 
-public interface ProductPosDto {
-    Long getProductId();
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class ProductPosDto {
+    private Long id;
 
-    String getName();
+    private Long name;
 
-    BigDecimal getBasePrice();
+    private BigDecimal basePrice;
 }
