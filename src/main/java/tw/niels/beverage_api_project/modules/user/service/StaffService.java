@@ -10,17 +10,17 @@ import tw.niels.beverage_api_project.modules.store.entity.Store;
 import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
 import tw.niels.beverage_api_project.modules.user.dto.CreateStaffRequestDto;
 import tw.niels.beverage_api_project.modules.user.entity.Staff;
-import tw.niels.beverage_api_project.modules.user.repository.StaffRepository;
+import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
 
 @Service
 public class StaffService {
 
-    private final StaffRepository staffRepository;
+    private final UserRepository staffRepository;
     private final BrandRepository brandRepository;
     private final StoreRepository storeRepository;
     private final PasswordEncoder passwordEncoder;
 
-    public StaffService(StaffRepository staffRepository,
+    public StaffService(UserRepository staffRepository,
             BrandRepository brandRepository,
             StoreRepository storeRepository,
             PasswordEncoder passwordEncoder) {

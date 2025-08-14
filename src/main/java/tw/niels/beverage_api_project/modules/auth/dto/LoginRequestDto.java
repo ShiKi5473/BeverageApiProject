@@ -1,16 +1,40 @@
 package tw.niels.beverage_api_project.modules.auth.dto;
 
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
-import lombok.Data;
-@Data
+
 public class LoginRequestDto {
-    @NotNull(message = "品牌ID不可為空")
-    private Long brandId;
+    @NotEmpty
+    private String username; // 對應到 User 的 primaryPhone
 
-    @NotBlank(message = "帳號不可為空")
-    private String userName;
-
-    @NotBlank(message = "密碼不可為空")
+    @NotEmpty
     private String password;
+
+    @NotNull
+    private Long brandId; // 新增品牌 ID
+
+    // Getters and Setters
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
+    public Long getBrandId() {
+        return brandId;
+    }
+
+    public void setBrandId(Long brandId) {
+        this.brandId = brandId;
+    }
 }

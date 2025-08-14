@@ -1,34 +1,40 @@
 package tw.niels.beverage_api_project.modules.auth.service;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+import tw.niels.beverage_api_project.modules.auth.dto.JwtAuthResponseDto;
 import tw.niels.beverage_api_project.modules.auth.dto.LoginRequestDto;
+import tw.niels.beverage_api_project.security.BrandContextHolder;
 import tw.niels.beverage_api_project.security.jwt.JwtTokenProvider;
 
 @Service
 public class AuthService {
-    private final AuthenticationManager authenticationManager;
-    private final JwtTokenProvider jwtTokenProvider;
+    @Autowired
+    private AuthenticationManager authenticationManager;
+    @Autowired
+    private JwtTokenProvider tokenProvider;
 
-    public AuthService(AuthenticationManager authenticationManager ,JwtTokenProvider jwtTokenProvider){
-        this.authenticationManager = authenticationManager;
-        this.jwtTokenProvider = jwtTokenProvider;
+    public JwtAuthResponseDto login(LoginRequestDto loginRequestDto) {
+        try {
+            // 在認證前，將 brandId 存入 ThreadLocal
+            BrandContextHolder.setBrandId(loginRequestDto.getBrandId());
+
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            loginRequestDto.getUsername(),
+                            loginRequestDto.getPassword()));
+
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+            String token = tokenProvider.generateToken(authentication);
+            return new JwtAuthResponseDto(token);
+        } finally {
+            // 無論認證成功或失敗，最後都要清除 ThreadLocal，避免記憶體洩漏
+            BrandContextHolder.clear();
+        }
     }
-
-    public String login(LoginRequestDto loginRequestDto){
-        String usernameAndBrandId = loginRequestDto.getUserName() + ":" + loginRequestDto.getBrandId();
-        Authentication authenticationRequest = new UsernamePasswordAuthenticationToken(usernameAndBrandId, loginRequestDto.getPassword());
-        Authentication authenticationResponse = authenticationManager.authenticate(authenticationRequest);
-
-        SecurityContextHolder.getContext().setAuthentication(authenticationResponse);
-
-        String token = jwtTokenProvider.generateToken(authenticationResponse);
-
-        return token;
-    }
-
 }

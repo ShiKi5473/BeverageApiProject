@@ -10,27 +10,26 @@ import tw.niels.beverage_api_project.modules.store.entity.Store;
 import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
 import tw.niels.beverage_api_project.modules.user.entity.Staff;
 import tw.niels.beverage_api_project.modules.user.enums.StaffRole;
-import tw.niels.beverage_api_project.modules.user.repository.StaffRepository;
-
+import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
 
 @Service
 public class BrandService {
     private final BrandRepository brandRepository;
     private final StoreRepository storeRepository;
-    private final StaffRepository staffRepository;
+    private final UserRepository staffRepository;
     private final PasswordEncoder passwordEncoder;
 
-    public BrandService (BrandRepository brandRepository,
-                        StoreRepository storeRepository,
-                        StaffRepository staffRepository,
-                        PasswordEncoder passwordEncoder){
+    public BrandService(BrandRepository brandRepository,
+            StoreRepository storeRepository,
+            UserRepository staffRepository,
+            PasswordEncoder passwordEncoder) {
         this.brandRepository = brandRepository;
         this.storeRepository = storeRepository;
         this.staffRepository = staffRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
-    public Brand createBrandAndAdmin(CreateBrandRequestDto requestDto){
+    public Brand createBrandAndAdmin(CreateBrandRequestDto requestDto) {
         Brand newBrand = new Brand();
         newBrand.setName(requestDto.getBrandName());
         brandRepository.save(newBrand);
