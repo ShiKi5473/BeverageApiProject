@@ -1,55 +1,42 @@
 package tw.niels.beverage_api_project.modules.brand.service;
 
-import org.springframework.security.crypto.password.PasswordEncoder;
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import tw.niels.beverage_api_project.modules.brand.dto.CreateBrandRequestDto;
 import tw.niels.beverage_api_project.modules.brand.entity.Brand;
 import tw.niels.beverage_api_project.modules.brand.repository.BrandRepository;
-import tw.niels.beverage_api_project.modules.store.entity.Store;
-import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
-import tw.niels.beverage_api_project.modules.user.entity.Staff;
-import tw.niels.beverage_api_project.modules.user.enums.StaffRole;
-import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
 
 @Service
 public class BrandService {
-    private final BrandRepository brandRepository;
-    private final StoreRepository storeRepository;
-    private final UserRepository staffRepository;
-    private final PasswordEncoder passwordEncoder;
 
-    public BrandService(BrandRepository brandRepository,
-            StoreRepository storeRepository,
-            UserRepository staffRepository,
-            PasswordEncoder passwordEncoder) {
-        this.brandRepository = brandRepository;
-        this.storeRepository = storeRepository;
-        this.staffRepository = staffRepository;
-        this.passwordEncoder = passwordEncoder;
+    @Autowired
+    private BrandRepository brandRepository;
+
+    @Transactional // 建議加上交易註解
+    public Brand createBrand(CreateBrandRequestDto requestDto) {
+        // 檢查品牌名稱是否已存在
+        brandRepository.findByName(requestDto.getName()).ifPresent(b -> {
+            throw new IllegalStateException("品牌名稱 '" + requestDto.getName() + "' 已經存在。");
+        });
+
+        Brand brand = new Brand();
+        brand.setName(requestDto.getName());
+        brand.setContactPerson(requestDto.getContactPerson());
+        brand.setActive(true); // 預設為啟用
+
+        return brandRepository.save(brand);
     }
 
-    public Brand createBrandAndAdmin(CreateBrandRequestDto requestDto) {
-        Brand newBrand = new Brand();
-        newBrand.setName(requestDto.getBrandName());
-        brandRepository.save(newBrand);
+    public List<Brand> getAllBrands() {
+        return brandRepository.findAll();
+    }
 
-        Store headquarters = new Store();
-        headquarters.setBrand(newBrand);
-        headquarters.setName(requestDto.getBrandName() + " - 總店");
-        storeRepository.save(headquarters);
-
-        CreateBrandRequestDto.BrandAdminDto adminDto = requestDto.getAdmin();
-        Staff newStaff = new Staff();
-        newStaff.setBrand(newBrand);
-        newStaff.setStore(null);
-        newStaff.setUsername(adminDto.getUsername());
-        newStaff.setPasswordHash(passwordEncoder.encode(adminDto.getPassword()));
-        newStaff.setFullName(adminDto.getFullName());
-        newStaff.setRole(StaffRole.BRAND_ADMIN);
-        newStaff.setActive(true);
-        staffRepository.save(newStaff);
-
-        return newBrand;
+    public Optional<Brand> getBrandById(Long id) {
+        return brandRepository.findById(id);
     }
 }

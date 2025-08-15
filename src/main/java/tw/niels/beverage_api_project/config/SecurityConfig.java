@@ -1,5 +1,6 @@
 package tw.niels.beverage_api_project.config;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -14,41 +15,43 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 import tw.niels.beverage_api_project.common.constants.ApiPaths;
+import tw.niels.beverage_api_project.security.CustomUserDetailsService;
 import tw.niels.beverage_api_project.security.jwt.JwtAuthenticationEntryPoint;
 import tw.niels.beverage_api_project.security.jwt.JwtAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity
+@EnableMethodSecurity // 【修改】啟用方法級別安全控制
 public class SecurityConfig {
-    private final JwtAuthenticationEntryPoint authenticationEntryPoint;
-    private final JwtAuthenticationFilter authenticationFilter;
 
-    public SecurityConfig(JwtAuthenticationEntryPoint authenticationEntryPoint,
-         JwtAuthenticationFilter authenticationFilter){
-            this.authenticationEntryPoint = authenticationEntryPoint;
-            this.authenticationFilter = authenticationFilter;
-         }
+    @Autowired
+    private CustomUserDetailsService userDetailsService;
+    @Autowired
+    private JwtAuthenticationEntryPoint authenticationEntryPoint;
+    @Autowired
+    private JwtAuthenticationFilter authenticationFilter;
+
     @Bean
-    public static PasswordEncoder passwordEncoder(){
+    public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
+
     @Bean
-    public static AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception{
-        return configuration.getAuthenticationManager();
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration)
+            throws Exception {
+        return authenticationConfiguration.getAuthenticationManager();
     }
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception{
-        http.csrf(csrf -> csrf.disable())
-            .exceptionHandling(exception -> exception
-                .authenticationEntryPoint(authenticationEntryPoint))
-            .sessionManagement(session -> session
-                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(authorize -> authorize
-                .requestMatchers(ApiPaths.API_V1 + "/auth/**").permitAll()
-                        // 除了上述路徑，所有其他請求都需要認證
-                .anyRequest().authenticated());
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+                .csrf(csrf -> csrf.disable())
+                .exceptionHandling(exception -> exception.authenticationEntryPoint(authenticationEntryPoint))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(ApiPaths.AUTH + "/**").permitAll() // 允許所有對 /api/auth 的請求
+                        .anyRequest().authenticated() // 其他所有請求都需要認證
+                );
 
         http.addFilterBefore(authenticationFilter, UsernamePasswordAuthenticationFilter.class);
 

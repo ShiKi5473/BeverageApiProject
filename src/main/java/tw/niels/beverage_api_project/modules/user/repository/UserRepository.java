@@ -6,11 +6,10 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
-import tw.niels.beverage_api_project.modules.user.entity.Staff;
 import tw.niels.beverage_api_project.modules.user.entity.User;
 
 @Repository
-public interface UserRepository extends JpaRepository<Staff, Long> {
+public interface UserRepository extends JpaRepository<User, Long> {
 
     // 使用手機號碼和品牌ID來尋找使用者，確保多租戶下的帳號唯一性
     @Query("SELECT u FROM User u WHERE u.primaryPhone = :phone AND u.brand.id = :brandId")
