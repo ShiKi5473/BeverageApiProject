@@ -47,6 +47,7 @@ public class OrderItem {
     @Column(name = "notes")
     private String notes;
 
+    //orderItem custom option
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(name = "order_item_options", joinColumns = @JoinColumn(name = "order_item_id"), inverseJoinColumns = @JoinColumn(name = "option_id"))
     private Set<ProductOption> options = new HashSet<>();
