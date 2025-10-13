@@ -21,6 +21,9 @@ import tw.niels.beverage_api_project.modules.user.enums.StaffRole;
 @Table(name = "staff_profiles")
 public class StaffProfile {
 
+    public StaffProfile() {
+    };
+
     @Id
     @Column(name = "user_id")
     private Long userId;

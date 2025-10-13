@@ -90,6 +90,9 @@ public class Order {
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<OrderItem> items = new HashSet<>();
 
+    public Order() {
+    }
+
     // getter setter
 
     public Long getOrderId() {

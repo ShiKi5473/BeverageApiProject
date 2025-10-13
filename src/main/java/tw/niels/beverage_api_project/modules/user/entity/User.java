@@ -24,6 +24,9 @@ import tw.niels.beverage_api_project.modules.user.entity.profile.StaffProfile;
 @Table(name = "users")
 public class User {
 
+    public User() {
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "user_id")

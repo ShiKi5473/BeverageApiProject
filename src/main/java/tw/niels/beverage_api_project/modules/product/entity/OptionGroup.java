@@ -17,42 +17,88 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 import tw.niels.beverage_api_project.modules.brand.entity.Brand;
 import tw.niels.beverage_api_project.modules.product.enums.SelectionType;
 
-@Getter
-@Setter
-@NoArgsConstructor
 @Entity
-@Table(name="option_groups", uniqueConstraints={
-    @UniqueConstraint(columnNames={"brand_id", "name"})
+@Table(name = "option_groups", uniqueConstraints = {
+        @UniqueConstraint(columnNames = { "brand_id", "name" })
 })
 public class OptionGroup {
+
+    public OptionGroup() {
+    };
+
     @Id
-    @GeneratedValue(strategy= GenerationType.IDENTITY)
-    @Column(name="group_id")
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "group_id")
     private Long group_id;
 
-    @ManyToOne(fetch=FetchType.LAZY)
-    @JoinColumn(name="brand_id", nullable=false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "brand_id", nullable = false)
     private Brand brand;
 
-    @Column(name="name", nullable=false, length=50)
+    @Column(name = "name", nullable = false, length = 50)
     private String name;
 
     @Enumerated(EnumType.STRING)
-    @Column(name="selection_type", nullable=false, length= 20)
+    @Column(name = "selection_type", nullable = false, length = 20)
     private SelectionType selectionType;
 
-    @Column(name="sort_order")
+    @Column(name = "sort_order")
     private Integer sortOrder;
 
-    @OneToMany(mappedBy="optionGroup",
-        cascade=CascadeType.ALL,
-        orphanRemoval=true,
-        fetch=FetchType.LAZY )
+    @OneToMany(mappedBy = "optionGroup", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private Set<ProductOption> options = new HashSet<>();
+
+    // getter and setter
+
+    public Long getGroup_id() {
+        return group_id;
+    }
+
+    public void setGroup_id(Long group_id) {
+        this.group_id = group_id;
+    }
+
+    public Brand getBrand() {
+        return brand;
+    }
+
+    public void setBrand(Brand brand) {
+        this.brand = brand;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public SelectionType getSelectionType() {
+        return selectionType;
+    }
+
+    public void setSelectionType(SelectionType selectionType) {
+        this.selectionType = selectionType;
+    }
+
+    public Integer getSortOrder() {
+        return sortOrder;
+    }
+
+    public void setSortOrder(Integer sortOrder) {
+        this.sortOrder = sortOrder;
+    }
+
+    public Set<ProductOption> getOptions() {
+        return options;
+    }
+
+    public void setOptions(Set<ProductOption> options) {
+        this.options = options;
+    }
+
 }

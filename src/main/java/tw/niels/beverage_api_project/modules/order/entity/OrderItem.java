@@ -22,6 +22,10 @@ import tw.niels.beverage_api_project.modules.product.entity.ProductOption;
 @Table(name = "order_items")
 public class OrderItem {
 
+    public OrderItem() {
+
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "order_item_id")
@@ -47,7 +51,7 @@ public class OrderItem {
     @Column(name = "notes")
     private String notes;
 
-    //orderItem custom option
+    // orderItem custom option
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(name = "order_item_options", joinColumns = @JoinColumn(name = "order_item_id"), inverseJoinColumns = @JoinColumn(name = "option_id"))
     private Set<ProductOption> options = new HashSet<>();

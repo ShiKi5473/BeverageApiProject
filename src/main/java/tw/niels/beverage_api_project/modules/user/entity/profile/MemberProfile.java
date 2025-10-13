@@ -19,6 +19,9 @@ import tw.niels.beverage_api_project.modules.user.enums.Gender;
 @Table(name = "member_profiles")
 public class MemberProfile {
 
+    public MemberProfile() {
+    };
+
     @Id
     @Column(name = "user_id")
     private Long userId;

@@ -1,12 +1,14 @@
 package tw.niels.beverage_api_project.modules.user.service;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import java.util.Optional;
+
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import tw.niels.beverage_api_project.modules.brand.entity.Brand;
 import tw.niels.beverage_api_project.modules.brand.repository.BrandRepository;
+import tw.niels.beverage_api_project.modules.order.dto.MemberDto;
 import tw.niels.beverage_api_project.modules.store.entity.Store;
 import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
 import tw.niels.beverage_api_project.modules.user.dto.CreateUserRequestDto;
@@ -18,17 +20,21 @@ import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
 @Service
 public class UserService {
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
 
-    @Autowired
-    private BrandRepository brandRepository;
+    private final BrandRepository brandRepository;
 
-    @Autowired
-    private StoreRepository storeRepository;
+    private final StoreRepository storeRepository;
 
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+    private final PasswordEncoder passwordEncoder;
+
+    public UserService(UserRepository userRepository, BrandRepository brandRepository, StoreRepository storeRepository,
+            PasswordEncoder passwordEncoder) {
+        this.userRepository = userRepository;
+        this.brandRepository = brandRepository;
+        this.storeRepository = storeRepository;
+        this.passwordEncoder = passwordEncoder;
+    }
 
     @Transactional
     public User createUser(CreateUserRequestDto requestDto) {
@@ -74,15 +80,27 @@ public class UserService {
             MemberProfile memberProfile = new MemberProfile();
             memberProfile.setFullName(memberDto.getFullName());
             memberProfile.setEmail(memberDto.getEmail());
-            // 【修改】設定其他會員資料
             memberProfile.setBirthDate(memberDto.getBirthDate());
             memberProfile.setGender(memberDto.getGender());
             memberProfile.setNotes(memberDto.getNotes());
-            // 建立雙向關聯
             user.setMemberProfile(memberProfile);
         }
 
         // 5. 儲存 User (由於 CascadeType.ALL, Profile 會一併被儲存)
         return userRepository.save(user);
+    }
+
+    /**
+     * 根據手機號碼和品牌 ID 查找會員資訊
+     *
+     * @param phone   會員手機號碼
+     * @param brandId 當前操作的品牌 ID
+     * @return 包含會員資訊的 Optional<MemberDto>
+     */
+    @Transactional
+    public Optional<MemberDto> findMemberByPhone(String phone, Long brandId) {
+        return userRepository.findByPrimaryPhoneAndBrandId(phone, brandId)
+                .filter(user -> user.getMemberProfile() != null)
+                .map(MemberDto::fromEntity);
     }
 }

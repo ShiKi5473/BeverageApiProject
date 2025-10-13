@@ -11,36 +11,84 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 import tw.niels.beverage_api_project.modules.brand.entity.Brand;
 
-@Getter
-@Setter
-@NoArgsConstructor
 @Entity
-@Table(name="product_options")
+@Table(name = "product_options")
 public class ProductOption {
+
+    public ProductOption() {
+    };
+
     @Id
-    @GeneratedValue(strategy=GenerationType.IDENTITY)
-    @Column(name="option_id")
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "option_id")
     private Long optionId;
 
-    @ManyToOne(fetch=FetchType.LAZY)
-    @JoinColumn(name="brand_id", nullable=false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "brand_id", nullable = false)
     private Brand brand;
 
-    @Column(name="option_name", nullable=false, length=50)
+    @Column(name = "option_name", nullable = false, length = 50)
     private String optionName;
 
-    @Column(name="price_adjustment", nullable=false, precision=10, scale=2)
+    @Column(name = "price_adjustment", nullable = false, precision = 10, scale = 2)
     private BigDecimal priceAdjustment;
 
-    @Column(name="is_default", nullable=false)
+    @Column(name = "is_default", nullable = false)
     private boolean isDefault;
 
-    @ManyToOne(fetch=FetchType.LAZY)
-    @JoinColumn(name="group_id", nullable=false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "group_id", nullable = false)
     private OptionGroup optionGroup;
+
+    // getter and setter
+    public Long getOptionId() {
+        return optionId;
+    }
+
+    public void setOptionId(Long optionId) {
+        this.optionId = optionId;
+    }
+
+    public Brand getBrand() {
+        return brand;
+    }
+
+    public void setBrand(Brand brand) {
+        this.brand = brand;
+    }
+
+    public String getOptionName() {
+        return optionName;
+    }
+
+    public void setOptionName(String optionName) {
+        this.optionName = optionName;
+    }
+
+    public BigDecimal getPriceAdjustment() {
+        return priceAdjustment;
+    }
+
+    public void setPriceAdjustment(BigDecimal priceAdjustment) {
+        this.priceAdjustment = priceAdjustment;
+    }
+
+    public boolean isDefault() {
+        return isDefault;
+    }
+
+    public void setDefault(boolean isDefault) {
+        this.isDefault = isDefault;
+    }
+
+    public OptionGroup getOptionGroup() {
+        return optionGroup;
+    }
+
+    public void setOptionGroup(OptionGroup optionGroup) {
+        this.optionGroup = optionGroup;
+    }
+
 }
