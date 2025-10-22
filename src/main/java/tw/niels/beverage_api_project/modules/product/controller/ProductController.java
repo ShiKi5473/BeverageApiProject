@@ -17,6 +17,7 @@ import tw.niels.beverage_api_project.common.constants.ApiPaths;
 import tw.niels.beverage_api_project.modules.product.dto.CreateCategoryRequestDto;
 import tw.niels.beverage_api_project.modules.product.dto.CreateProductRequestDto;
 import tw.niels.beverage_api_project.modules.product.dto.ProductPosDto;
+import tw.niels.beverage_api_project.modules.product.dto.ProductResponseDto;
 import tw.niels.beverage_api_project.modules.product.dto.ProductSummaryDto;
 import tw.niels.beverage_api_project.modules.product.entity.Category;
 import tw.niels.beverage_api_project.modules.product.entity.Product;
@@ -35,18 +36,17 @@ public class ProductController {
     }
 
     @PostMapping("/{brandId}" + ApiPaths.PRODUCTS)
-    public ResponseEntity<Product> createProduct(@PathVariable Long brandId,
+    public ResponseEntity<ProductResponseDto> createProduct(@PathVariable Long brandId,
             @Valid @RequestBody CreateProductRequestDto requestDto) {
         Product newProduct = productService.createProduct(brandId, requestDto);
-
-        return new ResponseEntity<>(newProduct, HttpStatus.CREATED);
+        return new ResponseEntity<>(ProductResponseDto.fromEntity(newProduct), HttpStatus.CREATED);
     }
 
     /**
      * 為指定品牌建立一個新的商品分類。
      * 只有品牌管理員可以執行此操作。
      */
-    @PostMapping("/categories")
+    @PostMapping("/{brandId}/cate   gories")
     @PreAuthorize("hasRole('BRAND_ADMIN')")
     public ResponseEntity<Category> createCategory(@PathVariable Long brandId,
             @Valid @RequestBody CreateCategoryRequestDto requestDto) {

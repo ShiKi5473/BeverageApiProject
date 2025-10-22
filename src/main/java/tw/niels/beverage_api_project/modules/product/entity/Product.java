@@ -55,7 +55,7 @@ public class Product {
     private ProductStatus status;
 
     @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(name = "product_category_mapping", joinColumns = @JoinColumn(name = "product_id"), inverseJoinColumns = @JoinColumn(name = "category_id"))
+    @JoinTable(name = "product_category_mappings", joinColumns = @JoinColumn(name = "product_id"), inverseJoinColumns = @JoinColumn(name = "category_id"))
     private Set<Category> categories = new HashSet<>();
 
     // getter and setter

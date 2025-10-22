@@ -5,6 +5,7 @@ import java.util.Set;
 
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import tw.niels.beverage_api_project.modules.product.enums.ProductStatus;
 
@@ -23,7 +24,7 @@ public class CreateProductRequestDto {
     @NotNull(message = "必須指定商品是否可用")
     private ProductStatus status;
 
-    @NotBlank(message = "必須為商品指定一個類別")
+    @NotEmpty(message = "必須為商品指定一個類別")
     private Set<Long> categoryIds;
 
     // getter and setter
