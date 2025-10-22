@@ -2,7 +2,7 @@ package tw.niels.beverage_api_project.security.jwt;
 
 import java.util.Date;
 
-import javax.crypto.SecretKey; // 注意：javax.crypto.SecretKey 在新版本可能會有變化，但概念不變
+import javax.crypto.SecretKey;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,6 +18,7 @@ import io.jsonwebtoken.UnsupportedJwtException;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
+import tw.niels.beverage_api_project.security.AppUserDetails;
 
 /**
  * JWT 令牌提供者類別，用於生成、驗證和解析 JWT 令牌。
@@ -60,8 +61,10 @@ public class JwtTokenProvider {
      */
     public String generateToken(Authentication authentication) {
         // 取得用戶名稱作為 JWT 的主體（Subject）
-        String username = authentication.getName();
-        
+        AppUserDetails userDetails = (AppUserDetails) authentication.getPrincipal();
+        String username = userDetails.getUsername();
+        Long brandId = userDetails.getBrandId();
+
         Date currentDate = new Date();
         // 計算令牌的過期時間
         Date expireDate = new Date(currentDate.getTime() + jwtExpirationInMs);
@@ -69,6 +72,7 @@ public class JwtTokenProvider {
         // 使用 Jwts.builder() 創建令牌
         return Jwts.builder()
                 .subject(username) // 設定主體
+                .claim("brandId", brandId) // 將 brandId 作為一個 "claim" 加入 Token
                 .issuedAt(currentDate) // 設定簽發時間
                 .expiration(expireDate) // 設定過期時間
                 .signWith(key) // 使用密鑰簽名
@@ -88,8 +92,21 @@ public class JwtTokenProvider {
                 .build()
                 .parseSignedClaims(token) // 解析已簽名的令牌
                 .getPayload(); // 取得負載（Payload），即 Claims 物件
-        
+
         return claims.getSubject(); // 返回主體（使用者名稱）
+    }
+
+    /**
+     * 專門用來從 Token 中解析出 brandId。
+     */
+    public Long getBrandIdFromJWT(String token) {
+        Claims claims = Jwts.parser()
+                .verifyWith(key)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+
+        return claims.get("brandId", Long.class);
     }
 
     /**

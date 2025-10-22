@@ -14,6 +14,7 @@ import tw.niels.beverage_api_project.modules.product.dto.ProductPosDto;
 import tw.niels.beverage_api_project.modules.product.dto.ProductSummaryDto;
 import tw.niels.beverage_api_project.modules.product.entity.Category;
 import tw.niels.beverage_api_project.modules.product.entity.Product;
+import tw.niels.beverage_api_project.modules.product.enums.ProductStatus;
 import tw.niels.beverage_api_project.modules.product.repository.CategoryRepository;
 import tw.niels.beverage_api_project.modules.product.repository.ProductRepository;
 
@@ -48,22 +49,20 @@ public class ProductService {
         newProduct.setDescription(request.getDescription());
         newProduct.setBasePrice(request.getBasePrice());
         newProduct.setImageUrl(request.getImageUrl());
-        newProduct.setIsAvailable(request.isAvailable());
+        newProduct.setStatus(request.getStatus());
         newProduct.setCategories(categories);
 
         return productRepository.save(newProduct);
     }
 
     @Transactional(readOnly = true)
-    public List<ProductSummaryDto> getAvailableSummaries(Long brandId){
-        return productRepository.findSummaryDtoByBrand_BrandIdAndIsAvailable(brandId, true);
+    public List<ProductSummaryDto> getAvailableSummaries(Long brandId) {
+        return productRepository.findSummaryDtoByBrand_BrandIdAndStatus(brandId, ProductStatus.ACTIVE);
     }
 
-     @Transactional(readOnly = true)
-    public List<ProductPosDto> getAvailableProductsForPos(Long brandId){
-        return productRepository.findPosDtoByBrand_BrandIdAndIsAvailable(brandId, true);
+    @Transactional(readOnly = true)
+    public List<ProductPosDto> getAvailableProductsForPos(Long brandId) {
+        return productRepository.findPosDtoByBrand_BrandIdAndStatus(brandId, ProductStatus.ACTIVE);
     }
-
-
 
 }

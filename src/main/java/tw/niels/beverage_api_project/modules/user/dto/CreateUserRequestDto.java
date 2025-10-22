@@ -78,7 +78,6 @@ public class CreateUserRequestDto {
     public static class MemberProfileDto {
         private String fullName;
         private String email;
-        // 【修改】新增其他會員欄位
         private Date birthDate;
         private Gender gender;
         private String notes;

@@ -2,6 +2,9 @@ package tw.niels.beverage_api_project.modules.user.entity.profile;
 
 import java.util.Date;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -45,6 +48,7 @@ public class StaffProfile {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     private StaffRole role;
 
     @Column(name = "hire_date")

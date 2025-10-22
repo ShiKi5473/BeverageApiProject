@@ -2,6 +2,9 @@ package tw.niels.beverage_api_project.modules.user.entity.profile;
 
 import java.util.Date;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -42,6 +45,7 @@ public class MemberProfile {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "gender")
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     private Gender gender;
 
     @Column(name = "total_points", nullable = false)

@@ -20,7 +20,7 @@ import tw.niels.beverage_api_project.modules.brand.entity.Brand;
 import tw.niels.beverage_api_project.modules.brand.service.BrandService;
 
 @RestController
-@RequestMapping(ApiPaths.BRANDS) // 建議為 Brand 建立一個新的 API 路徑
+@RequestMapping(ApiPaths.API_V1 + ApiPaths.BRANDS) // 建議為 Brand 建立一個新的 API 路徑
 public class BrandController {
 
     @Autowired

@@ -9,14 +9,15 @@ import org.springframework.stereotype.Repository;
 import tw.niels.beverage_api_project.modules.product.dto.ProductPosDto;
 import tw.niels.beverage_api_project.modules.product.dto.ProductSummaryDto;
 import tw.niels.beverage_api_project.modules.product.entity.Product;
+import tw.niels.beverage_api_project.modules.product.enums.ProductStatus;
 
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long> {
-    List<Product> findByBrand_BrandIdAndIsAvailable(Long brandId, boolean isAvailable);
+    List<Product> findByBrand_BrandIdAndStatus(Long brandId, ProductStatus Status);
 
-    List<ProductSummaryDto> findSummaryDtoByBrand_BrandIdAndIsAvailable(Long brandId, boolean isAvailable);
+    List<ProductSummaryDto> findSummaryDtoByBrand_BrandIdAndStatus(Long brandId, ProductStatus Status);
 
-    List<ProductPosDto> findPosDtoByBrand_BrandIdAndIsAvailable(Long brandId, boolean isAvailable);
+    List<ProductPosDto> findPosDtoByBrand_BrandIdAndStatus(Long brandId, ProductStatus status);
 
     Optional<Product> findByBrand_BrandIdAndProductId(Long brandId, Long productId);
 }

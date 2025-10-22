@@ -49,7 +49,7 @@ public class SecurityConfig {
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(authenticationEntryPoint))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(ApiPaths.AUTH + "/**").permitAll() // 允許所有對 /api/auth 的請求
+                        .requestMatchers(ApiPaths.API_V1 + ApiPaths.AUTH + "/**").permitAll() // 允許所有對 /api/auth 的請求
                         .anyRequest().authenticated() // 其他所有請求都需要認證
                 );
 

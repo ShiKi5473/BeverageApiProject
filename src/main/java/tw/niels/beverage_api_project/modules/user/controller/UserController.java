@@ -21,7 +21,7 @@ import tw.niels.beverage_api_project.modules.user.service.UserService;
 import tw.niels.beverage_api_project.security.AppUserDetails;
 
 @RestController
-@RequestMapping(ApiPaths.USERS)
+@RequestMapping(ApiPaths.API_V1 + ApiPaths.USERS)
 public class UserController {
 
     @Autowired
@@ -33,6 +33,7 @@ public class UserController {
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER')")
     public ResponseEntity<String> createUser(@Valid @RequestBody CreateUserRequestDto createUserRequestDto) {
         try {
+            System.out.println("try to create new user");
             User newUser = userService.createUser(createUserRequestDto);
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body("User created successfully with ID: " + newUser.getUserId());

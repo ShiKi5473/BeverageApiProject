@@ -15,7 +15,7 @@ import tw.niels.beverage_api_project.modules.auth.dto.LoginRequestDto;
 import tw.niels.beverage_api_project.modules.auth.service.AuthService;
 
 @RestController
-@RequestMapping(ApiPaths.AUTH) // 使用定義好的常數
+@RequestMapping(ApiPaths.API_V1 + ApiPaths.AUTH) // 使用定義好的常數
 public class AuthController {
 
     private final AuthService authService;
@@ -34,11 +34,13 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<?> authenticateUser(@RequestBody @Valid LoginRequestDto loginRequestDto) {
         try {
+            System.out.println("收到登入請求");
             // 直接呼叫 AuthService，它會回傳完整的 DTO
             JwtAuthResponseDto jwtAuthResponseDto = authService.login(loginRequestDto);
             return ResponseEntity.ok(jwtAuthResponseDto);
         } catch (AuthenticationException e) {
             // 如果 Spring Security 在認證過程中拋出異常（例如密碼錯誤），則捕捉它
+            System.out.println("failed");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("登入失敗：帳號、密碼或品牌不正確。");
         }
     }
