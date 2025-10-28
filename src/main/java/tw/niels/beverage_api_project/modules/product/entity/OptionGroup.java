@@ -32,7 +32,7 @@ public class OptionGroup {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "group_id")
-    private Long group_id;
+    private Long groupId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "brand_id", nullable = false)
@@ -53,12 +53,12 @@ public class OptionGroup {
 
     // getter and setter
 
-    public Long getGroup_id() {
-        return group_id;
+    public Long getGroupId() {
+        return groupId;
     }
 
-    public void setGroup_id(Long group_id) {
-        this.group_id = group_id;
+    public void setGroup_id(Long groupId) {
+        this.groupId = groupId;
     }
 
     public Brand getBrand() {

@@ -58,6 +58,10 @@ public class Product {
     @JoinTable(name = "product_category_mappings", joinColumns = @JoinColumn(name = "product_id"), inverseJoinColumns = @JoinColumn(name = "category_id"))
     private Set<Category> categories = new HashSet<>();
 
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(name = "product_option_group_mappings", joinColumns = @JoinColumn(name = "product_id"), inverseJoinColumns = @JoinColumn(name = "group_id"))
+    private Set<OptionGroup> optionGroups = new HashSet<>();
+
     // getter and setter
     public Long getProductId() {
         return productId;
@@ -121,6 +125,14 @@ public class Product {
 
     public void setStatus(ProductStatus status) {
         this.status = status;
+    }
+
+    public Set<OptionGroup> getOptionGroups() {
+        return optionGroups;
+    }
+
+    public void setOptionGroups(Set<OptionGroup> optionGroups) {
+        this.optionGroups = optionGroups;
     }
 
 }

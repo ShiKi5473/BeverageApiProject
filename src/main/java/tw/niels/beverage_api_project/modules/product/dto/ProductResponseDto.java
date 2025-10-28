@@ -9,6 +9,16 @@ import tw.niels.beverage_api_project.modules.product.entity.Product; // Import C
 import tw.niels.beverage_api_project.modules.product.enums.ProductStatus;
 
 public class ProductResponseDto {
+
+    private Long productId;
+    private String name;
+    private String description;
+    private BigDecimal basePrice;
+    private String imageUrl;
+    private ProductStatus status;
+    private Set<CategoryBasicDto> categories;
+    private Set<OptionGroupResponseDto> optionGroups;
+
     public Long getProductId() {
         return productId;
     }
@@ -65,13 +75,13 @@ public class ProductResponseDto {
         this.categories = categories;
     }
 
-    private Long productId;
-    private String name;
-    private String description;
-    private BigDecimal basePrice;
-    private String imageUrl;
-    private ProductStatus status;
-    private Set<CategoryBasicDto> categories; // 只包含分類的基本資訊，避免循環
+    public Set<OptionGroupResponseDto> getOptionGroups() {
+        return optionGroups;
+    }
+
+    public void setOptionGroups(Set<OptionGroupResponseDto> optionGroups) {
+        this.optionGroups = optionGroups;
+    }
 
     // 內部類別，只包含 Category 的基本資訊
 
@@ -120,6 +130,12 @@ public class ProductResponseDto {
         if (product.getCategories() != null) {
             dto.setCategories(product.getCategories().stream()
                     .map(CategoryBasicDto::fromEntity)
+                    .collect(Collectors.toSet()));
+        }
+
+        if (product.getOptionGroups() != null) {
+            dto.setOptionGroups(product.getOptionGroups().stream()
+                    .map(OptionGroupResponseDto::fromEntity)
                     .collect(Collectors.toSet()));
         }
         return dto;

@@ -7,15 +7,18 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
 import tw.niels.beverage_api_project.modules.brand.entity.Brand;
 import tw.niels.beverage_api_project.modules.brand.repository.BrandRepository;
 import tw.niels.beverage_api_project.modules.product.dto.CreateProductRequestDto;
 import tw.niels.beverage_api_project.modules.product.dto.ProductPosDto;
 import tw.niels.beverage_api_project.modules.product.dto.ProductSummaryDto;
 import tw.niels.beverage_api_project.modules.product.entity.Category;
+import tw.niels.beverage_api_project.modules.product.entity.OptionGroup;
 import tw.niels.beverage_api_project.modules.product.entity.Product;
 import tw.niels.beverage_api_project.modules.product.enums.ProductStatus;
 import tw.niels.beverage_api_project.modules.product.repository.CategoryRepository;
+import tw.niels.beverage_api_project.modules.product.repository.OptionGroupRepository;
 import tw.niels.beverage_api_project.modules.product.repository.ProductRepository;
 
 @Service
@@ -23,12 +26,14 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final BrandRepository brandRepository;
     private final CategoryRepository categoryRepository;
+    private final OptionGroupRepository optionGroupRepository;
 
     public ProductService(ProductRepository productRepository, BrandRepository brandRepository,
-            CategoryRepository categoryRepository) {
+            CategoryRepository categoryRepository, OptionGroupRepository optionGroupRepository) {
         this.productRepository = productRepository;
         this.brandRepository = brandRepository;
         this.categoryRepository = categoryRepository;
+        this.optionGroupRepository = optionGroupRepository;
     }
 
     public Product createProduct(Long brandId, CreateProductRequestDto request) {
@@ -53,6 +58,20 @@ public class ProductService {
         newProduct.setCategories(categories);
 
         return productRepository.save(newProduct);
+    }
+
+    @Transactional
+    public Product linkOptionGroupsToProduct(Long brandId, Long productId, Set<Long> groupIds) {
+        Product product = productRepository.findByBrand_BrandIdAndProductId(brandId, productId)
+                .orElseThrow(() -> new ResourceNotFoundException("找不到商品，ID：" + productId));
+
+        Set<OptionGroup> groupsToLink = groupIds.stream()
+                .map(groupId -> optionGroupRepository.findByBrand_BrandIdAndGroupId(brandId, groupId)
+                        .orElseThrow(() -> new ResourceNotFoundException("找不到選項群組，ID：" + groupId)))
+                .collect(Collectors.toSet());
+
+        product.setOptionGroups(groupsToLink);
+        return productRepository.save(product);
     }
 
     @Transactional(readOnly = true)
