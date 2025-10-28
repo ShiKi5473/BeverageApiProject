@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
 import tw.niels.beverage_api_project.common.constants.ApiPaths;
+import tw.niels.beverage_api_project.modules.product.dto.CategoryResponseDto;
 import tw.niels.beverage_api_project.modules.product.dto.CreateCategoryRequestDto;
 import tw.niels.beverage_api_project.modules.product.dto.CreateProductRequestDto;
 import tw.niels.beverage_api_project.modules.product.dto.ProductPosDto;
@@ -25,7 +26,7 @@ import tw.niels.beverage_api_project.modules.product.service.CategoryService;
 import tw.niels.beverage_api_project.modules.product.service.ProductService;
 
 @RestController
-@RequestMapping(ApiPaths.API_V1 + ApiPaths.BRANDS)
+@RequestMapping(ApiPaths.API_V1 + ApiPaths.BRANDS + "/{brandId}")
 public class ProductController {
     private final ProductService productService;
     private final CategoryService categoryService;
@@ -35,7 +36,7 @@ public class ProductController {
         this.categoryService = categoryService;
     }
 
-    @PostMapping("/{brandId}" + ApiPaths.PRODUCTS)
+    @PostMapping(ApiPaths.PRODUCTS)
     public ResponseEntity<ProductResponseDto> createProduct(@PathVariable Long brandId,
             @Valid @RequestBody CreateProductRequestDto requestDto) {
         Product newProduct = productService.createProduct(brandId, requestDto);
@@ -46,21 +47,21 @@ public class ProductController {
      * 為指定品牌建立一個新的商品分類。
      * 只有品牌管理員可以執行此操作。
      */
-    @PostMapping("/{brandId}/cate   gories")
+    @PostMapping("/categories")
     @PreAuthorize("hasRole('BRAND_ADMIN')")
-    public ResponseEntity<Category> createCategory(@PathVariable Long brandId,
+    public ResponseEntity<CategoryResponseDto> createCategory(@PathVariable Long brandId,
             @Valid @RequestBody CreateCategoryRequestDto requestDto) {
         Category newCategory = categoryService.createCategory(brandId, requestDto);
-        return new ResponseEntity<>(newCategory, HttpStatus.CREATED);
+        return new ResponseEntity<>(CategoryResponseDto.fromEntity(newCategory), HttpStatus.CREATED);
     }
 
-    @GetMapping("/{brandId}" + ApiPaths.PRODUCTS + "/summary")
+    @GetMapping(ApiPaths.PRODUCTS + "/summary")
     public ResponseEntity<List<ProductSummaryDto>> getProductSummaries(@PathVariable Long brandId) {
         List<ProductSummaryDto> products = productService.getAvailableSummaries(brandId);
         return ResponseEntity.ok(products);
     }
 
-    @GetMapping("/{brandId}" + ApiPaths.PRODUCTS + "/pos")
+    @GetMapping(ApiPaths.PRODUCTS + "/pos")
     public ResponseEntity<List<ProductPosDto>> getProductForPos(@PathVariable Long brandId) {
         List<ProductPosDto> products = productService.getAvailableProductsForPos(brandId);
         return ResponseEntity.ok(products);
