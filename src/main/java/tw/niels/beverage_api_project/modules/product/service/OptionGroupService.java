@@ -50,7 +50,6 @@ public class OptionGroupService {
                 .orElseThrow(() -> new ResourceNotFoundException("找不到選項群組，ID：" + groupId));
 
         ProductOption productOption = new ProductOption();
-        productOption.setBrand(optionGroup.getBrand());
         productOption.setOptionGroup(optionGroup);
         productOption.setOptionName(requestDto.getOptionName());
         productOption.setPriceAdjustment(requestDto.getPriceAdjustment());

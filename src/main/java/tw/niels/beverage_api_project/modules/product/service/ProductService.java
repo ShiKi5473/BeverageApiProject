@@ -1,5 +1,6 @@
 package tw.niels.beverage_api_project.modules.product.service;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -7,6 +8,7 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import tw.niels.beverage_api_project.common.exception.BadRequestException;
 import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
 import tw.niels.beverage_api_project.modules.brand.entity.Brand;
 import tw.niels.beverage_api_project.modules.brand.repository.BrandRepository;
@@ -36,6 +38,7 @@ public class ProductService {
         this.optionGroupRepository = optionGroupRepository;
     }
 
+    @Transactional
     public Product createProduct(Long brandId, CreateProductRequestDto request) {
         Brand brand = brandRepository.findById(brandId)
                 .orElseThrow(() -> new RuntimeException("找不到品牌，ID：" + brandId));
@@ -48,6 +51,13 @@ public class ProductService {
             throw new RuntimeException("部分分類 ID 無效");
         }
 
+        Set<OptionGroup> optionGroups = new HashSet<>();
+        if (request.getOptionGroupIds() != null && !request.getOptionGroupIds().isEmpty()) {
+            optionGroups = request.getOptionGroupIds().stream()
+                    .map(groupId -> optionGroupRepository.findByBrand_BrandIdAndGroupId(brandId, groupId)
+                            .orElseThrow(() -> new BadRequestException("無效的選項群組 ID：" + groupId + " 或不屬於此品牌")))
+                    .collect(Collectors.toSet());
+        }
         Product newProduct = new Product();
         newProduct.setBrand(brand);
         newProduct.setName(request.getName());
@@ -56,6 +66,7 @@ public class ProductService {
         newProduct.setImageUrl(request.getImageUrl());
         newProduct.setStatus(request.getStatus());
         newProduct.setCategories(categories);
+        newProduct.setOptionGroups(optionGroups);
 
         return productRepository.save(newProduct);
     }

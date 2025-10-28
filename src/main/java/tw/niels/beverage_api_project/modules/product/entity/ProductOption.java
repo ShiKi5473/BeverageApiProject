@@ -11,7 +11,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import tw.niels.beverage_api_project.modules.brand.entity.Brand;
 
 @Entity
 @Table(name = "product_options")
@@ -25,11 +24,7 @@ public class ProductOption {
     @Column(name = "option_id")
     private Long optionId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "brand_id", nullable = false)
-    private Brand brand;
-
-    @Column(name = "option_name", nullable = false, length = 50)
+    @Column(name = "name", nullable = false, length = 50)
     private String optionName;
 
     @Column(name = "price_adjustment", nullable = false, precision = 10, scale = 2)
@@ -49,14 +44,6 @@ public class ProductOption {
 
     public void setOptionId(Long optionId) {
         this.optionId = optionId;
-    }
-
-    public Brand getBrand() {
-        return brand;
-    }
-
-    public void setBrand(Brand brand) {
-        this.brand = brand;
     }
 
     public String getOptionName() {

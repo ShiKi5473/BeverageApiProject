@@ -1,6 +1,7 @@
 package tw.niels.beverage_api_project.modules.product.dto;
 
 import java.math.BigDecimal;
+import java.util.HashSet;
 import java.util.Set;
 
 import jakarta.validation.constraints.DecimalMin;
@@ -26,6 +27,8 @@ public class CreateProductRequestDto {
 
     @NotEmpty(message = "必須為商品指定一個類別")
     private Set<Long> categoryIds;
+
+    private Set<Long> optionGroupIds = new HashSet<>();
 
     // getter and setter
 
@@ -75,6 +78,14 @@ public class CreateProductRequestDto {
 
     public void setStatus(ProductStatus status) {
         this.status = status;
+    }
+
+    public Set<Long> getOptionGroupIds() {
+        return optionGroupIds;
+    }
+
+    public void setOptionGroupIds(Set<Long> optionGroupIds) {
+        this.optionGroupIds = optionGroupIds;
     }
 
 }
