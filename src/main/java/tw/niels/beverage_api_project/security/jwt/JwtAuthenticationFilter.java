@@ -2,7 +2,10 @@ package tw.niels.beverage_api_project.security.jwt;
 
 import java.io.IOException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -19,6 +22,8 @@ import tw.niels.beverage_api_project.security.CustomUserDetailsService;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    private static final Logger logger = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
     // 注入 JWT 相關工具類別，用於生成、驗證和解析 Token
     private final JwtTokenProvider jwtTokenProvider;
@@ -38,6 +43,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
+
+        logger.info("JwtAuthenticationFilter processing request: {}", request.getRequestURI());
+
         // 從請求的 Header 中提取 JWT Token
         String token = getTokenFromRequest(request);
 
@@ -63,16 +71,42 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 // 設定認證 Token 的詳細資訊，包括客戶端的 IP 地址和 Session ID
                 authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
+                logger.debug("Setting Authentication in SecurityContextHolder: {}", authenticationToken);
+
                 // 將認證 Token 設定到 Spring Security 的上下文中
                 // 如此一來，後續的控制器和服務層就能夠知道是哪個用戶發出的請求，並進行權限檢查
                 SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+            } catch (Exception e) {
+                // 記錄 Token 處理過程中的錯誤
+                logger.error("Error setting user authentication in security context", e);
+                // 即使出錯，也要清理 ThreadLocal
+                BrandContextHolder.clear();
             }
             // 繼續執行過濾器鏈中的下一個過濾器
             finally {
                 BrandContextHolder.clear();
             }
+        } else {
+            logger.debug("JWT Token not found or invalid.");
         }
-        filterChain.doFilter(request, response);
+        try {
+            // 呼叫下一個 filter 前打印狀態
+            Authentication authBeforeDoFilter = SecurityContextHolder.getContext().getAuthentication();
+            logger.debug("Authentication before calling filterChain.doFilter(): {}", authBeforeDoFilter);
+
+            filterChain.doFilter(request, response); // 繼續執行 Filter Chain (可能拋出例外)
+
+            // 下一個 filter 執行完畢後打印狀態
+            Authentication authAfterDoFilter = SecurityContextHolder.getContext().getAuthentication();
+            logger.debug("Authentication after calling filterChain.doFilter(): {}", authAfterDoFilter);
+
+        } finally {
+            // 在請求處理完畢後 (無論成功或失敗)，清理 ThreadLocal
+            BrandContextHolder.clear();
+            // 可選：您也可以在此處再次檢查 SecurityContextHolder 的狀態，但不建議在此清理 SecurityContextHolder 本身
+            // SecurityContextHolder.clearContext(); // <-- 通常不需要手動清理 SecurityContext
+            logger.debug("Cleaned BrandContextHolder.");
+        }
 
     }
 

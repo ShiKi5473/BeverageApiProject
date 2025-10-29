@@ -50,6 +50,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(ApiPaths.API_V1 + ApiPaths.AUTH + "/**").permitAll() // 允許所有對 /api/auth 的請求
+                        .requestMatchers("/error").permitAll() // 允許對預設錯誤端點的匿名訪問
                         .anyRequest().authenticated() // 其他所有請求都需要認證
                 );
 
