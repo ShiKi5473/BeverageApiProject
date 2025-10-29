@@ -3,12 +3,11 @@ package tw.niels.beverage_api_project.modules.order.dto;
 import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
-import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
 import tw.niels.beverage_api_project.modules.order.entity.Order;
+import tw.niels.beverage_api_project.modules.order.entity.PaymentMethodEntity;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
-import tw.niels.beverage_api_project.modules.order.enums.PaymentMethod;
 
 public class OrderResponseDto {
 
@@ -23,11 +22,19 @@ public class OrderResponseDto {
     private BigDecimal finalAmount;
     private Long pointsUsed;
     private Long pointsEarned;
-    private PaymentMethod paymentMethod;
+    private PaymentMethodDto paymentMethod;
     private String customerNote;
     private Date orderTime;
     private Date completedTime;
     private List<OrderItemResponseDto> items;
+
+    public PaymentMethodDto getPaymentMethod() {
+        return paymentMethod;
+    }
+
+    public void setPaymentMethod(PaymentMethodDto paymentMethod) {
+        this.paymentMethod = paymentMethod;
+    }
 
     public static class OrderItemResponseDto {
         private Long orderItemId;
@@ -128,6 +135,47 @@ public class OrderResponseDto {
         }
     }
 
+    public static class PaymentMethodDto {
+        private Integer id;
+        private String code;
+        private String name;
+
+        // Getters & Setters
+        public Integer getId() {
+            return id;
+        }
+
+        public void setId(Integer id) {
+            this.id = id;
+        }
+
+        public String getCode() {
+            return code;
+        }
+
+        public void setCode(String code) {
+            this.code = code;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public static PaymentMethodDto fromEntity(PaymentMethodEntity entity) {
+            if (entity == null)
+                return null;
+            PaymentMethodDto dto = new PaymentMethodDto();
+            dto.setId(entity.getPaymentMethodId());
+            dto.setCode(entity.getCode());
+            dto.setName(entity.getName());
+            return dto;
+        }
+    }
+
     public static OrderResponseDto fromEntity(Order order) {
         OrderResponseDto dto = new OrderResponseDto();
         dto.setOrderId(order.getOrderId());
@@ -145,7 +193,7 @@ public class OrderResponseDto {
         dto.setFinalAmount(order.getFinalAmount());
         dto.setPointsUsed(order.getPointsUsed());
         dto.setPointsEarned(order.getPointsEarned());
-        dto.setPaymentMethod(order.getPaymentMethod());
+        dto.setPaymentMethod(PaymentMethodDto.fromEntity(order.getPaymentMethod()));
         dto.setCustomerNote(order.getCustomerNote());
         dto.setOrderTime(order.getOrderTime());
         dto.setCompletedTime(order.getCompletedTime());
@@ -261,14 +309,6 @@ public class OrderResponseDto {
 
     public void setPointsEarned(Long pointsEarned) {
         this.pointsEarned = pointsEarned;
-    }
-
-    public PaymentMethod getPaymentMethod() {
-        return paymentMethod;
-    }
-
-    public void setPaymentMethod(PaymentMethod paymentMethod) {
-        this.paymentMethod = paymentMethod;
     }
 
     public String getCustomerNote() {

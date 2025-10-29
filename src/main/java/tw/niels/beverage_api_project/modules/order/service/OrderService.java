@@ -5,6 +5,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -19,8 +20,10 @@ import tw.niels.beverage_api_project.modules.order.dto.OrderItemDto;
 import tw.niels.beverage_api_project.modules.order.dto.OrderTotalDto;
 import tw.niels.beverage_api_project.modules.order.entity.Order;
 import tw.niels.beverage_api_project.modules.order.entity.OrderItem;
+import tw.niels.beverage_api_project.modules.order.entity.PaymentMethodEntity;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
 import tw.niels.beverage_api_project.modules.order.repository.OrderRepository;
+import tw.niels.beverage_api_project.modules.order.repository.PaymentMethodRepository;
 import tw.niels.beverage_api_project.modules.product.entity.Product;
 import tw.niels.beverage_api_project.modules.product.entity.ProductOption;
 import tw.niels.beverage_api_project.modules.product.repository.ProductOptionRepository;
@@ -38,6 +41,7 @@ public class OrderService {
     private final UserRepository userRepository;
     private final ProductRepository productRepository;
     private final ProductOptionRepository productOptionRepository;
+    private final PaymentMethodRepository paymentMethodRepository;
 
     // 用於生成簡單的訂單流水號，之後改成用redis取得流水號
     private static final AtomicLong orderCounter = new AtomicLong(0);
@@ -54,12 +58,14 @@ public class OrderService {
     }
 
     public OrderService(OrderRepository orderRepository, StoreRepository storeRepository, UserRepository userRepository,
-            ProductRepository productRepository, ProductOptionRepository productOptionRepository) {
+            ProductRepository productRepository, ProductOptionRepository productOptionRepository,
+            PaymentMethodRepository paymentMethodRepository) {
         this.orderRepository = orderRepository;
         this.storeRepository = storeRepository;
         this.userRepository = userRepository;
         this.productRepository = productRepository;
         this.productOptionRepository = productOptionRepository;
+        this.paymentMethodRepository = paymentMethodRepository;
     }
 
     @Transactional
@@ -77,6 +83,14 @@ public class OrderService {
             member = userRepository.findById(requestDto.getMemberId())
                     .filter(user -> user.getMemberProfile() != null && user.getBrand().getBrandId().equals(brandId))
                     .orElseThrow(() -> new ResourceNotFoundException("找不到會員，ID：" + requestDto.getMemberId()));
+        }
+
+        // 處理支付方式
+        PaymentMethodEntity paymentMethodEntity = null;
+        if (requestDto.getPaymentMethod() != null && !requestDto.getPaymentMethod().isBlank()) {
+            paymentMethodEntity = paymentMethodRepository.findByCode(requestDto.getPaymentMethod())
+                    .orElseThrow(() -> new BadRequestException("無效的支付方式代碼：" + requestDto.getPaymentMethod()));
+            // 您可以在這裡添加更多邏輯，例如檢查該支付方式是否可用 is_active
         }
 
         // 建立 Order Entity
@@ -165,6 +179,78 @@ public class OrderService {
         ProcessedItemsResult result = processOrderItems(null, requestDto.getItems(), brandId);
 
         return new OrderTotalDto(result.totalAmount);
+    }
+
+    /**
+     * 查詢訂單列表
+     * 
+     * @param brandId 品牌 ID (來自 JWT 或上下文)
+     * @param storeId 要查詢的店家 ID
+     * @param status  可選的訂單狀態篩選條件
+     * @return 訂單列表
+     */
+    @Transactional(readOnly = true)
+    public List<Order> getOrders(Long brandId, Long storeId, Optional<OrderStatus> status) {
+        // 在這裡可以加入權限檢查，例如檢查目前登入的使用者是否有權限查看 storeId 的訂單
+
+        if (status.isPresent()) {
+            return orderRepository.findAllByBrand_BrandIdAndStore_StoreIdAndStatus(brandId, storeId, status.get());
+        } else {
+            return orderRepository.findAllByBrand_BrandIdAndStore_StoreId(brandId, storeId);
+        }
+    }
+
+    /**
+     * 查詢單一訂單詳情
+     * 
+     * @param brandId 品牌 ID (來自 JWT 或上下文)
+     * @param orderId 要查詢的訂單 ID
+     * @return 訂單實體
+     * @throws ResourceNotFoundException 如果訂單不存在或不屬於該品牌
+     */
+    @Transactional(readOnly = true)
+    public Order getOrderDetails(Long brandId, Long orderId) {
+        Order order = orderRepository.findByBrand_BrandIdAndOrderId(brandId, orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("找不到訂單，ID：" + orderId));
+        // 在這裡可以加入權限檢查，例如檢查目前使用者是否能查看此訂單 (可能基於店家 ID)
+        return order;
+    }
+
+    /**
+     * 更新訂單狀態
+     * 
+     * @param brandId   品牌 ID (來自 JWT 或上下文)
+     * @param orderId   要更新的訂單 ID
+     * @param newStatus 新的訂單狀態
+     * @return 更新後的訂單實體
+     * @throws ResourceNotFoundException 如果訂單不存在或不屬於該品牌
+     * @throws BadRequestException       如果狀態轉換無效 (例如從 COMPLETED 更新)
+     */
+    @Transactional
+    public Order updateOrderStatus(Long brandId, Long orderId, OrderStatus newStatus) {
+        Order order = orderRepository.findByBrand_BrandIdAndOrderId(brandId, orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("找不到訂單，ID：" + orderId));
+
+        // 可以在此加入更複雜的狀態轉換邏輯檢查
+        // 例如：只有 PENDING 或 PREPARING 狀態才能變成 CANCELLED
+        // 例如：只有 PREPARING 狀態才能變成 COMPLETED
+        if (order.getStatus() == OrderStatus.COMPLETED || order.getStatus() == OrderStatus.CANCELLED) {
+            throw new BadRequestException("訂單狀態 " + order.getStatus() + " 無法被更新。");
+        }
+
+        // 簡單的狀態更新
+        order.setStatus(newStatus);
+
+        // 如果狀態更新為已完成，記錄完成時間
+        if (newStatus == OrderStatus.COMPLETED) {
+            order.setCompletedTime(new Date());
+            // TODO: 在此處或透過事件監聽器觸發點數累積、庫存扣除等後續邏輯
+            // 例如： memberPointService.addPoints(order.getMember().getUserId(),
+            // calculatePoints(order.getFinalAmount()));
+            // 例如： inventoryService.deductStock(order.getItems());
+        }
+
+        return orderRepository.save(order);
     }
 
 }

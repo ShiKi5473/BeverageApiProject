@@ -22,7 +22,6 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import tw.niels.beverage_api_project.modules.brand.entity.Brand;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
-import tw.niels.beverage_api_project.modules.order.enums.PaymentMethod;
 import tw.niels.beverage_api_project.modules.store.entity.Store;
 import tw.niels.beverage_api_project.modules.user.entity.User;
 
@@ -73,9 +72,9 @@ public class Order {
     @Column(name = "points_earned", nullable = false)
     private Long pointsEarned = 0L;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "payment_method")
-    private PaymentMethod paymentMethod;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "payment_method_id")
+    private PaymentMethodEntity paymentMethod;
 
     @Column(name = "customer_note")
     private String customerNote;
@@ -191,14 +190,6 @@ public class Order {
         this.pointsEarned = pointsEarned;
     }
 
-    public PaymentMethod getPaymentMethod() {
-        return paymentMethod;
-    }
-
-    public void setPaymentMethod(PaymentMethod paymentMethod) {
-        this.paymentMethod = paymentMethod;
-    }
-
     public String getCustomerNote() {
         return customerNote;
     }
@@ -229,6 +220,14 @@ public class Order {
 
     public void setItems(Set<OrderItem> items) {
         this.items = items;
+    }
+
+    public PaymentMethodEntity getPaymentMethod() {
+        return paymentMethod;
+    }
+
+    public void setPaymentMethod(PaymentMethodEntity paymentMethod) {
+        this.paymentMethod = paymentMethod;
     }
 
 }

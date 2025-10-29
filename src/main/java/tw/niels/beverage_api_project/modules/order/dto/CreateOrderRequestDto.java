@@ -13,9 +13,11 @@ public class CreateOrderRequestDto {
 
     private Long memberId; // 會員 ID，可選
 
+    private String paymentMethod;
+
     // staffId is from jwtToken
 
-    @NotEmpty(message="訂單品項不可為空")
+    @NotEmpty(message = "訂單品項不可為空")
     private List<@Valid OrderItemDto> items;
 
     // getter and setter
@@ -41,5 +43,13 @@ public class CreateOrderRequestDto {
 
     public void setItems(List<OrderItemDto> items) {
         this.items = items;
+    }
+
+    public String getPaymentMethod() {
+        return paymentMethod;
+    }
+
+    public void setPaymentMethod(String paymentMethod) {
+        this.paymentMethod = paymentMethod;
     }
 }
