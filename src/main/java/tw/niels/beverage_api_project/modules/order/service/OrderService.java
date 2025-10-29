@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import tw.niels.beverage_api_project.common.exception.BadRequestException;
 import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
+import tw.niels.beverage_api_project.modules.member.service.MemberPointService;
 import tw.niels.beverage_api_project.modules.order.dto.CreateOrderRequestDto;
 import tw.niels.beverage_api_project.modules.order.dto.OrderItemDto;
 import tw.niels.beverage_api_project.modules.order.dto.OrderTotalDto;
@@ -31,6 +32,7 @@ import tw.niels.beverage_api_project.modules.product.repository.ProductRepositor
 import tw.niels.beverage_api_project.modules.store.entity.Store;
 import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
 import tw.niels.beverage_api_project.modules.user.entity.User;
+import tw.niels.beverage_api_project.modules.user.repository.MemberProfileRepository;
 import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
 import tw.niels.beverage_api_project.security.AppUserDetails;
 
@@ -42,6 +44,8 @@ public class OrderService {
     private final ProductRepository productRepository;
     private final ProductOptionRepository productOptionRepository;
     private final PaymentMethodRepository paymentMethodRepository;
+    private final MemberPointService memberPointService;
+    private final MemberProfileRepository memberProfileRepository;
 
     // 用於生成簡單的訂單流水號，之後改成用redis取得流水號
     private static final AtomicLong orderCounter = new AtomicLong(0);
@@ -59,13 +63,17 @@ public class OrderService {
 
     public OrderService(OrderRepository orderRepository, StoreRepository storeRepository, UserRepository userRepository,
             ProductRepository productRepository, ProductOptionRepository productOptionRepository,
-            PaymentMethodRepository paymentMethodRepository) {
+            PaymentMethodRepository paymentMethodRepository,
+            MemberPointService memberPointService,
+            MemberProfileRepository memberProfileRepository) {
         this.orderRepository = orderRepository;
         this.storeRepository = storeRepository;
         this.userRepository = userRepository;
         this.productRepository = productRepository;
         this.productOptionRepository = productOptionRepository;
         this.paymentMethodRepository = paymentMethodRepository;
+        this.memberPointService = memberPointService;
+        this.memberProfileRepository = memberProfileRepository;
     }
 
     @Transactional
@@ -83,6 +91,15 @@ public class OrderService {
             member = userRepository.findById(requestDto.getMemberId())
                     .filter(user -> user.getMemberProfile() != null && user.getBrand().getBrandId().equals(brandId))
                     .orElseThrow(() -> new ResourceNotFoundException("找不到會員，ID：" + requestDto.getMemberId()));
+        } else if (requestDto.getPointsToUse() > 0) {
+            throw new BadRequestException("使用點數折抵時必須提供會員 ID");
+        }
+
+        // 點數處理
+        BigDecimal discountAmount = BigDecimal.ZERO;
+        Long pointsToUse = requestDto.getPointsToUse();
+        if (member != null && pointsToUse > 0) {
+            discountAmount = memberPointService.calculateDiscountAmount(pointsToUse);
         }
 
         // 處理支付方式
@@ -105,9 +122,29 @@ public class OrderService {
         ProcessedItemsResult result = processOrderItems(order, requestDto.getItems(), brandId);
         order.setItems(result.orderItems);
         order.setTotalAmount(result.totalAmount);
-        order.setFinalAmount(result.totalAmount); // 暫不處理折扣
+        order.setPointsUsed(pointsToUse);
+        order.setDiscountAmount(discountAmount);
+        // 計算最終金額
+        BigDecimal finalAmount = result.totalAmount.subtract(discountAmount);
+        // 確保最終金額不為負數
+        if (finalAmount.compareTo(BigDecimal.ZERO) < 0) {
+            finalAmount = BigDecimal.ZERO;
+            // 可選：如果折抵後變負數，是否要調整實際使用的點數？ (目前不處理)
+        }
+        order.setFinalAmount(finalAmount);
+        // 預設賺取點數為 0，完成時才計算
+        order.setPointsEarned(0L);
 
-        return orderRepository.save(order);
+        // 儲存訂單 (尚未扣除會員點數)
+        Order savedOrder = orderRepository.save(order);
+
+        if (member != null && pointsToUse > 0) {
+            // 這個方法內部有 @Transactional(propagation = Propagation.MANDATORY)
+            // 它會加入到當前的 createOrder 交易中
+            memberPointService.usePoints(member, savedOrder, pointsToUse);
+        }
+
+        return savedOrder; // 回傳儲存後的訂單
     }
 
     // 產生一個簡易的訂單號碼
@@ -238,18 +275,34 @@ public class OrderService {
             throw new BadRequestException("訂單狀態 " + order.getStatus() + " 無法被更新。");
         }
 
-        // 簡單的狀態更新
+        OrderStatus oldStatus = order.getStatus(); // 記錄舊狀態
         order.setStatus(newStatus);
 
-        // 如果狀態更新為已完成，記錄完成時間
         if (newStatus == OrderStatus.COMPLETED) {
             order.setCompletedTime(new Date());
-            // TODO: 在此處或透過事件監聽器觸發點數累積、庫存扣除等後續邏輯
-            // 例如： memberPointService.addPoints(order.getMember().getUserId(),
-            // calculatePoints(order.getFinalAmount()));
-            // 例如： inventoryService.deductStock(order.getItems());
-        }
 
+            // --- 【新增】 點數處理：計算並增加賺取的點數 ---
+            if (order.getMember() != null) {
+                Long pointsEarned = memberPointService.calculatePointsEarned(order.getFinalAmount());
+                order.setPointsEarned(pointsEarned); // 更新訂單上的記錄
+                if (pointsEarned > 0) {
+                    // 這個方法內部有 @Transactional(propagation = Propagation.MANDATORY)
+                    memberPointService.earnPoints(order.getMember(), order, pointsEarned);
+                }
+            }
+            // --- 點數處理結束 ---
+
+            // TODO: 在此處或透過事件監聽器觸發庫存扣除等後續邏輯
+        }
+        // 可選：處理取消訂單時，是否需要回補點數？
+        // else if (newStatus == OrderStatus.CANCELLED && oldStatus !=
+        // OrderStatus.CANCELLED) {
+        // if (order.getMember() != null && order.getPointsUsed() > 0) {
+        // // 需要一個回補點數的方法
+        // // memberPointService.refundPoints(order.getMember(), order,
+        // order.getPointsUsed());
+        // }
+        // }
         return orderRepository.save(order);
     }
 

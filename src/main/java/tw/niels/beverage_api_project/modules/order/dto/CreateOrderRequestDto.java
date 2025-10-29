@@ -3,6 +3,7 @@ package tw.niels.beverage_api_project.modules.order.dto;
 import java.util.List;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
@@ -15,10 +16,16 @@ public class CreateOrderRequestDto {
 
     private String paymentMethod;
 
+    @Min(value = 0, message = "使用點數不可為負數")
+    private Long pointsToUse = 0L;
+
     // staffId is from jwtToken
 
     @NotEmpty(message = "訂單品項不可為空")
     private List<@Valid OrderItemDto> items;
+
+    public CreateOrderRequestDto() {
+    }
 
     // getter and setter
     public Long getStoreId() {
@@ -51,5 +58,13 @@ public class CreateOrderRequestDto {
 
     public void setPaymentMethod(String paymentMethod) {
         this.paymentMethod = paymentMethod;
+    }
+
+    public Long getPointsToUse() {
+        return pointsToUse;
+    }
+
+    public void setPointsToUse(Long pointsToUse) {
+        this.pointsToUse = pointsToUse;
     }
 }
