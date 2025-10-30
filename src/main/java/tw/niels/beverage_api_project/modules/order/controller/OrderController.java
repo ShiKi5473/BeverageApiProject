@@ -7,6 +7,7 @@ import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -69,8 +70,10 @@ public class OrderController {
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
     public ResponseEntity<List<OrderResponseDto>> getOrders(
             @RequestParam Long storeId,
-            @RequestParam(required = false) OrderStatus status,
-            ControllerHelperService helperService) {
+            @RequestParam(required = false) OrderStatus status) {
+
+        // 從 JWT 取得 brandId 進行驗證與查詢
+
         Long brandId = helperService.getCurrentBrandId();
 
         // TODO: 在 Service 層或 Controller 層加入更嚴格的權限檢查：
@@ -94,10 +97,9 @@ public class OrderController {
      */
     @GetMapping("/{orderId}")
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
-    public ResponseEntity<OrderResponseDto> getOrderDetails(@PathVariable Long orderId,
-            ControllerHelperService helperService) {
+    public ResponseEntity<OrderResponseDto> getOrderDetails(@PathVariable Long orderId) {
 
-        Long brandId = helperService.getCurrentBrandId();
+        Long brandId = this.helperService.getCurrentBrandId();
 
         Order order = orderService.getOrderDetails(brandId, orderId);
 
@@ -114,9 +116,9 @@ public class OrderController {
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
     public ResponseEntity<OrderResponseDto> updateOrderStatus(
             @PathVariable Long orderId,
-            @Valid @RequestBody UpdateOrderStatusDto requestDto,
-            ControllerHelperService helperService) {
-        Long brandId = helperService.getCurrentBrandId();
+            @Valid @RequestBody UpdateOrderStatusDto requestDto) {
+
+        Long brandId = this.helperService.getCurrentBrandId();
 
         // TODO: 可選的權限檢查：檢查目前使用者是否有權限修改此訂單 (可能基於訂單的 storeId)
 

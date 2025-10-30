@@ -56,9 +56,8 @@ public class UserController {
      */
     @GetMapping("/member/by-phone/{phone}")
     @PreAuthorize("hasAnyRole('STAFF', 'MANAGER', 'BRAND_ADMIN')")
-    public ResponseEntity<MemberDto> getMemberByPhone(@PathVariable String phone,
-            ControllerHelperService helperService) {
-        Long brandId = helperService.getCurrentBrandId();
+    public ResponseEntity<MemberDto> getMemberByPhone(@PathVariable String phone) {
+        Long brandId = this.helperService.getCurrentBrandId();
         return userService.findMemberByPhone(phone, brandId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());

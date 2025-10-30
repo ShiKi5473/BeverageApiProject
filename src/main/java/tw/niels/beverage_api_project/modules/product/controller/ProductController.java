@@ -43,9 +43,8 @@ public class ProductController {
     }
 
     @PostMapping(ApiPaths.PRODUCTS)
-    public ResponseEntity<ProductResponseDto> createProduct(@Valid @RequestBody CreateProductRequestDto requestDto,
-            ControllerHelperService helperService) {
-        Long brandId = helperService.getCurrentBrandId();
+    public ResponseEntity<ProductResponseDto> createProduct(@Valid @RequestBody CreateProductRequestDto requestDto) {
+        Long brandId = this.helperService.getCurrentBrandId();
         Product newProduct = productService.createProduct(brandId, requestDto);
         return new ResponseEntity<>(ProductResponseDto.fromEntity(newProduct), HttpStatus.CREATED);
     }
@@ -56,23 +55,22 @@ public class ProductController {
      */
     @PostMapping("/categories")
     @PreAuthorize("hasRole('BRAND_ADMIN')")
-    public ResponseEntity<CategoryResponseDto> createCategory(@Valid @RequestBody CreateCategoryRequestDto requestDto,
-            ControllerHelperService helperService) {
-        Long brandId = helperService.getCurrentBrandId();
+    public ResponseEntity<CategoryResponseDto> createCategory(@Valid @RequestBody CreateCategoryRequestDto requestDto) {
+        Long brandId = this.helperService.getCurrentBrandId();
         Category newCategory = categoryService.createCategory(brandId, requestDto);
         return new ResponseEntity<>(CategoryResponseDto.fromEntity(newCategory), HttpStatus.CREATED);
     }
 
     @GetMapping(ApiPaths.PRODUCTS + "/summary")
-    public ResponseEntity<List<ProductSummaryDto>> getProductSummaries(ControllerHelperService helperService) {
-        Long brandId = helperService.getCurrentBrandId();
+    public ResponseEntity<List<ProductSummaryDto>> getProductSummaries() {
+        Long brandId = this.helperService.getCurrentBrandId();
         List<ProductSummaryDto> products = productService.getAvailableSummaries(brandId);
         return ResponseEntity.ok(products);
     }
 
     @GetMapping(ApiPaths.PRODUCTS + "/pos")
-    public ResponseEntity<List<ProductPosDto>> getProductForPos(ControllerHelperService helperService) {
-        Long brandId = helperService.getCurrentBrandId();
+    public ResponseEntity<List<ProductPosDto>> getProductForPos() {
+        Long brandId = this.helperService.getCurrentBrandId();
         List<ProductPosDto> products = productService.getAvailableProductsForPos(brandId);
         return ResponseEntity.ok(products);
     }
@@ -81,9 +79,8 @@ public class ProductController {
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER')")
     public ResponseEntity<ProductResponseDto> linkOptionGroupsToProduct(
             @PathVariable Long productId,
-            @RequestBody Set<Long> groupIds,
-            ControllerHelperService helperService) { // 傳入 OptionGroup ID 列表
-        Long brandId = helperService.getCurrentBrandId();
+            @RequestBody Set<Long> groupIds) { // 傳入 OptionGroup ID 列表
+        Long brandId = this.helperService.getCurrentBrandId();
         Product updatedProduct = productService.linkOptionGroupsToProduct(brandId, productId, groupIds);
         // 這裡需要修改 ProductResponseDto 來回傳 OptionGroups
         return ResponseEntity.ok(ProductResponseDto.fromEntity(updatedProduct));

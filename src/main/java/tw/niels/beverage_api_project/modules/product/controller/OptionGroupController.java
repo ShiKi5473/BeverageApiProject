@@ -41,18 +41,16 @@ public class OptionGroupController {
     // 建立選項群組 (例如: 甜度)
     @PostMapping("/option-groups")
     public ResponseEntity<OptionGroupResponseDto> createOptionGroup(
-            ControllerHelperService helperService,
             @Valid @RequestBody CreateOptionGroupRequestDto requestDto) {
-        Long brandId = helperService.getCurrentBrandId();
+        Long brandId = this.helperService.getCurrentBrandId();
         OptionGroup newGroup = optionGroupService.createOptionGroup(brandId, requestDto);
         return new ResponseEntity<>(OptionGroupResponseDto.fromEntity(newGroup), HttpStatus.CREATED);
     }
 
     // 取得品牌的所有選項群組
     @GetMapping("/option-groups")
-    public ResponseEntity<List<OptionGroupResponseDto>> getOptionGroupsByBrand(
-            ControllerHelperService helperService) {
-        Long brandId = helperService.getCurrentBrandId();
+    public ResponseEntity<List<OptionGroupResponseDto>> getOptionGroupsByBrand() {
+        Long brandId = this.helperService.getCurrentBrandId();
         List<OptionGroup> groups = optionGroupService.getOptionGroupsByBrand(brandId);
         List<OptionGroupResponseDto> dtos = groups.stream()
                 .map(OptionGroupResponseDto::fromEntity)
@@ -63,10 +61,9 @@ public class OptionGroupController {
     // 在群組下建立選項 (例如: "半糖")
     @PostMapping("/option-groups/{groupId}/options")
     public ResponseEntity<ProductOptionResponseDto> createProductOption(
-            ControllerHelperService helperService,
             @PathVariable Long groupId,
             @Valid @RequestBody CreateProductOptionRequestDto requestDto) {
-        Long brandId = helperService.getCurrentBrandId();
+        Long brandId = this.helperService.getCurrentBrandId();
         ProductOption newOption = optionGroupService.createProductOption(groupId, brandId, requestDto);
         return new ResponseEntity<>(ProductOptionResponseDto.fromEntity(newOption), HttpStatus.CREATED);
     }

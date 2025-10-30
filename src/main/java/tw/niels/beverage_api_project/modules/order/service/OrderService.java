@@ -9,12 +9,12 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import tw.niels.beverage_api_project.common.exception.BadRequestException;
 import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
+import tw.niels.beverage_api_project.common.service.ControllerHelperService;
 import tw.niels.beverage_api_project.modules.member.service.MemberPointService;
 import tw.niels.beverage_api_project.modules.order.dto.CreateOrderRequestDto;
 import tw.niels.beverage_api_project.modules.order.dto.OrderItemDto;
@@ -34,7 +34,6 @@ import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
 import tw.niels.beverage_api_project.modules.user.entity.User;
 import tw.niels.beverage_api_project.modules.user.repository.MemberProfileRepository;
 import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
-import tw.niels.beverage_api_project.security.AppUserDetails;
 
 @Service
 public class OrderService {
@@ -46,6 +45,7 @@ public class OrderService {
     private final PaymentMethodRepository paymentMethodRepository;
     private final MemberPointService memberPointService;
     private final MemberProfileRepository memberProfileRepository;
+    private final ControllerHelperService helperService;
 
     // 用於生成簡單的訂單流水號，之後改成用redis取得流水號
     private static final AtomicLong orderCounter = new AtomicLong(0);
@@ -65,7 +65,8 @@ public class OrderService {
             ProductRepository productRepository, ProductOptionRepository productOptionRepository,
             PaymentMethodRepository paymentMethodRepository,
             MemberPointService memberPointService,
-            MemberProfileRepository memberProfileRepository) {
+            MemberProfileRepository memberProfileRepository,
+            ControllerHelperService helperService) {
         this.orderRepository = orderRepository;
         this.storeRepository = storeRepository;
         this.userRepository = userRepository;
@@ -74,6 +75,7 @@ public class OrderService {
         this.paymentMethodRepository = paymentMethodRepository;
         this.memberPointService = memberPointService;
         this.memberProfileRepository = memberProfileRepository;
+        this.helperService = helperService;
     }
 
     @Transactional
@@ -156,10 +158,10 @@ public class OrderService {
 
     // 從 Security Context 取得當前登入的員工 User Entity
     private User getCurrentStaff() {
-        AppUserDetails userDetails = (AppUserDetails) SecurityContextHolder.getContext().getAuthentication()
-                .getPrincipal();
-        return userRepository.findById(userDetails.getUserId())
+        Long currentUserId = helperService.getCurrentUserId();
+        return userRepository.findById(currentUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("找不到當前登入的員工資訊"));
+
     }
 
     /**
