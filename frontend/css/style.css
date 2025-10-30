@@ -1,0 +1,160 @@
+/* --- 基本設定 --- */
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  background-color: #f4f4f4;
+}
+
+/* --- 登入頁面 [index.html] --- */
+.login-container {
+  width: 300px;
+  margin: 100px auto;
+  padding: 20px;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+.login-container h2 {
+  text-align: center;
+  margin-bottom: 20px;
+}
+.form-group {
+  margin-bottom: 15px;
+}
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+}
+.form-group input {
+  width: 100%;
+  padding: 8px;
+  box-sizing: border-box; /* 確保 padding 不會撐開寬度 */
+}
+button[type="submit"] {
+  width: 100%;
+  padding: 10px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+button[type="submit"]:hover {
+  background-color: #0056b3;
+}
+.error {
+  color: red;
+  font-size: 0.9em;
+}
+
+/* --- POS 頁面 [pos.html] --- */
+.pos-layout {
+  display: grid;
+  /* 定義三欄式佈局：商品區(自動佔滿) 和 購物車(300px) */
+  grid-template-columns: 1fr 300px;
+  /* 定義兩列：標頭(60px) 和 內容區(自動佔滿) */
+  grid-template-rows: 60px 1fr;
+  height: 100vh;
+}
+
+.pos-header {
+  /* 跨越 2 欄 */
+  grid-column: 1 / 3;
+  grid-row: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 20px;
+  background-color: #333;
+  color: white;
+}
+.pos-header #logout-button {
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.product-grid {
+  grid-column: 1;
+  grid-row: 2;
+  overflow-y: auto; /* 如果商品太多，可以滾動 */
+  padding: 20px;
+  display: grid;
+  /* 商品卡片網格 */
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 15px;
+}
+
+.cart-sidebar {
+  grid-column: 2;
+  grid-row: 2;
+  background-color: #fff;
+  padding: 20px;
+  box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+}
+
+.cart-total {
+  margin-top: auto; /* 把總計推到最下面 */
+  border-top: 1px solid #eee;
+  padding-top: 15px;
+}
+#checkout-button {
+  width: 100%;
+  padding: 10px;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+/* --- 商品卡片 (ProductCard.js) 的圖片樣式 --- */
+
+/* 圖片的樣式 */
+.product-image {
+  width: 100%; /* 圖片寬度填滿卡片 */
+  height: 120px; /* 固定高度 */
+  object-fit: cover; /* 圖片會被裁剪以填滿空間，不會變形 */
+  border-radius: 4px 4px 0 0; /* 配合卡片的圓角 */
+}
+
+/* 占位符的樣式 (給 POS 頁面使用) */
+.product-image-placeholder {
+  width: 100%;
+  height: 120px;
+  background-color: #f0f0f0; /* 淺灰色背景 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ccc;
+  font-size: 0.8em;
+  border-radius: 4px 4px 0 0;
+}
+/* (可選) 在占位符中間顯示飲料圖示或文字 */
+.product-image-placeholder::before {
+  content: "無圖片";
+  /* 或者您可以使用 FontAwesome 之類的圖示 */
+}
+
+/* 調整商品卡片，移除 padding-top，讓圖片貼齊頂部 */
+.product-card {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  /* padding: 15px; */
+  background-color: #fff;
+  cursor: pointer;
+  text-align: center;
+  transition: box-shadow 0.2s;
+  overflow: hidden; /* 確保圖片圓角生效 */
+  height: fit-content;
+}
+.product-name {
+  font-weight: bold;
+  margin: 10px; /* 改用 margin 增加內部間距 */
+}
+.product-price {
+  color: #555;
+  margin: 0 10px 10px 10px; /* 改用 margin 增加內部間距 */
+}
