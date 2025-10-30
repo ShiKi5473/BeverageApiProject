@@ -17,15 +17,15 @@ document.addEventListener("DOMContentLoaded", () => {
   // 3. 綁定登出按鈕事件
   logoutButton.addEventListener("click", () => {
     localStorage.removeItem("accessToken");
-    localStorage.removeItem("brandId");
+    localStorage.removeItem("brandId"); // 【保留】登入時仍需 brandId，登出時一併清除
     window.location.href = "index.html";
   });
 
   // 4. 定義一個函式來載入並渲染商品
   async function loadProducts() {
     try {
-      // 呼叫 API 取得商品
-      const products = await getPosProducts(); // products 是一個 ProductPosDto 陣列
+      // 呼叫 API 取得商品 [cite: shiki5473/beverageapiproject/BeverageApiProject-frontendPosView/src/main/java/tw/niels/beverage_api_project/modules/product/controller/ProductController.java]
+      const products = await getPosProducts(); // products 是一個 ProductPosDto 陣列 [cite: shiki5473/beverageapiproject/BeverageApiProject-frontendPosView/src/main/java/tw/niels/beverage_api_project/modules/product/dto/ProductPosDto.java]
 
       // 清空 "載入中..."
       productGrid.innerHTML = "";
@@ -52,7 +52,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // 6. 定義點擊商品時開啟 Modal 的函式 (目前先留空)
   function openOptionsModal(product) {
     console.log("點擊了商品:", product);
-    // TODO: 顯示 Modal 並根據 product.optionGroups 產生客製化選項
+    // TODO: 顯示 Modal 並根據 product.optionGroups 產生客製化選項 [cite: shiki5473/beverageapiproject/BeverageApiProject-frontendPosView/src/main/java/tw/niels/beverage_api_project/modules/product/dto/ProductPosDto.java]
     // const modal = document.getElementById("modal-overlay");
     // modal.style.display = "flex";
   }

@@ -7,25 +7,47 @@
     <link rel="stylesheet" href="css/style.css" />
   </head>
   <body>
+    <!-- 【修改】 佈局改為 2 列：頂部 Nav 和 下方三欄內容區 -->
     <div class="pos-layout">
-      <header class="pos-header">
+      <!-- 【修改】 這是新的頂部 Nav，取代舊的 header -->
+      <nav class="pos-navbar">
         <h1>POS 點餐系統</h1>
         <button id="logout-button">登出</button>
-      </header>
+      </nav>
 
-      <main class="product-grid" id="product-grid">
-        <p>正在載入商品...</p>
-      </main>
+      <!-- 【修改】 新增一個 main-content 容器來包裹三欄 -->
+      <div class="pos-main-content">
+        <!-- 【修改】 商品分類回到它自己的 <aside> 欄位中 -->
+        <aside class="category-sidebar" id="category-sidebar">
+          <h2>商品分類</h2>
+          <!-- 分類列表將由 JS 動態載入這裡 -->
+          <ul id="category-list">
+            <li>
+              <a href="#" data-category-id="all" class="active">全部商品</a>
+            </li>
+            <!-- 範例，將會被 JS 取代 -->
+          </ul>
+        </aside>
 
-      <aside class="cart-sidebar" id="cart-sidebar">
-        <h2>購物車</h2>
-        <div id="cart-items"></div>
-        <div class="cart-total">
-          <p>總計: <span id="cart-total-amount">NT$ 0</span></p>
-          <button id="checkout-button">結帳</button>
-        </div>
-      </aside>
+        <!-- product-grid 依舊是 main 標籤 -->
+        <main class="product-grid" id="product-grid">
+          <p>正在載入商品...</p>
+        </main>
 
+        <!-- cart-sidebar 依舊是 aside 標籤 -->
+        <aside class="cart-sidebar" id="cart-sidebar">
+          <h2>購物車</h2>
+          <div id="cart-items">
+            <!-- 購物車品項將由 JS 插入這裡 -->
+          </div>
+          <div class="cart-total">
+            <p>總計: <span id="cart-total-amount">NT$ 0</span></p>
+            <button id="checkout-button">結帳</button>
+          </div>
+        </aside>
+      </div>
+
+      <!-- Modal 維持不變 -->
       <div class="modal-overlay" id="modal-overlay" style="display: none">
         <div class="modal-content" id="modal-content"></div>
       </div>

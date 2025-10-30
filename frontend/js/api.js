@@ -8,9 +8,9 @@ const API_BASE_URL = "http://localhost:8080";
  * @returns {Promise<Response>} - 回傳 fetch 的原始 Response 物件
  */
 async function fetchWithAuth(endpoint, options = {}) {
-  // 1. 從 localStorage 取得 Token 和 brandId
+  // 1. 從 localStorage 取得 Token
   const token = localStorage.getItem("accessToken");
-  const brandId = localStorage.getItem("brandId");
+  // const brandId = localStorage.getItem("brandId"); // <-- 【移除】不再需要從 localStorage 讀取 brandId
 
   // 2. 如果沒有 Token，立即導向回登入頁
   if (!token) {
@@ -23,12 +23,13 @@ async function fetchWithAuth(endpoint, options = {}) {
   const headers = {
     "Content-Type": "application/json",
     ...options.headers, // 保留傳入的 headers
-    Authorization: `Bearer ${token}`, // 附加 Bearer Token
+    Authorization: `Bearer ${token}`, // 附加 Bearer Token [cite: shiki5473/beverageapiproject/BeverageApiProject-frontendPosView/src/main/java/tw/niels/beverage_api_project/security/jwt/JwtAuthenticationFilter.java]
   };
 
-  // 4. 組合完整的 API 網址
-  //    【重要】將 {brandId} 佔位符替換為儲存的 brandId
-  const url = `${API_BASE_URL}${endpoint.replace("{brandId}", brandId)}`;
+  // 4. 【修改】 組合完整的 API 網址
+  //    後端現在會自動從 Token 讀取 brandId，不再需要 {brandId} 佔位符
+  //    (舊) const url = `${API_BASE_URL}${endpoint.replace("{brandId}", brandId)}`;
+  const url = `${API_BASE_URL}${endpoint}`; // <-- 【簡化】
 
   try {
     // 5. 發送請求
@@ -54,7 +55,7 @@ async function fetchWithAuth(endpoint, options = {}) {
  */
 function redirectToLogin() {
   localStorage.removeItem("accessToken");
-  localStorage.removeItem("brandId");
+  localStorage.removeItem("brandId"); // 【保留】登入時仍需 brandId，登出時一併清除
   // 確保我們不會在 index.html 頁面還一直重複導向
   if (window.location.pathname !== "/index.html") {
     window.location.href = "index.html";
@@ -63,16 +64,15 @@ function redirectToLogin() {
 
 // --------------------------------------------------
 // 匯出 (export) 我們的函式，讓其他 JS 檔案可以使用
-// 注意：我們需要 <script type="module"> 才能使用 import/export
 // --------------------------------------------------
 
 /**
  * 取得 POS 商品列表
- * (對應 ProductController)
+ * (對應 ProductController [cite: shiki5473/beverageapiproject/BeverageApiProject-frontendPosView/src/main/java/tw/niels/beverage_api_project/modules/product/controller/ProductController.java])
  */
 export async function getPosProducts() {
   const response = await fetchWithAuth(
-    "/api/v1/brands/{brandId}/products/pos",
+    "/api/v1/brands/products/pos", // <-- 新的 API 路徑
     {
       method: "GET",
     }
@@ -80,5 +80,5 @@ export async function getPosProducts() {
   if (!response.ok) {
     throw new Error("取得商品失敗");
   }
-  return response.json(); // 解析並回傳 ProductPosDto 列表
+  return response.json(); // 解析並回傳 ProductPosDto 列表 [cite: shiki5473/beverageapiproject/BeverageApiProject-frontendPosView/src/main/java/tw/niels/beverage_api_project/modules/product/dto/ProductPosDto.java]
 }
