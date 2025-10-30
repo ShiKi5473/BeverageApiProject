@@ -7,7 +7,6 @@ import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
 import tw.niels.beverage_api_project.common.constants.ApiPaths;
+import tw.niels.beverage_api_project.common.service.ControllerHelperService;
 import tw.niels.beverage_api_project.modules.order.dto.CreateOrderRequestDto;
 import tw.niels.beverage_api_project.modules.order.dto.OrderResponseDto;
 import tw.niels.beverage_api_project.modules.order.dto.OrderTotalDto;
@@ -26,15 +26,16 @@ import tw.niels.beverage_api_project.modules.order.dto.UpdateOrderStatusDto;
 import tw.niels.beverage_api_project.modules.order.entity.Order;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
 import tw.niels.beverage_api_project.modules.order.service.OrderService;
-import tw.niels.beverage_api_project.security.AppUserDetails;
 
 @RestController
 @RequestMapping(ApiPaths.API_V1 + ApiPaths.ORDERS)
 public class OrderController {
     private final OrderService orderService;
+    private final ControllerHelperService helperService;
 
-    public OrderController(OrderService orderService) {
+    public OrderController(OrderService orderService, ControllerHelperService helperService) {
         this.orderService = orderService;
+        this.helperService = helperService;
     }
 
     /**
@@ -68,12 +69,9 @@ public class OrderController {
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
     public ResponseEntity<List<OrderResponseDto>> getOrders(
             @RequestParam Long storeId,
-            @RequestParam(required = false) OrderStatus status) { // 改為 required = false
-
-        // 從 JWT 取得 brandId 進行驗證與查詢
-        AppUserDetails userDetails = (AppUserDetails) SecurityContextHolder.getContext().getAuthentication()
-                .getPrincipal();
-        Long brandId = userDetails.getBrandId();
+            @RequestParam(required = false) OrderStatus status,
+            ControllerHelperService helperService) {
+        Long brandId = helperService.getCurrentBrandId();
 
         // TODO: 在 Service 層或 Controller 層加入更嚴格的權限檢查：
         // 檢查 userDetails 中的 storeId (如果有的話) 是否與請求的 storeId 一致，或者角色是否為 BRAND_ADMIN
@@ -96,10 +94,10 @@ public class OrderController {
      */
     @GetMapping("/{orderId}")
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
-    public ResponseEntity<OrderResponseDto> getOrderDetails(@PathVariable Long orderId) {
-        AppUserDetails userDetails = (AppUserDetails) SecurityContextHolder.getContext().getAuthentication()
-                .getPrincipal();
-        Long brandId = userDetails.getBrandId();
+    public ResponseEntity<OrderResponseDto> getOrderDetails(@PathVariable Long orderId,
+            ControllerHelperService helperService) {
+
+        Long brandId = helperService.getCurrentBrandId();
 
         Order order = orderService.getOrderDetails(brandId, orderId);
 
@@ -116,10 +114,9 @@ public class OrderController {
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
     public ResponseEntity<OrderResponseDto> updateOrderStatus(
             @PathVariable Long orderId,
-            @Valid @RequestBody UpdateOrderStatusDto requestDto) {
-        AppUserDetails userDetails = (AppUserDetails) SecurityContextHolder.getContext().getAuthentication()
-                .getPrincipal();
-        Long brandId = userDetails.getBrandId();
+            @Valid @RequestBody UpdateOrderStatusDto requestDto,
+            ControllerHelperService helperService) {
+        Long brandId = helperService.getCurrentBrandId();
 
         // TODO: 可選的權限檢查：檢查目前使用者是否有權限修改此訂單 (可能基於訂單的 storeId)
 

@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
 import tw.niels.beverage_api_project.common.constants.ApiPaths;
+import tw.niels.beverage_api_project.common.service.ControllerHelperService;
 import tw.niels.beverage_api_project.modules.product.dto.CategoryResponseDto;
 import tw.niels.beverage_api_project.modules.product.dto.CreateCategoryRequestDto;
 import tw.niels.beverage_api_project.modules.product.dto.CreateProductRequestDto;
@@ -28,19 +29,23 @@ import tw.niels.beverage_api_project.modules.product.service.CategoryService;
 import tw.niels.beverage_api_project.modules.product.service.ProductService;
 
 @RestController
-@RequestMapping(ApiPaths.API_V1 + ApiPaths.BRANDS + "/{brandId}")
+@RequestMapping(ApiPaths.API_V1 + ApiPaths.BRANDS)
 public class ProductController {
     private final ProductService productService;
     private final CategoryService categoryService;
+    private final ControllerHelperService helperService;
 
-    public ProductController(ProductService productService, CategoryService categoryService) {
+    public ProductController(ProductService productService, CategoryService categoryService,
+            ControllerHelperService helperService) {
         this.productService = productService;
         this.categoryService = categoryService;
+        this.helperService = helperService;
     }
 
     @PostMapping(ApiPaths.PRODUCTS)
-    public ResponseEntity<ProductResponseDto> createProduct(@PathVariable Long brandId,
-            @Valid @RequestBody CreateProductRequestDto requestDto) {
+    public ResponseEntity<ProductResponseDto> createProduct(@Valid @RequestBody CreateProductRequestDto requestDto,
+            ControllerHelperService helperService) {
+        Long brandId = helperService.getCurrentBrandId();
         Product newProduct = productService.createProduct(brandId, requestDto);
         return new ResponseEntity<>(ProductResponseDto.fromEntity(newProduct), HttpStatus.CREATED);
     }
@@ -51,20 +56,23 @@ public class ProductController {
      */
     @PostMapping("/categories")
     @PreAuthorize("hasRole('BRAND_ADMIN')")
-    public ResponseEntity<CategoryResponseDto> createCategory(@PathVariable Long brandId,
-            @Valid @RequestBody CreateCategoryRequestDto requestDto) {
+    public ResponseEntity<CategoryResponseDto> createCategory(@Valid @RequestBody CreateCategoryRequestDto requestDto,
+            ControllerHelperService helperService) {
+        Long brandId = helperService.getCurrentBrandId();
         Category newCategory = categoryService.createCategory(brandId, requestDto);
         return new ResponseEntity<>(CategoryResponseDto.fromEntity(newCategory), HttpStatus.CREATED);
     }
 
     @GetMapping(ApiPaths.PRODUCTS + "/summary")
-    public ResponseEntity<List<ProductSummaryDto>> getProductSummaries(@PathVariable Long brandId) {
+    public ResponseEntity<List<ProductSummaryDto>> getProductSummaries(ControllerHelperService helperService) {
+        Long brandId = helperService.getCurrentBrandId();
         List<ProductSummaryDto> products = productService.getAvailableSummaries(brandId);
         return ResponseEntity.ok(products);
     }
 
     @GetMapping(ApiPaths.PRODUCTS + "/pos")
-    public ResponseEntity<List<ProductPosDto>> getProductForPos(@PathVariable Long brandId) {
+    public ResponseEntity<List<ProductPosDto>> getProductForPos(ControllerHelperService helperService) {
+        Long brandId = helperService.getCurrentBrandId();
         List<ProductPosDto> products = productService.getAvailableProductsForPos(brandId);
         return ResponseEntity.ok(products);
     }
@@ -72,9 +80,10 @@ public class ProductController {
     @PutMapping(ApiPaths.PRODUCTS + "/{productId}/option-groups")
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER')")
     public ResponseEntity<ProductResponseDto> linkOptionGroupsToProduct(
-            @PathVariable Long brandId,
             @PathVariable Long productId,
-            @RequestBody Set<Long> groupIds) { // 傳入 OptionGroup ID 列表
+            @RequestBody Set<Long> groupIds,
+            ControllerHelperService helperService) { // 傳入 OptionGroup ID 列表
+        Long brandId = helperService.getCurrentBrandId();
         Product updatedProduct = productService.linkOptionGroupsToProduct(brandId, productId, groupIds);
         // 這裡需要修改 ProductResponseDto 來回傳 OptionGroups
         return ResponseEntity.ok(ProductResponseDto.fromEntity(updatedProduct));
