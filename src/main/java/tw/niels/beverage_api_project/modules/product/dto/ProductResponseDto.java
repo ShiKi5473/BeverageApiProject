@@ -4,8 +4,7 @@ import java.math.BigDecimal;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import tw.niels.beverage_api_project.modules.product.entity.Category;
-import tw.niels.beverage_api_project.modules.product.entity.Product; // Import Category
+import tw.niels.beverage_api_project.modules.product.entity.Product;
 import tw.niels.beverage_api_project.modules.product.enums.ProductStatus;
 
 public class ProductResponseDto {
@@ -84,36 +83,6 @@ public class ProductResponseDto {
     }
 
     // 內部類別，只包含 Category 的基本資訊
-
-    public static class CategoryBasicDto {
-        public Long getCategoryId() {
-            return categoryId;
-        }
-
-        public void setCategoryId(Long categoryId) {
-            this.categoryId = categoryId;
-        }
-
-        public String getName() {
-            return name;
-        }
-
-        public void setName(String name) {
-            this.name = name;
-        }
-
-        private Long categoryId;
-        private String name;
-
-        public static CategoryBasicDto fromEntity(Category category) {
-            if (category == null)
-                return null;
-            CategoryBasicDto dto = new CategoryBasicDto();
-            dto.setCategoryId(category.getCategoryId());
-            dto.setName(category.getName());
-            return dto;
-        }
-    }
 
     public static ProductResponseDto fromEntity(Product product) {
         if (product == null)

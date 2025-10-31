@@ -1,5 +1,7 @@
 package tw.niels.beverage_api_project.modules.product.service;
 
+import java.util.List;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,6 +45,12 @@ public class CategoryService {
 
         // 4. 儲存到資料庫並回傳
         return categoryRepository.save(newCategory);
+    }
+
+    @Transactional
+    public List<Category> getCategoriesByBrand(Long brandId) {
+        return categoryRepository.findByBrand_BrandId(brandId);
+        // TODO 未來可加入排序
     }
 
 }

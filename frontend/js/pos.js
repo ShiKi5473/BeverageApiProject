@@ -1,6 +1,7 @@
-// 從 api.js 匯入 (import) 我們需要的函式
-import { getPosProducts } from "./api.js";
+import { getCategories, getPosProducts } from "./api.js";
 import { createProductCard } from "./components/ProductCard.js";
+
+let allProducts = [];
 
 // 等待 DOM 載入
 document.addEventListener("DOMContentLoaded", () => {
@@ -13,6 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // 2. 取得頁面上的主要元素
   const productGrid = document.getElementById("product-grid");
   const logoutButton = document.getElementById("logout-button");
+  const categoryList = document.getElementById("category-list");
 
   // 3. 綁定登出按鈕事件
   logoutButton.addEventListener("click", () => {
@@ -22,41 +24,102 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // 4. 定義一個函式來載入並渲染商品
-  async function loadProducts() {
+  async function loadAllData() {
+    productGrid.innerHTML = "<p>正在載入資料...</p>";
+    categoryList.innerHTML = "<li><a>載入中...</a></li>";
+
     try {
-      // 呼叫 API 取得商品 [cite: shiki5473/beverageapiproject/BeverageApiProject-frontendPosView/src/main/java/tw/niels/beverage_api_project/modules/product/controller/ProductController.java]
-      const products = await getPosProducts(); // products 是一個 ProductPosDto 陣列 [cite: shiki5473/beverageapiproject/BeverageApiProject-frontendPosView/src/main/java/tw/niels/beverage_api_project/modules/product/dto/ProductPosDto.java]
+      const [products, categories] = await Promise.all([
+        getPosProducts(),
+        getCategories(),
+      ]);
 
-      // 清空 "載入中..."
-      productGrid.innerHTML = "";
+      allProducts = products;
+      renderCategoryList(categories);
+      renderProducts("all");
 
-      // 5. 遍歷商品陣列，建立 DOM 元素
-      products.forEach((product) => {
-        const productCard = createProductCard(product); // <-- 使用元件
-
-        // 6. 將「點擊事件」綁定在 pos.js (父層)
-        //    元件本身不該知道點擊後要幹嘛，這由父層決定
-        productCard.addEventListener("click", () => {
-          openOptionsModal(product);
-        });
-
-        // 7. 將元件產生的 DOM 元素加入到格線中
-        productGrid.appendChild(productCard);
-      });
+      addCategoryClickListeners();
     } catch (error) {
-      console.error("載入商品時發生錯誤:", error);
-      productGrid.innerHTML = `<p class="error">載入商品失敗: ${error.message}</p>`;
+      console.error("載入資料時發生錯誤:", error);
+      productGrid.innerHTML = `<p class="error">資料載入失敗: ${error.message}</p>`;
+      categoryList.innerHTML = "<li><a>載入失敗</a></li>";
     }
   }
 
-  // 6. 定義點擊商品時開啟 Modal 的函式 (目前先留空)
+  // 5. 渲染分類列表
+  function renderCategoryList(categories) {
+    categoryList.innerHTML = "";
+
+    // 新增 "全部商品" 選項
+    const allLi = document.createElement("li");
+    allLi.innerHTML = `<a href="#" data-category-id="all" class="active">全部商品</a>`;
+    categoryList.appendChild(allLi);
+
+    //
+    categories.forEach((category) => {
+      const li = document.createElement("li");
+      li.innerHTML = `<a href="#" data-category-id="${category.categoryId}">${category.name}</a>`;
+      categoryList.appendChild(li);
+    });
+  }
+
+  // 6. 根據分類 ID 渲染商品
+  function renderProducts(categoryId) {
+    productGrid.innerHTML = ""; // 清空畫布
+
+    // 篩選商品
+    const productsToRender =
+      categoryId === "all"
+        ? allProducts // 如果是 "all"，顯示全部
+        : allProducts.filter(
+            (product) =>
+              // 檢查 product.categories 是否存在，且是否 "有任何一個" 分類的 ID 符合
+              product.categories &&
+              product.categories.some((cat) => cat.categoryId == categoryId)
+          );
+
+    if (productsToRender.length === 0) {
+      productGrid.innerHTML = "<p>這個分類沒有商品</p>";
+      return;
+    }
+
+    // 渲染篩選後的商品
+    productsToRender.forEach((product) => {
+      const productCard = createProductCard(product);
+      productCard.addEventListener("click", () => {
+        openOptionsModal(product);
+      });
+      productGrid.appendChild(productCard);
+    });
+  }
+
+  // 7. 綁定分類點擊事件
+  function addCategoryClickListeners() {
+    categoryList.addEventListener("click", (event) => {
+      event.preventDefault(); //
+
+      const target = event.target;
+      if (target.tagName === "A") {
+        categoryList
+          .querySelectorAll("a")
+          .forEach((a) => a.classList.remove("active"));
+        //
+        target.classList.add("active");
+
+        const selectedCategoryId = target.getAttribute("data-category-id");
+        renderProducts(selectedCategoryId);
+      }
+    });
+  }
+
+  // 8. 定義點擊商品時開啟 Modal 的函式 (維持不變)
   function openOptionsModal(product) {
     console.log("點擊了商品:", product);
-    // TODO: 顯示 Modal 並根據 product.optionGroups 產生客製化選項 [cite: shiki5473/beverageapiproject/BeverageApiProject-frontendPosView/src/main/java/tw/niels/beverage_api_project/modules/product/dto/ProductPosDto.java]
+    // TODO: 顯示 Modal 並根據 product.optionGroups 產生客製化選項
     // const modal = document.getElementById("modal-overlay");
     // modal.style.display = "flex";
   }
 
-  // 7. 立即執行載入商品
-  loadProducts();
+  // 9. 【修改】 執行 loadAllData
+  loadAllData();
 });

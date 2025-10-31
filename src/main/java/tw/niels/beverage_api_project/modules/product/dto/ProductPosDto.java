@@ -15,6 +15,8 @@ public class ProductPosDto {
 
     Set<OptionGroupResponseDto> optionGroups;
 
+    Set<CategoryBasicDto> categories;
+
     public static ProductPosDto fromEntity(Product product) {
         if (product == null)
             return null;
@@ -31,17 +33,34 @@ public class ProductPosDto {
                             .map(OptionGroupResponseDto::fromEntity)
                             .collect(Collectors.toSet()));
         }
+
+        if (product.getCategories() != null) {
+            dto.setCategories(
+                    product.getCategories().stream()
+                            .map(CategoryBasicDto::fromEntity)
+                            .collect(Collectors.toSet()));
+        }
         return dto;
     }
 
-    public ProductPosDto(BigDecimal basePrice, Long id, String name, Set<OptionGroupResponseDto> optionGroups) {
+    public ProductPosDto(BigDecimal basePrice, Long id, String name, Set<OptionGroupResponseDto> optionGroups,
+            Set<CategoryBasicDto> categories) {
         this.basePrice = basePrice;
         this.id = id;
         this.name = name;
         this.optionGroups = optionGroups;
+        this.categories = categories;
     }
 
     public ProductPosDto() {
+    }
+
+    public Set<CategoryBasicDto> getCategories() {
+        return categories;
+    }
+
+    public void setCategories(Set<CategoryBasicDto> categories) {
+        this.categories = categories;
     }
 
     public Long getId() {

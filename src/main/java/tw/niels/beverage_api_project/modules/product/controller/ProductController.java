@@ -2,6 +2,7 @@ package tw.niels.beverage_api_project.modules.product.controller;
 
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -79,11 +80,21 @@ public class ProductController {
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER')")
     public ResponseEntity<ProductResponseDto> linkOptionGroupsToProduct(
             @PathVariable Long productId,
-            @RequestBody Set<Long> groupIds) { // 傳入 OptionGroup ID 列表
+            @RequestBody Set<Long> groupIds) {
         Long brandId = this.helperService.getCurrentBrandId();
         Product updatedProduct = productService.linkOptionGroupsToProduct(brandId, productId, groupIds);
-        // 這裡需要修改 ProductResponseDto 來回傳 OptionGroups
         return ResponseEntity.ok(ProductResponseDto.fromEntity(updatedProduct));
+    }
+
+    @GetMapping("/categories")
+    @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
+    public ResponseEntity<List<CategoryResponseDto>> getCategoriesByBrand() {
+        Long brandId = this.helperService.getCurrentBrandId();
+        List<Category> categories = categoryService.getCategoriesByBrand(brandId);
+        List<CategoryResponseDto> dtos = categories.stream()
+                .map(dto -> CategoryResponseDto.fromEntity(dto))
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(dtos);
     }
 
 }

@@ -71,14 +71,21 @@ function redirectToLogin() {
  * (對應 ProductController [cite: shiki5473/beverageapiproject/BeverageApiProject-frontendPosView/src/main/java/tw/niels/beverage_api_project/modules/product/controller/ProductController.java])
  */
 export async function getPosProducts() {
-  const response = await fetchWithAuth(
-    "/api/v1/brands/products/pos", // <-- 新的 API 路徑
-    {
-      method: "GET",
-    }
-  );
+  const response = await fetchWithAuth("/api/v1/brands/products/pos", {
+    method: "GET",
+  });
   if (!response.ok) {
     throw new Error("取得商品失敗");
   }
-  return response.json(); // 解析並回傳 ProductPosDto 列表 [cite: shiki5473/beverageapiproject/BeverageApiProject-frontendPosView/src/main/java/tw/niels/beverage_api_project/modules/product/dto/ProductPosDto.java]
+  return response.json();
+}
+
+export async function getCategories() {
+  const response = await fetchWithAuth("/api/v1/brands/categories", {
+    method: "GET",
+  });
+  if (!response.ok) {
+    throw new Error("取得分類失敗");
+  }
+  return response.json();
 }
