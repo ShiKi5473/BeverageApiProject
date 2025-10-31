@@ -32,7 +32,6 @@ import tw.niels.beverage_api_project.modules.product.repository.ProductRepositor
 import tw.niels.beverage_api_project.modules.store.entity.Store;
 import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
 import tw.niels.beverage_api_project.modules.user.entity.User;
-import tw.niels.beverage_api_project.modules.user.repository.MemberProfileRepository;
 import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
 
 @Service
@@ -44,7 +43,6 @@ public class OrderService {
     private final ProductOptionRepository productOptionRepository;
     private final PaymentMethodRepository paymentMethodRepository;
     private final MemberPointService memberPointService;
-    private final MemberProfileRepository memberProfileRepository;
     private final ControllerHelperService helperService;
 
     // 用於生成簡單的訂單流水號，之後改成用redis取得流水號
@@ -65,7 +63,6 @@ public class OrderService {
             ProductRepository productRepository, ProductOptionRepository productOptionRepository,
             PaymentMethodRepository paymentMethodRepository,
             MemberPointService memberPointService,
-            MemberProfileRepository memberProfileRepository,
             ControllerHelperService helperService) {
         this.orderRepository = orderRepository;
         this.storeRepository = storeRepository;
@@ -74,7 +71,6 @@ public class OrderService {
         this.productOptionRepository = productOptionRepository;
         this.paymentMethodRepository = paymentMethodRepository;
         this.memberPointService = memberPointService;
-        this.memberProfileRepository = memberProfileRepository;
         this.helperService = helperService;
     }
 
@@ -120,6 +116,7 @@ public class OrderService {
         order.setStaff(staff);
         order.setOrderNumber(generateOrderNumber(store.getStoreId()));
         order.setStatus(OrderStatus.PENDING);
+        order.setPaymentMethod(paymentMethodEntity);
 
         ProcessedItemsResult result = processOrderItems(order, requestDto.getItems(), brandId);
         order.setItems(result.orderItems);

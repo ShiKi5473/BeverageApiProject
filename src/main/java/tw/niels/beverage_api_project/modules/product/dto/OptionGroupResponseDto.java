@@ -60,11 +60,11 @@ public class OptionGroupResponseDto {
         this.sortOrder = sortOrder;
     }
 
-    public Set getOptions() {
+    public Set<ProductOptionResponseDto> getOptions() {
         return options;
     }
 
-    public void setOptions(Set options) {
+    public void setOptions(Set<ProductOptionResponseDto> options) {
         this.options = options;
     }
 }

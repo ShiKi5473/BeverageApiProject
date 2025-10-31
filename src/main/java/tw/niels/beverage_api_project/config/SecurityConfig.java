@@ -21,17 +21,14 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import tw.niels.beverage_api_project.common.constants.ApiPaths;
-import tw.niels.beverage_api_project.security.CustomUserDetailsService;
 import tw.niels.beverage_api_project.security.jwt.JwtAuthenticationEntryPoint;
 import tw.niels.beverage_api_project.security.jwt.JwtAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity // 【修改】啟用方法級別安全控制
+@EnableMethodSecurity
 public class SecurityConfig {
 
-    @Autowired
-    private CustomUserDetailsService userDetailsService;
     @Autowired
     private JwtAuthenticationEntryPoint authenticationEntryPoint;
     @Autowired
