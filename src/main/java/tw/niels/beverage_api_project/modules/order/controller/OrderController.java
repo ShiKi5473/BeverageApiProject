@@ -22,6 +22,7 @@ import tw.niels.beverage_api_project.common.service.ControllerHelperService;
 import tw.niels.beverage_api_project.modules.order.dto.CreateOrderRequestDto;
 import tw.niels.beverage_api_project.modules.order.dto.OrderResponseDto;
 import tw.niels.beverage_api_project.modules.order.dto.OrderTotalDto;
+import tw.niels.beverage_api_project.modules.order.dto.ProcessPaymentRequestDto;
 import tw.niels.beverage_api_project.modules.order.dto.UpdateOrderStatusDto;
 import tw.niels.beverage_api_project.modules.order.entity.Order;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
@@ -122,6 +123,22 @@ public class OrderController {
         // TODO: 可選的權限檢查：檢查目前使用者是否有權限修改此訂單 (可能基於訂單的 storeId)
 
         Order updatedOrder = orderService.updateOrderStatus(brandId, orderId, requestDto.getStatus());
+        return ResponseEntity.ok(OrderResponseDto.fromEntity(updatedOrder));
+    }
+
+    /**
+     * 處理一筆現有訂單的付款 (結帳)
+     * PATCH /api/v1/orders/{orderId}/checkout
+     */
+    @PatchMapping("/{orderId}/checkout")
+    @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
+    public ResponseEntity<OrderResponseDto> processOrderPayment(
+            @PathVariable Long orderId,
+            @Valid @RequestBody ProcessPaymentRequestDto requestDto) {
+
+        Long brandId = this.helperService.getCurrentBrandId();
+
+        Order updatedOrder = orderService.processPayment(brandId, orderId, requestDto);
         return ResponseEntity.ok(OrderResponseDto.fromEntity(updatedOrder));
     }
 

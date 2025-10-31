@@ -19,6 +19,7 @@ import tw.niels.beverage_api_project.modules.member.service.MemberPointService;
 import tw.niels.beverage_api_project.modules.order.dto.CreateOrderRequestDto;
 import tw.niels.beverage_api_project.modules.order.dto.OrderItemDto;
 import tw.niels.beverage_api_project.modules.order.dto.OrderTotalDto;
+import tw.niels.beverage_api_project.modules.order.dto.ProcessPaymentRequestDto;
 import tw.niels.beverage_api_project.modules.order.entity.Order;
 import tw.niels.beverage_api_project.modules.order.entity.OrderItem;
 import tw.niels.beverage_api_project.modules.order.entity.PaymentMethodEntity;
@@ -83,65 +84,28 @@ public class OrderService {
         Store store = storeRepository.findByBrand_BrandIdAndStoreId(brandId, requestDto.getStoreId())
                 .orElseThrow(() -> new ResourceNotFoundException("找不到店家，ID：" + requestDto.getStoreId()));
 
-        // 查找會員 (如果有的話)
-        User member = null;
-        if (requestDto.getMemberId() != null) {
-            member = userRepository.findById(requestDto.getMemberId())
-                    .filter(user -> user.getMemberProfile() != null && user.getBrand().getBrandId().equals(brandId))
-                    .orElseThrow(() -> new ResourceNotFoundException("找不到會員，ID：" + requestDto.getMemberId()));
-        } else if (requestDto.getPointsToUse() > 0) {
-            throw new BadRequestException("使用點數折抵時必須提供會員 ID");
-        }
-
-        // 點數處理
-        BigDecimal discountAmount = BigDecimal.ZERO;
-        Long pointsToUse = requestDto.getPointsToUse();
-        if (member != null && pointsToUse > 0) {
-            discountAmount = memberPointService.calculateDiscountAmount(pointsToUse);
-        }
-
-        // 處理支付方式
-        PaymentMethodEntity paymentMethodEntity = null;
-        if (requestDto.getPaymentMethod() != null && !requestDto.getPaymentMethod().isBlank()) {
-            paymentMethodEntity = paymentMethodRepository.findByCode(requestDto.getPaymentMethod())
-                    .orElseThrow(() -> new BadRequestException("無效的支付方式代碼：" + requestDto.getPaymentMethod()));
-            // 您可以在這裡添加更多邏輯，例如檢查該支付方式是否可用 is_active
-        }
-
         // 建立 Order Entity
         Order order = new Order();
         order.setBrand(staff.getBrand());
         order.setStore(store);
-        order.setMember(member);
         order.setStaff(staff);
+        order.setMember(null);
         order.setOrderNumber(generateOrderNumber(store.getStoreId()));
         order.setStatus(OrderStatus.PENDING);
-        order.setPaymentMethod(paymentMethodEntity);
+        order.setPaymentMethod(null);
 
         ProcessedItemsResult result = processOrderItems(order, requestDto.getItems(), brandId);
         order.setItems(result.orderItems);
         order.setTotalAmount(result.totalAmount);
-        order.setPointsUsed(pointsToUse);
-        order.setDiscountAmount(discountAmount);
-        // 計算最終金額
-        BigDecimal finalAmount = result.totalAmount.subtract(discountAmount);
-        // 確保最終金額不為負數
-        if (finalAmount.compareTo(BigDecimal.ZERO) < 0) {
-            finalAmount = BigDecimal.ZERO;
-            // 可選：如果折抵後變負數，是否要調整實際使用的點數？ (目前不處理)
-        }
-        order.setFinalAmount(finalAmount);
-        // 預設賺取點數為 0，完成時才計算
+
+        order.setPointsUsed(0L);
+        order.setDiscountAmount(BigDecimal.ZERO);
         order.setPointsEarned(0L);
 
-        // 儲存訂單 (尚未扣除會員點數)
-        Order savedOrder = orderRepository.save(order);
+        order.setFinalAmount(result.totalAmount);
 
-        if (member != null && pointsToUse > 0) {
-            // 這個方法內部有 @Transactional(propagation = Propagation.MANDATORY)
-            // 它會加入到當前的 createOrder 交易中
-            memberPointService.usePoints(member, savedOrder, pointsToUse);
-        }
+        // 儲存訂單
+        Order savedOrder = orderRepository.save(order);
 
         return savedOrder; // 回傳儲存後的訂單
     }
@@ -302,6 +266,66 @@ public class OrderService {
         // order.getPointsUsed());
         // }
         // }
+        return orderRepository.save(order);
+    }
+
+    @Transactional
+    public Order processPayment(Long brandId, Long orderId, ProcessPaymentRequestDto requestDto) {
+        // 1.
+        Order order = orderRepository.findByBrand_BrandIdAndOrderId(brandId, orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("找不到訂單，ID：" + orderId));
+
+        // 2.
+        if (order.getStatus() != OrderStatus.PENDING && order.getStatus() != OrderStatus.HELD) {
+            throw new BadRequestException("訂單狀態為 " + order.getStatus() + "，無法進行結帳。");
+        }
+
+        // 3.
+        PaymentMethodEntity paymentMethodEntity = paymentMethodRepository.findByCode(requestDto.getPaymentMethod())
+                .orElseThrow(() -> new BadRequestException("無效的支付方式代碼：" + requestDto.getPaymentMethod()));
+
+        order.setPaymentMethod(paymentMethodEntity);
+
+        // 4.
+        User member = null;
+        BigDecimal discountAmount = BigDecimal.ZERO;
+        Long pointsToUse = 0L;
+
+        if (requestDto.getMemberId() != null) {
+            member = userRepository.findById(requestDto.getMemberId())
+                    .filter(user -> user.getMemberProfile() != null && user.getBrand().getBrandId().equals(brandId))
+                    .orElseThrow(() -> new ResourceNotFoundException("找不到會員，ID：" + requestDto.getMemberId()));
+
+            order.setMember(member); //
+
+            if (requestDto.getPointsToUse() > 0) {
+                pointsToUse = requestDto.getPointsToUse();
+                //
+                discountAmount = memberPointService.calculateDiscountAmount(pointsToUse);
+                //
+                memberPointService.usePoints(member, order, pointsToUse);
+            }
+        }
+
+        // 5.
+        order.setPointsUsed(pointsToUse);
+        order.setDiscountAmount(discountAmount);
+
+        BigDecimal finalAmount = order.getTotalAmount().subtract(discountAmount);
+        if (finalAmount.compareTo(BigDecimal.ZERO) < 0) {
+            finalAmount = BigDecimal.ZERO;
+        }
+        order.setFinalAmount(finalAmount);
+
+        // 6.
+        //
+        order.setStatus(OrderStatus.PREPARING); //
+
+        //
+        if (order.getStatus() == OrderStatus.PREPARING) {
+            // ...
+        }
+
         return orderRepository.save(order);
     }
 
