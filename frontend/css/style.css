@@ -404,3 +404,14 @@ button[type="submit"]:hover {
   min-width: 30px;
   text-align: center;
 }
+
+#hold-button {
+  width: 100%;
+  padding: 10px;
+  background-color: #ffc107;
+  color: #333;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 10px;
+}

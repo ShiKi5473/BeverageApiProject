@@ -89,3 +89,22 @@ export async function getCategories() {
   }
   return response.json();
 }
+
+/**
+ * 對一筆現有訂單進行結帳 (付款、綁定會員)
+ * (對應 OrderController)
+ * @param {number} orderId -
+ * @param {object} paymentData -
+ */
+export async function processPayment(orderId, paymentData) {
+  const response = await fetchWithAuth(`/api/v1/orders/${orderId}/checkout`, {
+    method: "PATCH",
+    body: JSON.stringify(paymentData),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`付款失敗: ${errorBody}`);
+  }
+  return response.json();
+}

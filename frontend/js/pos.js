@@ -1,4 +1,9 @@
-import { getCategories, getPosProducts } from "./api.js";
+import {
+  getCategories,
+  getPosProducts,
+  createOrder,
+  processPayment,
+} from "./api.js";
 import { createProductCard } from "./components/ProductCard.js";
 import { createOptionsModalContent } from "./components/OptionsModal.js";
 import { createCartItem, updateCartTotal } from "./components/Cart.js";
@@ -27,6 +32,125 @@ document.addEventListener("DOMContentLoaded", () => {
   };
   const navbar = createNavbar("POS 點餐系統", handleLogout);
   posLayout.insertBefore(navbar, mainContent);
+
+  async function submitOrder(statusString) {
+    if (shoppingCart.length === 0) {
+      alert("購物車是空的！");
+      return;
+    }
+
+    const orderItemsDto = shoppingCart.map((item) => ({
+      productId: item.productId,
+      quantity: item.quantity,
+      notes: item.notes,
+      optionIds: item.selectedOptions.map((opt) => opt.optionId),
+    }));
+
+    //
+    const createOrderRequest = {
+      storeId: 1, //
+      items: orderItemsDto,
+      status: statusString, //
+    };
+
+    try {
+      //
+      const newOrder = await createOrder(createOrderRequest);
+
+      //
+      openPaymentModal(newOrder);
+    } catch (error) {
+      console.error(` ${statusString} 失敗:`, error);
+      alert(` ${statusString} 失敗: ${error.message}`);
+    }
+  }
+
+  //
+  function openPaymentModal(order) {
+    //
+    const totalAmount = order.totalAmount;
+    const orderId = order.orderId;
+
+    //
+    modalContent.innerHTML = `
+        <h3>訂單 ${order.orderNumber} - 結帳</h3>
+        <p>總金額: NT$ ${totalAmount}</p>
+        <div class"form-group">
+            <label for="member-phone">會員手機 (選填)</label>
+            <input type="text" id="member-phone" />
+            <button type="button" id="find-member-btn">查詢</button>
+            <span id="member-info"></span>
+        </div>
+        <div class"form-group" id="points-group" style="display:none;">
+            <label for="points-to-use">使用點數</label>
+            <input type="number" id="points-to-use" value="0" />
+        </div>
+        <div class"form-group">
+            <label>付款方式</label>
+            <div class="option-buttons-container">
+                <button type"button" class="option-btn payment-btn" data-method="CASH">現金</button>
+                <button type"button" class="option-btn payment-btn" data-method="CREDIT_CARD">信用卡</button>
+            </div>
+        </div>
+    `;
+
+    let selectedMemberId = null;
+    let selectedPaymentMethod = null;
+
+    //
+    modalOverlay.style.display = "flex";
+
+    // (
+    //
+
+    const paymentButtons = modalContent.querySelector(
+      ".option-buttons-container"
+    );
+    paymentButtons.addEventListener("click", (e) => {
+      if (e.target.classList.contains("payment-btn")) {
+        paymentButtons
+          .querySelectorAll(".payment-btn")
+          .forEach((btn) => btn.classList.remove("active"));
+        e.target.classList.add("active");
+        selectedPaymentMethod = e.target.dataset.method;
+      }
+    });
+
+    //
+    const confirmPaymentButton = document.createElement("button");
+    confirmPaymentButton.textContent = "確認付款";
+    confirmPaymentButton.className = "modal-add-btn";
+    confirmPaymentButton.onclick = async () => {
+      if (!selectedPaymentMethod) {
+        alert("請選擇付款方式！");
+        return;
+      }
+
+      const pointsToUse =
+        document.getElementById("points-to-use").valueAsNumber || 0;
+
+      const paymentData = {
+        memberId: selectedMemberId,
+        pointsToUse: pointsToUse,
+        paymentMethod: selectedPaymentMethod,
+      };
+
+      try {
+        const paidOrder = await processPayment(orderId, paymentData);
+        alert(
+          `付款成功！ 訂單 ${paidOrder.orderNumber} 狀態已更新為 ${paidOrder.status}`
+        );
+
+        //
+        shoppingCart = [];
+        renderCart();
+        closeModal(); //
+      } catch (error) {
+        alert(`付款失敗: ${error.message}`);
+      }
+    };
+    modalContent.appendChild(confirmPaymentButton);
+  }
 
   // 3.
   async function loadAllData() {
