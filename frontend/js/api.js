@@ -143,3 +143,25 @@ export async function getOrderDetails(orderId) {
     }
     return response.json();
 }
+
+/**
+ * 根據手機號碼查詢會員
+ * (對應 UserController GET /api/v1/users/member/by-phone/{phone})
+ * @param {string} phone 會員手機
+ */
+export async function findMemberByPhone(phone) {
+    const response = await fetchWithAuth(`/api/v1/users/member/by-phone/${phone}`, {
+        method: "GET",
+    });
+
+    if (response.status === 404) {
+        // 404 不是伺服器錯誤，是「查無此人」，回傳 null
+        return null;
+    }
+
+    if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`查詢會員失敗: ${errorBody}`);
+    }
+    return response.json();
+}
