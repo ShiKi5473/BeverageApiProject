@@ -72,13 +72,16 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         // 允許來自您前端 Live Server 的來源
-        configuration.setAllowedOrigins(Arrays.asList("http://127.0.0.1:5501"));
+        configuration.setAllowedOrigins(Arrays.asList(
+                "http://localhost:63342",
+                "http://127.0.0.1:63342"
+        ));
         // 允許所有標準的 HTTP 方法
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS", "HEAD"));
         // 允許前端攜帶認證資訊 (例如 Cookies 或 Authorization header)
         configuration.setAllowCredentials(true);
         // 允許所有常見的標頭
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type"));
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "x-ijt"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         // 將此 CORS 設定應用到所有路徑 ("/**")

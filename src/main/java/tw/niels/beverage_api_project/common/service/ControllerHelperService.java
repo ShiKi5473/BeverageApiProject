@@ -42,4 +42,12 @@ public class ControllerHelperService {
     public Long getCurrentUserId() {
         return getCurrentUserDetails().getUserId();
     }
+
+    /**
+     * 獲取當前使用者所屬的 Store ID (如果有的話)
+     * * @return 店家 ID (Long)，可能為 null
+     */
+    public Long getCurrentStoreId() {
+        return getCurrentUserDetails().getStoreId();
+    }
 }

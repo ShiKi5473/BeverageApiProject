@@ -2,7 +2,6 @@ import {
   getCategories,
   getPosProducts,
   createOrder,
-  processPayment,
 } from "./api.js";
 import { createProductCard } from "./components/ProductCard.js";
 import { createOptionsModalContent } from "./components/OptionsModal.js";
@@ -33,7 +32,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const navbar = createNavbar("POS 點餐系統", handleLogout);
   posLayout.insertBefore(navbar, mainContent);
 
-  async function submitOrder(statusString) {
+  async function submitOrder(action) {
     if (shoppingCart.length === 0) {
       alert("購物車是空的！");
       return;
@@ -48,109 +47,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
     //
     const createOrderRequest = {
-      storeId: 1, //
       items: orderItemsDto,
-      status: statusString, //
+      status: (action === 'HELD') ? 'HELD' : 'PENDING'
     };
 
     try {
-      //
-      const newOrder = await createOrder(createOrderRequest);
-
-      //
-      openPaymentModal(newOrder);
+        const newOrder = await createOrder(createOrderRequest);
+        if (action === 'HELD') {
+            // 暫存成功
+            alert(`訂單 ${newOrder.orderNumber} 已暫存`);
+            shoppingCart = [];
+            renderCart();
+        } else {
+            window.location.href = `checkout.html?orderId=${newOrder.orderId}`;        }
     } catch (error) {
-      console.error(` ${statusString} 失敗:`, error);
-      alert(` ${statusString} 失敗: ${error.message}`);
+        console.error(` ${action} 失敗:`, error);
+        alert(` ${action} 失敗: ${error.message}`);
     }
   }
 
-  //
-  function openPaymentModal(order) {
-    //
-    const totalAmount = order.totalAmount;
-    const orderId = order.orderId;
 
-    //
-    modalContent.innerHTML = `
-        <h3>訂單 ${order.orderNumber} - 結帳</h3>
-        <p>總金額: NT$ ${totalAmount}</p>
-        <div class"form-group">
-            <label for="member-phone">會員手機 (選填)</label>
-            <input type="text" id="member-phone" />
-            <button type="button" id="find-member-btn">查詢</button>
-            <span id="member-info"></span>
-        </div>
-        <div class"form-group" id="points-group" style="display:none;">
-            <label for="points-to-use">使用點數</label>
-            <input type="number" id="points-to-use" value="0" />
-        </div>
-        <div class"form-group">
-            <label>付款方式</label>
-            <div class="option-buttons-container">
-                <button type"button" class="option-btn payment-btn" data-method="CASH">現金</button>
-                <button type"button" class="option-btn payment-btn" data-method="CREDIT_CARD">信用卡</button>
-            </div>
-        </div>
-    `;
-
-    let selectedMemberId = null;
-    let selectedPaymentMethod = null;
-
-    //
-    modalOverlay.style.display = "flex";
-
-    // (
-    //
-
-    const paymentButtons = modalContent.querySelector(
-      ".option-buttons-container"
-    );
-    paymentButtons.addEventListener("click", (e) => {
-      if (e.target.classList.contains("payment-btn")) {
-        paymentButtons
-          .querySelectorAll(".payment-btn")
-          .forEach((btn) => btn.classList.remove("active"));
-        e.target.classList.add("active");
-        selectedPaymentMethod = e.target.dataset.method;
-      }
-    });
-
-    //
-    const confirmPaymentButton = document.createElement("button");
-    confirmPaymentButton.textContent = "確認付款";
-    confirmPaymentButton.className = "modal-add-btn";
-    confirmPaymentButton.onclick = async () => {
-      if (!selectedPaymentMethod) {
-        alert("請選擇付款方式！");
-        return;
-      }
-
-      const pointsToUse =
-        document.getElementById("points-to-use").valueAsNumber || 0;
-
-      const paymentData = {
-        memberId: selectedMemberId,
-        pointsToUse: pointsToUse,
-        paymentMethod: selectedPaymentMethod,
-      };
-
-      try {
-        const paidOrder = await processPayment(orderId, paymentData);
-        alert(
-          `付款成功！ 訂單 ${paidOrder.orderNumber} 狀態已更新為 ${paidOrder.status}`
-        );
-
-        //
-        shoppingCart = [];
-        renderCart();
-        closeModal(); //
-      } catch (error) {
-        alert(`付款失敗: ${error.message}`);
-      }
-    };
-    modalContent.appendChild(confirmPaymentButton);
-  }
 
   // 3.
   async function loadAllData() {
@@ -319,5 +235,17 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   loadAllData();
+    const checkoutButton = document.getElementById("checkout-button");
+    const holdButton = document.getElementById("hold-button");
+
+    // 1. 綁定 "結帳" 按鈕
+    checkoutButton.addEventListener("click", () => {
+        submitOrder('CHECKOUT'); // 傳入 'CHECKOUT'，會被轉為 'PENDING'
+    });
+
+    // 2. 綁定 "暫存訂單" 按鈕
+    holdButton.addEventListener("click", () => {
+        submitOrder('HELD'); // 傳入 'HELD'
+    });
   renderCart();
 });

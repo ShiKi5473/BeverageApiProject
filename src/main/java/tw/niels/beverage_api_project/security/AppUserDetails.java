@@ -22,24 +22,31 @@ public class AppUserDetails implements UserDetails {
     private final Long brandId;
     private final String username; // 使用手機號碼作為 username
     private final String password;
+    private final Long storeId;
     private final Collection<? extends GrantedAuthority> authorities;
 
-    public AppUserDetails(Long userId, Long brandId, String username, String password,
+    public AppUserDetails(Long userId, Long brandId, Long storeId, String username, String password,
             Collection<? extends GrantedAuthority> authorities) {
         this.userId = userId;
         this.brandId = brandId;
         this.username = username;
         this.password = password;
+        this.storeId = storeId;
         this.authorities = authorities;
     }
 
     public static AppUserDetails build(User user) {
         Set<GrantedAuthority> authorities = new HashSet<>();
+        Long storeId = null;
 
         // 檢查是否有員工角色資料
         StaffProfile staffProfile = user.getStaffProfile();
         if (staffProfile != null) {
             authorities.add(new SimpleGrantedAuthority("ROLE_" + staffProfile.getRole().name()));
+
+            if (staffProfile.getStore() != null) {
+                storeId = staffProfile.getStore().getStoreId();
+            }
         } else {
             // 如果沒有員工資料，預設給予會員角色
             authorities.add(new SimpleGrantedAuthority("ROLE_MEMBER"));
@@ -48,6 +55,7 @@ public class AppUserDetails implements UserDetails {
         return new AppUserDetails(
                 user.getUserId(),
                 user.getBrand().getBrandId(),
+                storeId,
                 user.getPrimaryPhone(),
                 user.getPasswordHash(),
                 authorities);
@@ -74,6 +82,10 @@ public class AppUserDetails implements UserDetails {
     @Override
     public String getUsername() {
         return username;
+    }
+
+    public Long getStoreId() {
+        return storeId;
     }
 
     @Override

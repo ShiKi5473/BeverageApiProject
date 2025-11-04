@@ -415,3 +415,15 @@ button[type="submit"]:hover {
   cursor: pointer;
   margin-top: 10px;
 }
+/* --- Checkout 頁面樣式 --- */
+#checkout-container {
+    margin-top: 60px; /* 讓它離頂部近一點 */
+}
+
+/* 讓付款按鈕有 active 狀態 */
+.payment-btn.active {
+    background-color: #007bff;
+    color: white;
+    border-color: #007bff;
+    font-weight: bold;
+}

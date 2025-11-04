@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>結帳</title>
+    <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<div class="login-container" id="checkout-container">
+    <h2>訂單結帳</h2>
+
+    <div id="loading-mask">
+        <p>正在載入訂單資料...</p>
+    </div>
+
+    <div id="checkout-content" style="display: none;">
+        <p>訂單編號: <strong id="order-number">---</strong></p>
+        <p>總金額: <strong id="total-amount" style="font-size: 1.5em; color: #000;">NT$ 0</strong></p>
+
+        <hr>
+
+        <div class="form-group">
+            <label for="member-phone">會員手機 (選填)</label>
+            <input type="text" id="member-phone" />
+            <button type="button" id="find-member-btn" style="width: auto; padding: 8px 12px; margin-top: 5px;">查詢</button>
+            <span id="member-info"></span>
+        </div>
+
+        <div class="form-group" id="points-group" style="display: none;">
+            <label for="points-to-use">使用點數</label>
+            <input type="number" id="points-to-use" value="0" />
+        </div>
+
+        <div class="form-group">
+            <label>付款方式 (必選)</label>
+            <div class="option-buttons-container">
+                <button type="button" class="option-btn payment-btn" data-method="CASH">現金</button>
+                <button type="button" class="option-btn payment-btn" data-method="CREDIT_CARD">信用卡</button>
+            </div>
+        </div>
+
+        <button id="confirm-payment-button" class="modal-add-btn" style="margin-top: 20px;">確認付款</button>
+        <button id="cancel-button" class="modal-close-btn">取消並返回點餐</button>
+    </div>
+</div>
+
+<script src="js/checkout.js" type="module"></script>
+</body>
+</html>

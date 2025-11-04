@@ -108,3 +108,38 @@ export async function processPayment(orderId, paymentData) {
   }
   return response.json();
 }
+
+/**
+ * 建立一筆新訂單
+ * (對應 OrderController)
+ * @param {object} orderData - 包含 storeId 和 items 的訂單資料
+ */
+export async function createOrder(orderData) {
+    // 呼叫後端的 POST /api/v1/orders
+    const response = await fetchWithAuth("/api/v1/orders", {
+        method: "POST",
+        body: JSON.stringify(orderData),
+    });
+
+    if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`建立訂單失敗: ${errorBody}`);
+    }
+    return response.json();
+}
+/**
+ * 取得單一訂單的詳細資料
+ * (對應 OrderController GET /api/v1/orders/{orderId})
+ * @param {number} orderId 訂單 ID
+ */
+export async function getOrderDetails(orderId) {
+    const response = await fetchWithAuth(`/api/v1/orders/${orderId}`, {
+        method: "GET",
+    });
+
+    if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`取得訂單詳情失敗: ${errorBody}`);
+    }
+    return response.json();
+}

@@ -5,15 +5,15 @@ import java.util.List;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
 
 public class CreateOrderRequestDto {
 
-    @NotNull(message = "店家ID不可為空")
-    private Long storeId;
 
-    private String paymentMethod;
+    @NotNull(message = "訂單狀態不可為空")
+    private OrderStatus status;
 
-    // staffId is from jwtToken
+// staffId is from jwtToken
 
     @NotEmpty(message = "訂單品項不可為空")
     private List<@Valid OrderItemDto> items;
@@ -22,13 +22,6 @@ public class CreateOrderRequestDto {
     }
 
     // getter and setter
-    public Long getStoreId() {
-        return storeId;
-    }
-
-    public void setStoreId(Long storeId) {
-        this.storeId = storeId;
-    }
 
     public List<OrderItemDto> getItems() {
         return items;
@@ -38,12 +31,13 @@ public class CreateOrderRequestDto {
         this.items = items;
     }
 
-    public String getPaymentMethod() {
-        return paymentMethod;
+
+    public OrderStatus getStatus() {
+        return status;
     }
 
-    public void setPaymentMethod(String paymentMethod) {
-        this.paymentMethod = paymentMethod;
+    public void setStatus(OrderStatus status) {
+        this.status = status;
     }
 
 }

@@ -80,9 +80,14 @@ public class OrderService {
         User staff = getCurrentStaff();
         Long brandId = staff.getBrand().getBrandId();
 
-        // 驗證店家是否存在於該品牌底下
-        Store store = storeRepository.findByBrand_BrandIdAndStoreId(brandId, requestDto.getStoreId())
-                .orElseThrow(() -> new ResourceNotFoundException("找不到店家，ID：" + requestDto.getStoreId()));
+        Long storeId = helperService.getCurrentStoreId();
+        if (storeId == null) {
+            // 品牌管理員或未分派的員工
+            throw new BadRequestException("此帳號未綁定店家，無法建立訂單。");
+        }
+
+        Store store = storeRepository.findByBrand_BrandIdAndStoreId(brandId, storeId)
+                .orElseThrow(() -> new ResourceNotFoundException("找不到店家 (JWT storeId: " + storeId + ")"));
 
         // 建立 Order Entity
         Order order = new Order();
@@ -91,8 +96,8 @@ public class OrderService {
         order.setStaff(staff);
         order.setMember(null);
         order.setOrderNumber(generateOrderNumber(store.getStoreId()));
-        order.setStatus(OrderStatus.PENDING);
-        order.setPaymentMethod(null);
+        order.setStatus(requestDto.getStatus());
+        order.setPaymentMethod(null); // 建立時一律為 null
 
         ProcessedItemsResult result = processOrderItems(order, requestDto.getItems(), brandId);
         order.setItems(result.orderItems);
@@ -105,9 +110,7 @@ public class OrderService {
         order.setFinalAmount(result.totalAmount);
 
         // 儲存訂單
-        Order savedOrder = orderRepository.save(order);
-
-        return savedOrder; // 回傳儲存後的訂單
+        return orderRepository.save(order);
     }
 
     // 產生一個簡易的訂單號碼
@@ -323,7 +326,7 @@ public class OrderService {
 
         //
         if (order.getStatus() == OrderStatus.PREPARING) {
-            // ...
+            // TODO新增狀態機
         }
 
         return orderRepository.save(order);
