@@ -2,6 +2,7 @@
 package tw.niels.beverage_api_project.modules.order.state;
 
 // ... 匯入 ...
+import org.springframework.context.ApplicationEventPublisher;
 import tw.niels.beverage_api_project.common.exception.BadRequestException;
 import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
 import tw.niels.beverage_api_project.modules.member.service.MemberPointService;
@@ -10,6 +11,7 @@ import tw.niels.beverage_api_project.modules.order.dto.ProcessPaymentRequestDto;
 import tw.niels.beverage_api_project.modules.order.entity.Order;
 import tw.niels.beverage_api_project.modules.order.entity.PaymentMethodEntity;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
+import tw.niels.beverage_api_project.modules.order.event.OrderStateChangedEvent;
 import tw.niels.beverage_api_project.modules.order.repository.PaymentMethodRepository;
 import tw.niels.beverage_api_project.modules.order.service.OrderItemProcessorService;
 import tw.niels.beverage_api_project.modules.user.entity.User;
@@ -20,21 +22,22 @@ import java.math.BigDecimal;
 // 注意：這個類別「不」需要 @Component，因為它不會被 Spring 直接實例化
 public abstract class AbstractPrePaymentState extends AbstractOrderState {
 
-    // 移入所有依賴
     protected final MemberPointService memberPointService;
     protected final PaymentMethodRepository paymentMethodRepository;
     protected final UserRepository userRepository;
     protected final OrderItemProcessorService orderItemProcessorService;
+    private final ApplicationEventPublisher eventPublisher;
 
-    // 移入建構子
     public AbstractPrePaymentState(MemberPointService memberPointService,
                                    PaymentMethodRepository paymentMethodRepository,
                                    UserRepository userRepository,
-                                   OrderItemProcessorService orderItemProcessorService) {
+                                   OrderItemProcessorService orderItemProcessorService,
+                                   ApplicationEventPublisher eventPublisher) {
         this.memberPointService = memberPointService;
         this.paymentMethodRepository = paymentMethodRepository;
         this.userRepository = userRepository;
         this.orderItemProcessorService = orderItemProcessorService;
+        this.eventPublisher = eventPublisher;
     }
 
     // 移入 update 實作
@@ -56,11 +59,11 @@ public abstract class AbstractPrePaymentState extends AbstractOrderState {
     // 移入 processPayment 實作
     @Override
     public void processPayment(Order order, ProcessPaymentRequestDto requestDto) {
-        // ... (從 PendingState 搬過來的完整邏輯) ...
+        OrderStatus oldStatus = order.getStatus();
+
         PaymentMethodEntity paymentMethodEntity = paymentMethodRepository.findByCode(requestDto.getPaymentMethod())
                 .orElseThrow(() -> new BadRequestException("無效的支付方式代碼：" + requestDto.getPaymentMethod()));
         order.setPaymentMethod(paymentMethodEntity);
-        // ... (處理會員和點數的邏輯) ...
         User member = null;
         BigDecimal discountAmount = BigDecimal.ZERO;
         Long pointsToUse = 0L;
@@ -86,11 +89,14 @@ public abstract class AbstractPrePaymentState extends AbstractOrderState {
         }
         order.setFinalAmount(finalAmount);
         order.setStatus(OrderStatus.PREPARING);
+        eventPublisher.publishEvent(new OrderStateChangedEvent(order, oldStatus, OrderStatus.PREPARING));
     }
 
     // 移入 cancel 實作
     @Override
     public void cancel(Order order) {
+        OrderStatus oldStatus = order.getStatus();
         order.setStatus(OrderStatus.CANCELLED);
+        eventPublisher.publishEvent(new OrderStateChangedEvent(order, oldStatus, OrderStatus.CANCELLED));
     }
 }

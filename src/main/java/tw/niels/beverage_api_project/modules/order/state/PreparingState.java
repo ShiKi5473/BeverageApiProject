@@ -1,9 +1,11 @@
 package tw.niels.beverage_api_project.modules.order.state;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import tw.niels.beverage_api_project.modules.member.service.MemberPointService;
 import tw.niels.beverage_api_project.modules.order.entity.Order;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
+import tw.niels.beverage_api_project.modules.order.event.OrderStateChangedEvent;
 
 import java.util.Date;
 
@@ -11,9 +13,12 @@ import java.util.Date;
 public class PreparingState extends AbstractOrderState {
 
     private final MemberPointService memberPointService;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public PreparingState(MemberPointService memberPointService) {
+    public PreparingState(MemberPointService memberPointService,
+                          ApplicationEventPublisher eventPublisher) {
         this.memberPointService = memberPointService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -24,7 +29,7 @@ public class PreparingState extends AbstractOrderState {
      */
     @Override
     public void complete(Order order) {
-        // --- 這是從 OrderService.updateOrderStatus 搬移過來的邏輯 ---
+        OrderStatus oldStatus = order.getStatus();
         order.setCompletedTime(new Date());
 
         if (order.getMember() != null) {
@@ -34,10 +39,9 @@ public class PreparingState extends AbstractOrderState {
                 memberPointService.earnPoints(order.getMember(), order, pointsEarned);
             }
         }
-        // --- 邏輯結束 ---
 
-        // 【關鍵】狀態轉換
         order.setStatus(OrderStatus.COMPLETED);
+        eventPublisher.publishEvent(new OrderStateChangedEvent(order, oldStatus, OrderStatus.COMPLETED));
     }
 
     /**
@@ -45,13 +49,12 @@ public class PreparingState extends AbstractOrderState {
      */
     @Override
     public void cancel(Order order) {
-        // --- 這是從 OrderService.updateOrderStatus 搬移過來的邏輯 ---
+        OrderStatus oldStatus = order.getStatus();
         if (order.getMember() != null && order.getPointsUsed() > 0) {
             memberPointService.refundPoints(order.getMember(), order);
         }
-        // --- 邏輯結束 ---
 
-        // 【關鍵】狀態轉換
         order.setStatus(OrderStatus.CANCELLED);
+        eventPublisher.publishEvent(new OrderStateChangedEvent(order, oldStatus, OrderStatus.CANCELLED));
     }
 }
