@@ -1,4 +1,4 @@
-// 修改後的：PendingState.java
+// 新增的：HeldState.java
 package tw.niels.beverage_api_project.modules.order.state;
 
 import org.springframework.stereotype.Component;
@@ -8,20 +8,21 @@ import tw.niels.beverage_api_project.modules.order.repository.PaymentMethodRepos
 import tw.niels.beverage_api_project.modules.order.service.OrderItemProcessorService;
 import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
 
-@Component("PENDING")
-public class PendingState extends AbstractPrePaymentState {
+@Component("HELD") // 【注意】Bean Name
+public class HeldState extends AbstractPrePaymentState { // 【注意】繼承新類別
 
     // 建構子只需呼叫 super()
-    public PendingState(MemberPointService memberPointService,
-                        PaymentMethodRepository paymentMethodRepository,
-                        UserRepository userRepository,
-                        OrderItemProcessorService orderItemProcessorService) {
+    public HeldState(MemberPointService memberPointService,
+                     PaymentMethodRepository paymentMethodRepository,
+                     UserRepository userRepository,
+                     OrderItemProcessorService orderItemProcessorService) {
         super(memberPointService, paymentMethodRepository, userRepository, orderItemProcessorService);
     }
 
     @Override
     protected OrderStatus getStatus() {
-        return OrderStatus.PENDING;
+        return OrderStatus.HELD;
     }
 
+    // update(), processPayment(), cancel() 都不用寫了！
 }
