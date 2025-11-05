@@ -1,17 +1,7 @@
 package tw.niels.beverage_api_project.modules.order.service;
 
-import java.math.BigDecimal;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicLong;
-
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import tw.niels.beverage_api_project.common.exception.BadRequestException;
 import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
 import tw.niels.beverage_api_project.common.service.ControllerHelperService;
@@ -35,6 +25,10 @@ import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
 import tw.niels.beverage_api_project.modules.user.entity.User;
 import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
 
+import java.math.BigDecimal;
+import java.text.SimpleDateFormat;
+import java.util.*;
+
 @Service
 public class OrderService {
     private final OrderRepository orderRepository;
@@ -45,9 +39,9 @@ public class OrderService {
     private final PaymentMethodRepository paymentMethodRepository;
     private final MemberPointService memberPointService;
     private final ControllerHelperService helperService;
+    private final OrderNumberService orderNumberService;
 
-    // 用於生成簡單的訂單流水號，之後改成用redis取得流水號
-    private static final AtomicLong orderCounter = new AtomicLong(0);
+
 
     // 用於封裝品項處理結果的內部類別
     private static class ProcessedItemsResult {
@@ -64,7 +58,8 @@ public class OrderService {
             ProductRepository productRepository, ProductOptionRepository productOptionRepository,
             PaymentMethodRepository paymentMethodRepository,
             MemberPointService memberPointService,
-            ControllerHelperService helperService) {
+            ControllerHelperService helperService,
+                        OrderNumberService orderNumberService) {
         this.orderRepository = orderRepository;
         this.storeRepository = storeRepository;
         this.userRepository = userRepository;
@@ -73,7 +68,10 @@ public class OrderService {
         this.paymentMethodRepository = paymentMethodRepository;
         this.memberPointService = memberPointService;
         this.helperService = helperService;
+        this.orderNumberService = orderNumberService;
     }
+
+
 
     @Transactional
     public Order createOrder(CreateOrderRequestDto requestDto) {
@@ -113,11 +111,16 @@ public class OrderService {
         return orderRepository.save(order);
     }
 
-    // 產生一個簡易的訂單號碼
+    // 產生一個訂單號碼
     private String generateOrderNumber(Long storeId) {
-        String date = new SimpleDateFormat("yyyyMMddHHmmss").format(new Date());
-        long count = orderCounter.incrementAndGet() % 1000; // 取 3 位數，避免過長
-        return String.format("%d-%s-%03d", storeId, date, count);
+        // 1. 獲取日期字串 (yyyyMMdd)
+        String date = new SimpleDateFormat("yyyyMMdd").format(new Date());
+
+        // 2. 獲取 Redis 流水號 (來自新服務)
+        long sequence = orderNumberService.getNextStoreDailySequence(storeId);
+
+        // 3. 格式化為新訂單號，例如：1-20251105-0001 (店家ID-日期-4位流水號)
+        return String.format("%d-%s-%04d", storeId, date, sequence);
     }
 
     // 從 Security Context 取得當前登入的員工 User Entity
@@ -215,7 +218,7 @@ public class OrderService {
     public Order getOrderDetails(Long brandId, Long orderId) {
         Order order = orderRepository.findByBrand_BrandIdAndOrderId(brandId, orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("找不到訂單，ID：" + orderId));
-        // 在這裡可以加入權限檢查，例如檢查目前使用者是否能查看此訂單 (可能基於店家 ID)
+        // TODO 在這裡可以加入權限檢查，例如檢查目前使用者是否能查看此訂單 (可能基於店家 ID)
         return order;
     }
 
@@ -241,7 +244,7 @@ public class OrderService {
             throw new BadRequestException("訂單狀態 " + order.getStatus() + " 無法被更新。");
         }
 
-        OrderStatus oldStatus = order.getStatus(); // 記錄舊狀態
+//        OrderStatus oldStatus = order.getStatus(); // 記錄舊狀態
         order.setStatus(newStatus);
 
         if (newStatus == OrderStatus.COMPLETED) {
