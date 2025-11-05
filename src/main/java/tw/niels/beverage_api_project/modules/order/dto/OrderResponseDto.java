@@ -43,6 +43,7 @@ public class OrderResponseDto {
         private Integer quantity;
         private BigDecimal unitPrice;
         private BigDecimal subtotal;
+        private String notes;
         private List<OptionResponseDto> options;
 
         // getter and setter for orderItemResponseDto
@@ -92,6 +93,14 @@ public class OrderResponseDto {
 
         public void setSubtotal(BigDecimal subtotal) {
             this.subtotal = subtotal;
+        }
+
+        public String getNotes() {
+            return notes;
+        }
+
+        public void setNotes(String notes) {
+            this.notes = notes;
         }
 
         public List<OptionResponseDto> getOptions() {
@@ -206,6 +215,7 @@ public class OrderResponseDto {
             itemDto.setQuantity(item.getQuantity());
             itemDto.setUnitPrice(item.getUnitPrice());
             itemDto.setSubtotal(item.getSubtotal());
+            itemDto.setNotes(item.getNotes());
 
             List<OptionResponseDto> optionDtos = item.getOptions().stream().map(option -> {
                 OptionResponseDto optionDto = new OptionResponseDto();

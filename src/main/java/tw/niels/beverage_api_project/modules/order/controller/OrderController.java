@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import tw.niels.beverage_api_project.common.constants.ApiPaths;
+import tw.niels.beverage_api_project.common.exception.BadRequestException;
 import tw.niels.beverage_api_project.common.service.ControllerHelperService;
 import tw.niels.beverage_api_project.modules.order.dto.*;
 import tw.niels.beverage_api_project.modules.order.entity.Order;
@@ -112,6 +113,29 @@ public class OrderController {
         // TODO: 可選的權限檢查：檢查目前使用者是否有權限修改此訂單 (可能基於訂單的 storeId)
 
         Order updatedOrder = orderService.updateOrderStatus(brandId, orderId, requestDto.getStatus());
+        return ResponseEntity.ok(OrderResponseDto.fromEntity(updatedOrder));
+    }
+
+    /**
+     * 【新 API】
+     * 更新一筆 HELD 狀態的訂單
+     * PUT /api/v1/orders/{orderId}
+     */
+    @PutMapping("/{orderId}")
+    @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
+    public ResponseEntity<OrderResponseDto> updateHeldOrder(
+            @PathVariable Long orderId,
+            @Valid @RequestBody CreateOrderRequestDto createOrderRequestDto) {
+
+        Long brandId = helperService.getCurrentBrandId();
+
+        // 檢查 DTO 狀態，防止更新為 PREPARING
+        OrderStatus newStatus = createOrderRequestDto.getStatus();
+        if (newStatus != OrderStatus.HELD && newStatus != OrderStatus.PENDING) {
+            throw new BadRequestException("更新訂單時，狀態只能設為 HELD 或 PENDING。");
+        }
+
+        Order updatedOrder = orderService.updateHeldOrder(brandId, orderId, createOrderRequestDto);
         return ResponseEntity.ok(OrderResponseDto.fromEntity(updatedOrder));
     }
 

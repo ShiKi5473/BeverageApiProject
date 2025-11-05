@@ -57,6 +57,36 @@ public class MemberPointService {
         // 計算應獲得點數 (例如：每 1 元積 1 點，無條件捨去)
         return finalAmount.multiply(POINTS_PER_DOLLAR).longValue();
     }
+    /**
+     * 【新方法】
+     * 退還點數 (在訂單取消時呼叫)
+     * * @param member 會員 User 實體
+     * @param order  相關訂單
+     */
+    @Transactional(propagation = Propagation.MANDATORY) // 確保此方法在現有交易中執行
+    public void refundPoints(User member, Order order) {
+        Long pointsToRefund = order.getPointsUsed();
+
+        if (member == null || pointsToRefund == null || pointsToRefund <= 0) {
+            return; // 沒有會員或沒有使用點數，直接返回
+        }
+
+        MemberProfile profile = member.getMemberProfile();
+        if (profile == null) {
+            System.err.println("警告：試圖為非會員 User ID " + member.getUserId() + " 退還點數");
+            return;
+        }
+
+        // 增加點數 (退還)
+        long newTotalPoints = profile.getTotalPoints() + pointsToRefund;
+        profile.setTotalPoints(newTotalPoints);
+        memberProfileRepository.save(profile); // 儲存更新後的 Profile
+
+        // 記錄 Log
+        String reason = "訂單取消點數返還 (單號: " + (order != null ? order.getOrderNumber() : "N/A") + ")";
+        MemberPointLog log = new MemberPointLog(member, order, pointsToRefund, newTotalPoints, reason);
+        memberPointLogRepository.save(log);
+    }
 
     /**
      * 使用點數 (在創建訂單時呼叫)

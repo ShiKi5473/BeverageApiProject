@@ -16,6 +16,8 @@ import tw.niels.beverage_api_project.modules.order.entity.PaymentMethodEntity;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
 import tw.niels.beverage_api_project.modules.order.repository.OrderRepository;
 import tw.niels.beverage_api_project.modules.order.repository.PaymentMethodRepository;
+import tw.niels.beverage_api_project.modules.order.state.OrderState;
+import tw.niels.beverage_api_project.modules.order.state.OrderStateFactory;
 import tw.niels.beverage_api_project.modules.product.entity.Product;
 import tw.niels.beverage_api_project.modules.product.entity.ProductOption;
 import tw.niels.beverage_api_project.modules.product.repository.ProductOptionRepository;
@@ -34,14 +36,24 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final StoreRepository storeRepository;
     private final UserRepository userRepository;
-    private final ProductRepository productRepository;
-    private final ProductOptionRepository productOptionRepository;
-    private final PaymentMethodRepository paymentMethodRepository;
-    private final MemberPointService memberPointService;
     private final ControllerHelperService helperService;
     private final OrderNumberService orderNumberService;
+    private final OrderStateFactory  orderStateFactory;
+    private final OrderItemProcessorService orderItemProcessorService;
 
-
+    public OrderService(OrderRepository orderRepository, StoreRepository storeRepository, UserRepository userRepository,
+                        ControllerHelperService helperService,
+                        OrderNumberService orderNumberService,
+                        OrderStateFactory orderStateFactory,
+                        OrderItemProcessorService orderItemProcessorService) {
+        this.orderRepository = orderRepository;
+        this.storeRepository = storeRepository;
+        this.userRepository = userRepository;
+        this.helperService = helperService;
+        this.orderNumberService = orderNumberService;
+        this.orderStateFactory = orderStateFactory;
+        this.orderItemProcessorService = orderItemProcessorService;
+    }
 
     // 用於封裝品項處理結果的內部類別
     private static class ProcessedItemsResult {
@@ -54,22 +66,7 @@ public class OrderService {
         }
     }
 
-    public OrderService(OrderRepository orderRepository, StoreRepository storeRepository, UserRepository userRepository,
-            ProductRepository productRepository, ProductOptionRepository productOptionRepository,
-            PaymentMethodRepository paymentMethodRepository,
-            MemberPointService memberPointService,
-            ControllerHelperService helperService,
-                        OrderNumberService orderNumberService) {
-        this.orderRepository = orderRepository;
-        this.storeRepository = storeRepository;
-        this.userRepository = userRepository;
-        this.productRepository = productRepository;
-        this.productOptionRepository = productOptionRepository;
-        this.paymentMethodRepository = paymentMethodRepository;
-        this.memberPointService = memberPointService;
-        this.helperService = helperService;
-        this.orderNumberService = orderNumberService;
-    }
+
 
 
 
@@ -97,8 +94,8 @@ public class OrderService {
         order.setStatus(requestDto.getStatus());
         order.setPaymentMethod(null); // 建立時一律為 null
 
-        ProcessedItemsResult result = processOrderItems(order, requestDto.getItems(), brandId);
-        order.setItems(result.orderItems);
+        OrderItemProcessorService.ProcessedItemsResult result =
+                orderItemProcessorService.processOrderItems(order, requestDto.getItems(), brandId);        order.setItems(result.orderItems);
         order.setTotalAmount(result.totalAmount);
 
         order.setPointsUsed(0L);
@@ -131,47 +128,6 @@ public class OrderService {
 
     }
 
-    /**
-     * 處理訂單品項的核心邏輯：建立 OrderItem 實體並計算總金額
-     */
-    private ProcessedItemsResult processOrderItems(Order order, List<OrderItemDto> itemDtos, Long brandId) {
-        Set<OrderItem> orderItems = new HashSet<>();
-        BigDecimal totalAmount = BigDecimal.ZERO;
-
-        for (OrderItemDto itemDto : itemDtos) {
-            Product product = productRepository.findByBrand_BrandIdAndProductId(brandId, itemDto.getProductId())
-                    .orElseThrow(() -> new ResourceNotFoundException("找不到商品，ID：" + itemDto.getProductId()));
-
-            OrderItem orderItem = new OrderItem();
-            orderItem.setOrder(order);
-            orderItem.setProduct(product);
-            orderItem.setQuantity(itemDto.getQuantity());
-            orderItem.setNotes(itemDto.getNotes());
-
-            BigDecimal optionsPrice = BigDecimal.ZERO;
-            if (itemDto.getOptionIds() != null && !itemDto.getOptionIds().isEmpty()) {
-                Set<ProductOption> options = productOptionRepository.findByOptionIdIn(itemDto.getOptionIds());
-                if (options.size() != itemDto.getOptionIds().size()) {
-                    throw new BadRequestException("部分選項 ID 無效");
-                }
-                orderItem.setOptions(options);
-                optionsPrice = options.stream()
-                        .map(ProductOption::getPriceAdjustment)
-                        .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-            }
-
-            BigDecimal unitPrice = product.getBasePrice().add(optionsPrice);
-            orderItem.setUnitPrice(unitPrice);
-
-            BigDecimal subtotal = unitPrice.multiply(new BigDecimal(itemDto.getQuantity()));
-            orderItem.setSubtotal(subtotal);
-
-            orderItems.add(orderItem);
-            totalAmount = totalAmount.add(subtotal);
-        }
-        return new ProcessedItemsResult(orderItems, totalAmount);
-    }
 
     /**
      * 計算訂單總金額，但不儲存訂單。
@@ -182,7 +138,8 @@ public class OrderService {
         User staff = getCurrentStaff();
         Long brandId = staff.getBrand().getBrandId();
 
-        ProcessedItemsResult result = processOrderItems(null, requestDto.getItems(), brandId);
+        OrderItemProcessorService.ProcessedItemsResult result =
+                orderItemProcessorService.processOrderItems(null, requestDto.getItems(), brandId);
 
         return new OrderTotalDto(result.totalAmount);
     }
@@ -234,104 +191,58 @@ public class OrderService {
      */
     @Transactional
     public Order updateOrderStatus(Long brandId, Long orderId, OrderStatus newStatus) {
-        Order order = orderRepository.findByBrand_BrandIdAndOrderId(brandId, orderId)
-                .orElseThrow(() -> new ResourceNotFoundException("找不到訂單，ID：" + orderId));
+        Order order = getOrderDetails(brandId, orderId);
 
-        // 可以在此加入更複雜的狀態轉換邏輯檢查
-        // 例如：只有 PENDING 或 PREPARING 狀態才能變成 CANCELLED
-        // 例如：只有 PREPARING 狀態才能變成 COMPLETED
-        if (order.getStatus() == OrderStatus.COMPLETED || order.getStatus() == OrderStatus.CANCELLED) {
-            throw new BadRequestException("訂單狀態 " + order.getStatus() + " 無法被更新。");
-        }
+        // 1. 根據訂單「當前」狀態，取得對應的狀態物件
+        OrderState currentState = orderStateFactory.getState(order.getStatus());
 
-//        OrderStatus oldStatus = order.getStatus(); // 記錄舊狀態
-        order.setStatus(newStatus);
-
+        // 2. 委派「動作」給狀態物件
         if (newStatus == OrderStatus.COMPLETED) {
-            order.setCompletedTime(new Date());
-
-            // --- 【新增】 點數處理：計算並增加賺取的點數 ---
-            if (order.getMember() != null) {
-                Long pointsEarned = memberPointService.calculatePointsEarned(order.getFinalAmount());
-                order.setPointsEarned(pointsEarned); // 更新訂單上的記錄
-                if (pointsEarned > 0) {
-                    // 這個方法內部有 @Transactional(propagation = Propagation.MANDATORY)
-                    memberPointService.earnPoints(order.getMember(), order, pointsEarned);
-                }
-            }
-            // --- 點數處理結束 ---
-
-            // TODO: 在此處或透過事件監聽器觸發庫存扣除等後續邏輯
+            currentState.complete(order);
+        } else if (newStatus == OrderStatus.CANCELLED) {
+            currentState.cancel(order);
+        } else {
+            // (可選) 暫不支援 KDS 直接更新到其他狀態 (例如 PREPARING)
+            throw new BadRequestException("此 API 僅支援將狀態更新為 COMPLETED 或 CANCELLED。");
         }
-        // 可選：處理取消訂單時，是否需要回補點數？
-        // else if (newStatus == OrderStatus.CANCELLED && oldStatus !=
-        // OrderStatus.CANCELLED) {
-        // if (order.getMember() != null && order.getPointsUsed() > 0) {
-        // // 需要一個回補點數的方法
-        // // memberPointService.refundPoints(order.getMember(), order,
-        // order.getPointsUsed());
-        // }
-        // }
+
+        // 狀態物件內部已經修改了 order 的狀態，我們只需儲存
         return orderRepository.save(order);
     }
 
     @Transactional
+    public Order updateHeldOrder(Long brandId, Long orderId, CreateOrderRequestDto dto) {
+        // 1. 取得訂單 (並驗證 brandId)
+        Order order = getOrderDetails(brandId, orderId);
+
+        // 2. 取得目前狀態 (例如 HELD)
+        OrderState currentState = orderStateFactory.getState(order.getStatus());
+
+        // 3. 委派 "update" 動作
+        // (如果狀態不是 HELD/PENDING，currentState.update() 會自動拋出例外)
+        currentState.update(order, dto);
+
+        return orderRepository.save(order);
+    }
+
+    /**
+     * 【重構】
+     * 處理付款。
+     * 將「付款」動作委派給目前的狀態物件 (PendingState 或 HeldState)。
+     */
+    @Transactional
     public Order processPayment(Long brandId, Long orderId, ProcessPaymentRequestDto requestDto) {
-        // 1.
-        Order order = orderRepository.findByBrand_BrandIdAndOrderId(brandId, orderId)
-                .orElseThrow(() -> new ResourceNotFoundException("找不到訂單，ID：" + orderId));
+        // 1. 取得訂單
+        Order order = getOrderDetails(brandId, orderId);
 
-        // 2.
-        if (order.getStatus() != OrderStatus.PENDING && order.getStatus() != OrderStatus.HELD) {
-            throw new BadRequestException("訂單狀態為 " + order.getStatus() + "，無法進行結帳。");
-        }
+        // 2. 根據訂單「當前」狀態，取得對應的狀態物件
+        OrderState currentState = orderStateFactory.getState(order.getStatus());
 
-        // 3.
-        PaymentMethodEntity paymentMethodEntity = paymentMethodRepository.findByCode(requestDto.getPaymentMethod())
-                .orElseThrow(() -> new BadRequestException("無效的支付方式代碼：" + requestDto.getPaymentMethod()));
+        // 3. 委派「付款」動作給狀態物件
+        // (如果狀態不是 PENDING/HELD，currentState.processPayment() 會自動拋出例外)
+        currentState.processPayment(order, requestDto);
 
-        order.setPaymentMethod(paymentMethodEntity);
-
-        // 4.
-        User member = null;
-        BigDecimal discountAmount = BigDecimal.ZERO;
-        Long pointsToUse = 0L;
-
-        if (requestDto.getMemberId() != null) {
-            member = userRepository.findById(requestDto.getMemberId())
-                    .filter(user -> user.getMemberProfile() != null && user.getBrand().getBrandId().equals(brandId))
-                    .orElseThrow(() -> new ResourceNotFoundException("找不到會員，ID：" + requestDto.getMemberId()));
-
-            order.setMember(member); //
-
-            if (requestDto.getPointsToUse() > 0) {
-                pointsToUse = requestDto.getPointsToUse();
-                //
-                discountAmount = memberPointService.calculateDiscountAmount(pointsToUse);
-                //
-                memberPointService.usePoints(member, order, pointsToUse);
-            }
-        }
-
-        // 5.
-        order.setPointsUsed(pointsToUse);
-        order.setDiscountAmount(discountAmount);
-
-        BigDecimal finalAmount = order.getTotalAmount().subtract(discountAmount);
-        if (finalAmount.compareTo(BigDecimal.ZERO) < 0) {
-            finalAmount = BigDecimal.ZERO;
-        }
-        order.setFinalAmount(finalAmount);
-
-        // 6.
-        //
-        order.setStatus(OrderStatus.PREPARING); //
-
-        //
-        if (order.getStatus() == OrderStatus.PREPARING) {
-            // TODO新增狀態機
-        }
-
+        // 狀態物件內部已經修改了 order 的狀態，我們只需儲存
         return orderRepository.save(order);
     }
 
