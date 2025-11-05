@@ -59,7 +59,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const handleLogout = () => {
         localStorage.removeItem("accessToken");
         localStorage.removeItem("brandId");
-        window.location.href = "index.html";
+        window.location.href = "login.html";
     };
     const navbar = createNavbar("結帳系統", handleLogout);
     layoutEl.insertBefore(navbar, mainEl);
@@ -292,8 +292,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             alert(
                 `付款成功！ 訂單 ${paidOrder.orderNumber} 狀態已更新為 ${paidOrder.status}`
             );
-            window.location.href = "pos.html"; // 付款成功，跳回點餐頁
-
+            window.location.href = "pos.html";
         } catch (error) {
             alert(`付款失敗: ${error.message}`);
             confirmPaymentButton.disabled = false;
@@ -329,8 +328,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     confirmPaymentButton.addEventListener("click", handleConfirmPayment);
     cancelButton.addEventListener("click", () => {
         if (confirm("確定要取消結帳並返回點餐頁嗎？ (此訂單將維持 PENDING 狀態)")) {
-            window.location.href = "pos.html";
-        }
+            window.location.href = "pos.html";        }
     });
 
     // --- 6. 啟動 ---

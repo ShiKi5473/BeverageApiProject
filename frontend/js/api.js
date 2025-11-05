@@ -57,9 +57,8 @@ function redirectToLogin() {
   localStorage.removeItem("accessToken");
   localStorage.removeItem("brandId"); // 【保留】登入時仍需 brandId，登出時一併清除
   // 確保我們不會在 index.html 頁面還一直重複導向
-  if (window.location.pathname !== "/index.html") {
-    window.location.href = "index.html";
-  }
+    if (!window.location.pathname.endsWith("/login.html")) {
+        window.location.href = "login.html";  }
 }
 
 // --------------------------------------------------

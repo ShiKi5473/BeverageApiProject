@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>POS 點餐系統</title>
+    <link rel="stylesheet" href="../css/base.css" />
+    <link rel="stylesheet" href="../css/components/navbar.css" />
+    <link rel="stylesheet" href="../css/components/productCard.css" />
+    <link rel="stylesheet" href="../css/components/modal.css" />
+    <link rel="stylesheet" href="../css/pages/pos.css" />
+</head>
+<body>
+<div class="pos-layout">
+    <div class="pos-main-content">
+        <aside class="category-sidebar" id="category-sidebar">
+            <h2>商品分類</h2>
+            <ul id="category-list">
+                <li><a href="#" data-category-id="all" class="active">全部商品</a></li>
+            </ul>
+        </aside>
+
+        <main class="product-grid" id="product-grid">
+            <p>正在載入商品...</p>
+        </main>
+
+        <aside class="cart-sidebar" id="cart-sidebar">
+            <h2>購物車</h2>
+            <div id="cart-items"></div>
+            <div class="cart-total">
+                <p>總計: <span id="cart-total-amount">NT$ 0</span></p>
+                <button id="hold-button" class="btn-hold">暫存訂單</button>
+                <button id="checkout-button">結帳</button>
+            </div>
+        </aside>
+    </div>
+
+    <div class="modal-overlay" id="modal-overlay" style="display: none">
+        <div class="modal-content" id="modal-content"></div>
+    </div>
+</div>
+
+<script src="../js/pos.js" type="module"></script>
+</body>
+</html>

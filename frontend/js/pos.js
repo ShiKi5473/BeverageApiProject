@@ -27,7 +27,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const handleLogout = () => {
     localStorage.removeItem("accessToken");
     localStorage.removeItem("brandId");
-    window.location.href = "index.html";
+      window.location.href = "login.html";
   };
   const navbar = createNavbar("POS 點餐系統", handleLogout);
   posLayout.insertBefore(navbar, mainContent);
@@ -59,8 +59,9 @@ document.addEventListener("DOMContentLoaded", () => {
             shoppingCart = [];
             renderCart();
         } else {
-            window.location.href = `checkout.html?orderId=${newOrder.orderId}`;        }
-    } catch (error) {
+            window.location.href = `checkout.html?orderId=${newOrder.orderId}`;
+        }
+    }catch (error) {
         console.error(` ${action} 失敗:`, error);
         alert(` ${action} 失敗: ${error.message}`);
     }
@@ -110,7 +111,7 @@ document.addEventListener("DOMContentLoaded", () => {
         : allProducts.filter(
             (product) =>
               product.categories &&
-              product.categories.some((cat) => cat.categoryId == categoryId)
+              product.categories.some((cat) => cat.categoryId === Number(categoryId))
           );
 
     if (productsToRender.length === 0) {

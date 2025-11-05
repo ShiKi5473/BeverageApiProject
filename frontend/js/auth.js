@@ -47,7 +47,7 @@ document.addEventListener("DOMContentLoaded", () => {
         localStorage.setItem("brandId", brandId);
 
         // 11. 登入成功，轉跳到點餐頁面 (pos.html)
-        window.location.href = "pos.html";
+          window.location.href = "pos.html";
       } else {
         // 12. 登入失敗 (例如 401 帳密錯誤)
         const errorText = await response.text();
