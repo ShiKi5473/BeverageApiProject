@@ -15,7 +15,7 @@ import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
  * 這裡將使用者名稱和品牌ID合併為一個字串來查詢，例如 "username:brandId"。
  */
 
-@Service
+@Service("customUserDetailsService")
 public class CustomUserDetailsService implements UserDetailsService {
 
     @Autowired
@@ -28,8 +28,10 @@ public class CustomUserDetailsService implements UserDetailsService {
         Long brandId = BrandContextHolder.getBrandId();
 
         if (brandId == null) {
-            // 這是一個重要的安全檢查，防止在沒有品牌上下文的情況下進行認證
-            throw new IllegalStateException("BrandId not found in security context.");
+            // 如果 BrandId 為 null，代表這可能是平台管理員登入嘗試。
+            // 拋出 UsernameNotFoundException，告知 AuthenticationManager
+            // 「此 Provider 找不到使用者」，以便它嘗試下一個 Provider。
+            throw new UsernameNotFoundException("BrandId not found in security context. Cannot authenticate tenant user.");
         }
 
         // 在我們的設計中，username 即為 primaryPhone

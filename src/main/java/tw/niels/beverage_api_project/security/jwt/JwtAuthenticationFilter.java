@@ -4,27 +4,23 @@ import java.io.IOException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.MalformedJwtException;
-import io.jsonwebtoken.UnsupportedJwtException;
-import io.jsonwebtoken.security.SignatureException;
 import jakarta.annotation.Nonnull;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import tw.niels.beverage_api_project.security.BrandContextHolder;
-import tw.niels.beverage_api_project.security.CustomUserDetailsService;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -34,12 +30,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     // 注入 JWT 相關工具類別，用於生成、驗證和解析 Token
     private final JwtTokenProvider jwtTokenProvider;
     // 注入自定義的 UserDetailsService，用於從資料庫載入用戶資訊
-    private final CustomUserDetailsService userDetailsService;
+    private final UserDetailsService tenantUserDetailsService;
+    private final UserDetailsService platformAdminDetailsService; // 新增的
 
-    // 依賴注入的建構函式，Spring 會自動注入 JwtTokenProvider 和 CustomUserDetailsService 實例
-    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider, CustomUserDetailsService userDetailsService) {
+    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider,
+                                   @Qualifier("customUserDetailsService") UserDetailsService tenantUserDetailsService, // 使用 @Qualifier
+                                   @Qualifier("platformAdminDetailsService") UserDetailsService platformAdminDetailsService) {
         this.jwtTokenProvider = jwtTokenProvider;
-        this.userDetailsService = userDetailsService;
+        this.tenantUserDetailsService = tenantUserDetailsService;
+        this.platformAdminDetailsService = platformAdminDetailsService;
     }
 
     /**
@@ -48,80 +47,64 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
      */
     @Override
     protected void doFilterInternal(@Nonnull HttpServletRequest request,
-            @Nonnull HttpServletResponse response,
-            @Nonnull FilterChain filterChain)
+                                    @Nonnull HttpServletResponse response,
+                                    @Nonnull FilterChain filterChain)
             throws ServletException, IOException {
 
         filterLogger.info("JwtAuthenticationFilter processing request: {}", request.getRequestURI());
 
-        // 從請求的 Header 中提取 JWT Token
         String token = getTokenFromRequest(request);
 
-        // 檢查 Token 是否存在且有效
         if (StringUtils.hasText(token) && jwtTokenProvider.validateToken(token)) {
             try {
-                // 從 Token 中解析出 username 和 brandId
                 String username = jwtTokenProvider.getUsernameFromJWT(token);
-                Long brandId = jwtTokenProvider.getBrandIdFromJWT(token);
+                String userType = jwtTokenProvider.getTypeFromJWT(token); // 取得使用者類型
 
-                BrandContextHolder.setBrandId(brandId);
+                UserDetails userDetails;
 
-                // 根據用戶名從資料庫中載入用戶的詳細資訊（UserDetails）
-                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                // 【關鍵修改】
+                if ("PLATFORM_ADMIN".equals(userType)) {
+                    // 如果是平台管理員，呼叫 PlatformAdminDetailsService
+                    // 不設定 BrandContextHolder
+                    userDetails = platformAdminDetailsService.loadUserByUsername(username);
 
-                // 建立一個 UsernamePasswordAuthenticationToken 物件，用於代表已驗證的用戶
-                // 這個 Token 包含了用戶資訊（userDetails）、憑證（null，因為 JWT 不需密碼）和權限
+                } else if ("TENANT".equals(userType)) {
+                    // 如果是品牌員工，呼叫 CustomUserDetailsService
+                    Long brandId = jwtTokenProvider.getBrandIdFromJWT(token);
+                    if (brandId == null) {
+                        throw new MalformedJwtException("TENANT token is missing brandId claim.");
+                    }
+                    BrandContextHolder.setBrandId(brandId); // 設定 Brand 上下文
+                    userDetails = tenantUserDetailsService.loadUserByUsername(username);
+
+                } else {
+                    throw new MalformedJwtException("Invalid token type: " + userType);
+                }
+
+                // --- 後續授權邏輯 (保持不變) ---
                 UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
                         userDetails,
-                        null, // JWT Token 已經驗證過，不需要密碼，故設為 null
-                        userDetails.getAuthorities()); // 取得用戶的權限列表
+                        null,
+                        userDetails.getAuthorities());
 
-                // 設定認證 Token 的詳細資訊，包括客戶端的 IP 地址和 Session ID
                 authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-
-                filterLogger.debug("Setting Authentication in SecurityContextHolder: {}", authenticationToken);
-
-                // 將認證 Token 設定到 Spring Security 的上下文中
-                // 如此一來，後續的控制器和服務層就能夠知道是哪個用戶發出的請求，並進行權限檢查
                 SecurityContextHolder.getContext().setAuthentication(authenticationToken);
-            } catch (ExpiredJwtException | MalformedJwtException | SignatureException | UnsupportedJwtException
-                    | UsernameNotFoundException e) {
-                // 這些是「預期中」的認證失敗：Token 本身有問題，或 Token 對應的用戶不存在
-                // 使用 WARN 級別，因為這不是系統錯誤，而是客戶端的問題
-                filterLogger.warn("Authentication failed: {}", e.getMessage());
-
-                // 同樣要清除上下文
-                BrandContextHolder.clear();
-                SecurityContextHolder.clearContext();
 
             } catch (Exception e) {
-                // 這些是「未預期」的系統錯誤 (例如 NullPointerException 或資料庫連線問題)
-                // 這裡才真正需要使用 ERROR 級別
-                filterLogger.error("Unexpected error setting user authentication", e);
-
-                // 同樣要清除上下文
+                filterLogger.warn("Authentication failed: {}", e.getMessage());
                 BrandContextHolder.clear();
                 SecurityContextHolder.clearContext();
             }
         } else {
             filterLogger.debug("JWT Token not found or invalid.");
         }
+
         try {
-            // 呼叫下一個 filter 前打印狀態
-            Authentication authBeforeDoFilter = SecurityContextHolder.getContext().getAuthentication();
-            filterLogger.debug("Authentication before calling filterChain.doFilter(): {}", authBeforeDoFilter);
-
-            filterChain.doFilter(request, response); // 繼續執行 Filter Chain (可能拋出例外)
-
-            // 下一個 filter 執行完畢後打印狀態
-            Authentication authAfterDoFilter = SecurityContextHolder.getContext().getAuthentication();
-            filterLogger.debug("Authentication after calling filterChain.doFilter(): {}", authAfterDoFilter);
-
+            filterChain.doFilter(request, response);
         } finally {
-            BrandContextHolder.clear();
-            filterLogger.debug("Cleaned BrandContextHolder.");
+            BrandContextHolder.clear(); // 確保 BrandContextHolder 總是被清除
+            // SecurityContextHolder 在此不應被清除，除非有例外
         }
-
     }
 
     /**

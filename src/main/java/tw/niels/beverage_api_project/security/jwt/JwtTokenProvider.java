@@ -18,6 +18,7 @@ import io.jsonwebtoken.UnsupportedJwtException;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
+import tw.niels.beverage_api_project.modules.platform.security.PlatformAdminDetails;
 import tw.niels.beverage_api_project.security.AppUserDetails;
 
 /**
@@ -60,24 +61,32 @@ public class JwtTokenProvider {
      * @return 創建的 JWT 令牌字串
      */
     public String generateToken(Authentication authentication) {
-        // 取得用戶名稱作為 JWT 的主體（Subject）
-        AppUserDetails userDetails = (AppUserDetails) authentication.getPrincipal();
-        String username = userDetails.getUsername();
-        Long brandId = userDetails.getBrandId();
+            String username = authentication.getName();
+            Date currentDate = new Date();
+            Date expireDate = new Date(currentDate.getTime() + jwtExpirationInMs);
 
-        Date currentDate = new Date();
-        // 計算令牌的過期時間
-        Date expireDate = new Date(currentDate.getTime() + jwtExpirationInMs);
+            // 使用 Jwts.builder() 創建令牌
+            var tokenBuilder = Jwts.builder()
+                    .subject(username)
+                    .issuedAt(currentDate)
+                    .expiration(expireDate);
 
-        // 使用 Jwts.builder() 創建令牌
-        return Jwts.builder()
-                .subject(username) // 設定主體
-                .claim("brandId", brandId) // 將 brandId 作為一個 "claim" 加入 Token
-                .issuedAt(currentDate) // 設定簽發時間
-                .expiration(expireDate) // 設定過期時間
-                .signWith(key) // 使用密鑰簽名
-                .compact(); // 壓縮成最終的令牌字串
-    }
+            // 【關鍵修改】
+            // 檢查 Principal 的類型
+            Object principal = authentication.getPrincipal();
+            if (principal instanceof AppUserDetails userDetails) {
+                // 如果是品牌員工，存入 brandId
+                tokenBuilder.claim("brandId", userDetails.getBrandId());
+                tokenBuilder.claim("type", "TENANT"); // 新增一個 "type" 標記
+            } else if (principal instanceof PlatformAdminDetails) {
+                // 如果是平台管理員，不存 brandId
+                tokenBuilder.claim("type", "PLATFORM_ADMIN"); // 新增一個 "type" 標記
+            }
+
+            return tokenBuilder
+                    .signWith(key) // 使用密鑰簽名
+                    .compact(); // 壓縮成最終的令牌字串
+        }
 
     /**
      * 從 JWT 令牌中提取使用者名稱。
@@ -106,7 +115,21 @@ public class JwtTokenProvider {
                 .parseSignedClaims(token)
                 .getPayload();
 
+        // 使用 get(key, type) 避免 ClassCastException，如果 claim 不存在會回傳 null
         return claims.get("brandId", Long.class);
+    }
+
+    /**
+     * 【新增】
+     * 專門用來從 Token 中解析出使用者類型 (TENANT 或 PLATFORM_ADMIN)
+     */
+    public String getTypeFromJWT(String token) {
+        Claims claims = Jwts.parser()
+                .verifyWith(key)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+        return claims.get("type", String.class);
     }
 
     /**
