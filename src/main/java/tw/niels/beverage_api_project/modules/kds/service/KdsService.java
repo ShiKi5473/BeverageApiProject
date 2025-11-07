@@ -36,35 +36,45 @@ public class KdsService {
         KdsOrderDto kdsOrderDto = KdsOrderDto.fromEntity(order);
         switch (newStatus) {
             case PREPARING:
+                // 現場/線上訂單付款完成
                 logger.info("[KDS] 推送新訂單: #{} 至 {}", order.getOrderNumber(), kdsTopic);
-
-                // 【關鍵】透過 WebSocket 推送 "新訂單" 訊息
-                // 前端 KDS 訂閱 kdsTopic 後，就會收到 "NEW_ORDER" 和訂單資料
+                KdsOrderDto kdsDto;
                 messagingTemplate.convertAndSend(kdsTopic,
                         new KdsMessage("NEW_ORDER", kdsOrderDto));
                 break;
 
-            case CANCELLED:
-                if (event.getOldStatus() == OrderStatus.PREPARING) {
-                    logger.info("[KDS] 推送取消訂單: #{} 至 {}", order.getOrderNumber(), kdsTopic);
+            case READY_FOR_PICKUP:
+                // 【新增】KDS 製作完成
+                logger.info("[KDS] 訂單製作完成: #{} 至 {}", order.getOrderNumber(), kdsTopic);
 
-                    // 【關鍵】推送 "取消訂單" 訊息
-                    messagingTemplate.convertAndSend(kdsTopic,
-                            new KdsMessage("CANCEL_ORDER", kdsOrderDto));
-                }
+                // KDS 螢幕將訂單移至 "待取餐"
+                messagingTemplate.convertAndSend(kdsTopic,
+                        new KdsMessage("MOVE_TO_PICKUP", kdsOrderDto));
+
+                // (未來) 在此觸發線上點餐顧客的「取餐通知」
+                // customerNotificationService.notifyCustomer(order, "您的餐點已可取用！");
                 break;
 
-            case COMPLETED:
-                logger.info("[KDS] 推送完成訂單: #{} 至 {}", order.getOrderNumber(), kdsTopic);
+            case CLOSED:
+                // 【修改】POS 確認顧客已取餐
+                logger.info("[KDS] 訂單已結案: #{} 至 {}", order.getOrderNumber(), kdsTopic);
 
-                // 【關鍵】推送 "完成訂單" 訊息 (KDS 可移至待取餐)
+                // KDS 螢幕可以將訂單從 "待取餐" 列表中移除
                 messagingTemplate.convertAndSend(kdsTopic,
-                        new KdsMessage("COMPLETE_ORDER", kdsOrderDto));
+                        new KdsMessage("REMOVE_FROM_PICKUP", kdsOrderDto));
+                break;
+
+            case CANCELLED:
+                // 訂單在任何階段被取消
+                logger.info("[KDS] 推送取消訂單: #{} 至 {}", order.getOrderNumber(), kdsTopic);
+                messagingTemplate.convertAndSend(kdsTopic,
+                        new KdsMessage("CANCEL_ORDER", kdsOrderDto));
                 break;
 
             default:
                 break;
         }
+
 
 
     }

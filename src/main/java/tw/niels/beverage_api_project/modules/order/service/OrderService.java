@@ -5,23 +5,15 @@ import org.springframework.transaction.annotation.Transactional;
 import tw.niels.beverage_api_project.common.exception.BadRequestException;
 import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
 import tw.niels.beverage_api_project.common.service.ControllerHelperService;
-import tw.niels.beverage_api_project.modules.member.service.MemberPointService;
 import tw.niels.beverage_api_project.modules.order.dto.CreateOrderRequestDto;
-import tw.niels.beverage_api_project.modules.order.dto.OrderItemDto;
 import tw.niels.beverage_api_project.modules.order.dto.OrderTotalDto;
 import tw.niels.beverage_api_project.modules.order.dto.ProcessPaymentRequestDto;
 import tw.niels.beverage_api_project.modules.order.entity.Order;
 import tw.niels.beverage_api_project.modules.order.entity.OrderItem;
-import tw.niels.beverage_api_project.modules.order.entity.PaymentMethodEntity;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
 import tw.niels.beverage_api_project.modules.order.repository.OrderRepository;
-import tw.niels.beverage_api_project.modules.order.repository.PaymentMethodRepository;
 import tw.niels.beverage_api_project.modules.order.state.OrderState;
 import tw.niels.beverage_api_project.modules.order.state.OrderStateFactory;
-import tw.niels.beverage_api_project.modules.product.entity.Product;
-import tw.niels.beverage_api_project.modules.product.entity.ProductOption;
-import tw.niels.beverage_api_project.modules.product.repository.ProductOptionRepository;
-import tw.niels.beverage_api_project.modules.product.repository.ProductRepository;
 import tw.niels.beverage_api_project.modules.store.entity.Store;
 import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
 import tw.niels.beverage_api_project.modules.user.entity.User;
@@ -197,15 +189,14 @@ public class OrderService {
         OrderState currentState = orderStateFactory.getState(order.getStatus());
 
         // 2. 委派「動作」給狀態物件
-        if (newStatus == OrderStatus.COMPLETED) {
+        if (newStatus == OrderStatus.CLOSED) {
             currentState.complete(order);
         } else if (newStatus == OrderStatus.CANCELLED) {
             currentState.cancel(order);
         } else {
             // (可選) 暫不支援 KDS 直接更新到其他狀態 (例如 PREPARING)
-            throw new BadRequestException("此 API 僅支援將狀態更新為 COMPLETED 或 CANCELLED。");
+            throw new BadRequestException("此 API 僅支援將狀態更新為 CLOSED 或 CANCELLED。");
         }
-
         // 狀態物件內部已經修改了 order 的狀態，我們只需儲存
         return orderRepository.save(order);
     }

@@ -7,8 +7,6 @@ import tw.niels.beverage_api_project.modules.order.entity.Order;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
 import tw.niels.beverage_api_project.modules.order.event.OrderStateChangedEvent;
 
-import java.util.Date;
-
 @Component("PREPARING") // 使用 Enum 名稱作為 Spring Bean 名稱
 public class PreparingState extends AbstractOrderState {
 
@@ -29,19 +27,15 @@ public class PreparingState extends AbstractOrderState {
      */
     @Override
     public void complete(Order order) {
+        // 【注意】此 "complete" 動作現在由 KDS 觸發，代表「製作完成」
+
         OrderStatus oldStatus = order.getStatus();
-        order.setCompletedTime(new Date());
 
-        if (order.getMember() != null) {
-            Long pointsEarned = memberPointService.calculatePointsEarned(order.getFinalAmount());
-            order.setPointsEarned(pointsEarned);
-            if (pointsEarned > 0) {
-                memberPointService.earnPoints(order.getMember(), order, pointsEarned);
-            }
-        }
+        // 【修改】狀態轉換
+        order.setStatus(OrderStatus.READY_FOR_PICKUP);
 
-        order.setStatus(OrderStatus.COMPLETED);
-        eventPublisher.publishEvent(new OrderStateChangedEvent(order, oldStatus, OrderStatus.COMPLETED));
+        // 【修改】發布新事件
+        eventPublisher.publishEvent(new OrderStateChangedEvent(order, oldStatus, OrderStatus.READY_FOR_PICKUP));
     }
 
     /**
