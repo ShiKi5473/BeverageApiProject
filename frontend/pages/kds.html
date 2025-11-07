@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8" />
+    <title>KDS 廚房顯示系統 (測試)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 10px; }
+        .order-card { border: 1px solid #333; border-radius: 5px; padding: 10px; margin: 10px; width: 250px; float: left; }
+        .order-card.completed { background-color: #d4edda; }
+        .order-card.cancelled { background-color: #f8d7da; text-decoration: line-through; }
+        .order-card h3 { margin-top: 0; }
+    </style>
+</head>
+<body>
+<h1>KDS 廚房顯示系統 (店家 1 專用)</h1>
+<div id="connection-status" style="color: red;">尚未連線</div>
+<hr />
+<div id="order-wall"></div>
+
+<script src="../js/kds.js"></script>
+</body>
+</html>

@@ -73,6 +73,7 @@ public class SecurityConfig {
                         .requestMatchers(ApiPaths.API_V1 + ApiPaths.AUTH + "/**").permitAll() // 允許 "品牌" 登入
                         .requestMatchers(ApiPaths.API_V1 + "/platform/auth/login").permitAll() // 【新增】允許 "平台" 登入
                         .requestMatchers("/error").permitAll()
+                        .requestMatchers("/ws-kds/**").permitAll()
                         .anyRequest().authenticated()
                 );
 
