@@ -2,6 +2,7 @@ package tw.niels.beverage_api_project.modules.order.state;
 
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
+import tw.niels.beverage_api_project.common.exception.BadRequestException;
 import tw.niels.beverage_api_project.modules.member.service.MemberPointService;
 import tw.niels.beverage_api_project.modules.order.entity.Order;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
@@ -60,5 +61,9 @@ public class ReadyForPickupState extends AbstractOrderState {
 
         order.setStatus(OrderStatus.CANCELLED);
         eventPublisher.publishEvent(new OrderStateChangedEvent(order, oldStatus, OrderStatus.CANCELLED));
+    }
+    @Override
+    public void accept(Order order) {
+        throw new BadRequestException("訂單狀態為 " + getStatus() + "，無法執行接單動作。");
     }
 }

@@ -154,5 +154,20 @@ public class OrderController {
         Order updatedOrder = orderService.processPayment(brandId, orderId, requestDto);
         return ResponseEntity.ok(OrderResponseDto.fromEntity(updatedOrder));
     }
+    /**
+     * 店家確認接收一筆等待中的線上訂單
+     * PATCH /api/v1/orders/{orderId}/accept
+     */
+    @PatchMapping("/{orderId}/accept")
+    @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
+    public ResponseEntity<OrderResponseDto> acceptOrder(@PathVariable Long orderId) {
+
+        Long brandId = this.helperService.getCurrentBrandId();
+
+        // 呼叫 Service 新增的方法 (您需要在 OrderService 中建立此方法)
+        Order updatedOrder = orderService.acceptOrder(brandId, orderId);
+
+        return ResponseEntity.ok(OrderResponseDto.fromEntity(updatedOrder));
+    }
 
 }

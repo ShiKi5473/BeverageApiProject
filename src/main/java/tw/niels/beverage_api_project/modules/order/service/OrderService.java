@@ -47,19 +47,6 @@ public class OrderService {
         this.orderItemProcessorService = orderItemProcessorService;
     }
 
-    // 用於封裝品項處理結果的內部類別
-    private static class ProcessedItemsResult {
-        final Set<OrderItem> orderItems;
-        final BigDecimal totalAmount;
-
-        ProcessedItemsResult(Set<OrderItem> orderItems, BigDecimal totalAmount) {
-            this.orderItems = orderItems;
-            this.totalAmount = totalAmount;
-        }
-    }
-
-
-
 
 
     @Transactional
@@ -125,7 +112,6 @@ public class OrderService {
      * 計算訂單總金額，但不儲存訂單。
      */
     @Transactional(readOnly = true)
-
     public OrderTotalDto calculateOrderTotal(CreateOrderRequestDto requestDto) {
         User staff = getCurrentStaff();
         Long brandId = staff.getBrand().getBrandId();
@@ -225,8 +211,24 @@ public class OrderService {
         return orderRepository.save(order);
     }
 
+    @Transactional
+    public Order acceptOrder(Long brandId, Long orderId) {
+        // 1. 取得訂單
+        Order order = getOrderDetails(brandId, orderId);
+
+        // 2. 根據訂單「當前」狀態，取得對應的狀態物件
+        // 這裡 currentState 應該是 AwaitingAcceptanceState
+        OrderState currentState = orderStateFactory.getState(order.getStatus());
+
+        // 3. 委派「接單」動作
+        // (如果狀態不是 AWAITING_ACCEPTANCE，會自動拋出例外)
+        currentState.accept(order);
+
+        // 4. 儲存
+        return orderRepository.save(order);
+    }
+
     /**
-     * 【重構】
      * 處理付款。
      * 將「付款」動作委派給目前的狀態物件 (PendingState 或 HeldState)。
      */

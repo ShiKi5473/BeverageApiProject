@@ -71,7 +71,8 @@ public class MemberPointService {
             return; // 沒有會員或沒有使用點數，直接返回
         }
 
-        MemberProfile profile = member.getMemberProfile();
+        MemberProfile profile = memberProfileRepository.findByIdForUpdate(member.getUserId())
+                .orElseThrow(() -> new BadRequestException("使用者 ID " + member.getUserId() + " 不是會員"));
         if (profile == null) {
             System.err.println("警告：試圖為非會員 User ID " + member.getUserId() + " 退還點數");
             return;
@@ -83,8 +84,7 @@ public class MemberPointService {
         memberProfileRepository.save(profile); // 儲存更新後的 Profile
 
         // 記錄 Log
-        String reason = "訂單取消點數返還 (單號: " + (order != null ? order.getOrderNumber() : "N/A") + ")";
-        MemberPointLog log = new MemberPointLog(member, order, pointsToRefund, newTotalPoints, reason);
+        String reason = "訂單取消點數返還 (單號: " + order.getOrderNumber() + ")";        MemberPointLog log = new MemberPointLog(member, order, pointsToRefund, newTotalPoints, reason);
         memberPointLogRepository.save(log);
     }
 
@@ -102,7 +102,9 @@ public class MemberPointService {
             return; // 沒有會員或沒使用點數，直接返回
         }
 
-        MemberProfile profile = member.getMemberProfile();
+        MemberProfile profile = memberProfileRepository.findByIdForUpdate(member.getUserId())
+                .orElseThrow(() -> new BadRequestException("使用者 ID " + member.getUserId() + " 不是會員"));
+
         if (profile == null) {
             throw new BadRequestException("使用者 ID " + member.getUserId() + " 不是會員");
         }
@@ -135,7 +137,8 @@ public class MemberPointService {
             return; // 沒有會員或沒賺取點數，直接返回
         }
 
-        MemberProfile profile = member.getMemberProfile();
+        MemberProfile profile = memberProfileRepository.findByIdForUpdate(member.getUserId())
+                .orElseThrow(() -> new BadRequestException("使用者 ID " + member.getUserId() + " 不是會員"));
         if (profile == null) {
             // 理論上此時 profile 不應為 null，但還是加上防禦性檢查
             System.err.println("警告：試圖為非會員 User ID " + member.getUserId() + " 增加點數");

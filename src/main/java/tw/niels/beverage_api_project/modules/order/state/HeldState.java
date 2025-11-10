@@ -26,5 +26,4 @@ public class HeldState extends AbstractPrePaymentState { // 【注意】繼承�
         return OrderStatus.HELD;
     }
 
-    // update(), processPayment(), cancel() 都不用寫了！
 }

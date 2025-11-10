@@ -60,8 +60,12 @@ public class OrderItemProcessorService {
             orderItem.setOrder(order);
             orderItem.setProduct(product);
             orderItem.setQuantity(itemDto.getQuantity());
-            orderItem.setNotes(itemDto.getNotes()); // DTO 上的 notes 存到 Entity
-
+// 【新增】簡易的 XSS 防護：移除所有 HTML 標籤
+            String notes = itemDto.getNotes();
+            if (notes != null) {
+                notes = notes.replaceAll("<[^>]*>", ""); // 移除所有 <...> 標籤
+            }
+            orderItem.setNotes(notes); // 儲存清理過的 notes
             BigDecimal optionsPrice = BigDecimal.ZERO;
             if (itemDto.getOptionIds() != null && !itemDto.getOptionIds().isEmpty()) {
                 Set<ProductOption> options = productOptionRepository.findByOptionIdIn(itemDto.getOptionIds());

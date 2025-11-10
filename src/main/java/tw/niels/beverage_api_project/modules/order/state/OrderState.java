@@ -34,4 +34,10 @@ public interface OrderState {
      */
     void cancel(Order order);
 
+    /**
+     * 動作：店家確認接單
+     * (僅 AWAITING_ACCEPTANCE 狀態可執行)
+     */
+    void accept(Order order);
+
 }

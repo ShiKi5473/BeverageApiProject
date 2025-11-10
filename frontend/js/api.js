@@ -28,7 +28,6 @@ async function fetchWithAuth(endpoint, options = {}) {
 
   // 4. 【修改】 組合完整的 API 網址
   //    後端現在會自動從 Token 讀取 brandId，不再需要 {brandId} 佔位符
-  //    (舊) const url = `${API_BASE_URL}${endpoint.replace("{brandId}", brandId)}`;
   const url = `${API_BASE_URL}${endpoint}`; // <-- 【簡化】
 
   try {

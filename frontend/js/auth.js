@@ -47,11 +47,20 @@ document.addEventListener("DOMContentLoaded", () => {
         localStorage.setItem("brandId", brandId);
 
           if (data.storeId) {
+              // 登入者是「店員」或「店長」
               localStorage.setItem("storeId", data.storeId);
+              // 11. 轉跳到點餐頁面 (pos.html)
+              window.location.href = "pos.html";
           } else {
-              // 如果登入者是品牌管理員 (BRAND_ADMIN)，他可能沒有 storeId
+              // 登入者是「品牌管理員」
               localStorage.removeItem("storeId");
-              console.warn("此帳號沒有綁定店家 (storeId)。");
+              console.warn("此帳號為品牌管理員，應導向管理頁面 (目前尚未建立)");
+              // TODO 未來您可以建立一個 admin.html
+              // window.location.href = "admin.html";
+
+              // 目前暫時顯示提醒，並允許他進入 POS (雖然 POS 會擋住他)
+              alert("品牌管理員登入成功。\n（目前沒有專屬後台，將嘗試進入 POS 頁）");
+              window.location.href = "pos.html"; // 保留原狀，但已告知使用者
           }
 
         // 11. 登入成功，轉跳到點餐頁面 (pos.html)

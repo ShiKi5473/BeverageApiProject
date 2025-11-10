@@ -92,11 +92,14 @@ public abstract class AbstractPrePaymentState extends AbstractOrderState {
         eventPublisher.publishEvent(new OrderStateChangedEvent(order, oldStatus, OrderStatus.PREPARING));
     }
 
-    // 移入 cancel 實作
     @Override
     public void cancel(Order order) {
         OrderStatus oldStatus = order.getStatus();
         order.setStatus(OrderStatus.CANCELLED);
         eventPublisher.publishEvent(new OrderStateChangedEvent(order, oldStatus, OrderStatus.CANCELLED));
+    }
+    @Override
+    public void accept(Order order) {
+        throw new BadRequestException("訂單狀態為 " + getStatus() + "，無法執行接單動作。");
     }
 }
