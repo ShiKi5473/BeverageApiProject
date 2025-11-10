@@ -189,13 +189,22 @@ public class OrderService {
         OrderState currentState = orderStateFactory.getState(order.getStatus());
 
         // 2. 委派「動作」給狀態物件
-        if (newStatus == OrderStatus.CLOSED) {
+        if (newStatus == OrderStatus.READY_FOR_PICKUP) {
+            // 由 KDS 觸發 (PREPARING -> READY_FOR_PICKUP)
+            // currentState 應該是 PreparingState
+            // 呼叫 PreparingState.complete() 會將狀態轉為 READY_FOR_PICKUP
             currentState.complete(order);
+        } else if (newStatus == OrderStatus.CLOSED) {
+            // 由 POS 觸發 (READY_FOR_PICKUP -> CLOSED)
+            // currentState 應該是 ReadyForPickupState
+            // 呼叫 ReadyForPickupState.complete() 會將狀態轉為 CLOSED
+            currentState.complete(order);
+
         } else if (newStatus == OrderStatus.CANCELLED) {
             currentState.cancel(order);
         } else {
-            // (可選) 暫不支援 KDS 直接更新到其他狀態 (例如 PREPARING)
-            throw new BadRequestException("此 API 僅支援將狀態更新為 CLOSED 或 CANCELLED。");
+            // 拋出一個更通用的錯誤訊息
+            throw new BadRequestException("此 API 不支援將狀態更新為 " + newStatus);
         }
         // 狀態物件內部已經修改了 order 的狀態，我們只需儲存
         return orderRepository.save(order);
