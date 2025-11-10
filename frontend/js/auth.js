@@ -46,6 +46,14 @@ document.addEventListener("DOMContentLoaded", () => {
         localStorage.setItem("accessToken", data.accessToken);
         localStorage.setItem("brandId", brandId);
 
+          if (data.storeId) {
+              localStorage.setItem("storeId", data.storeId);
+          } else {
+              // 如果登入者是品牌管理員 (BRAND_ADMIN)，他可能沒有 storeId
+              localStorage.removeItem("storeId");
+              console.warn("此帳號沒有綁定店家 (storeId)。");
+          }
+
         // 11. 登入成功，轉跳到點餐頁面 (pos.html)
           window.location.href = "pos.html";
       } else {

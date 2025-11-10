@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 
 import tw.niels.beverage_api_project.modules.auth.dto.JwtAuthResponseDto;
 import tw.niels.beverage_api_project.modules.auth.dto.LoginRequestDto;
+import tw.niels.beverage_api_project.security.AppUserDetails;
 import tw.niels.beverage_api_project.security.BrandContextHolder;
 import tw.niels.beverage_api_project.security.jwt.JwtTokenProvider;
 
@@ -31,7 +32,13 @@ public class AuthService {
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
             String token = tokenProvider.generateToken(authentication);
-            return new JwtAuthResponseDto(token);
+
+            JwtAuthResponseDto responseDto = new JwtAuthResponseDto(token);
+            Object principal = authentication.getPrincipal();
+            if(principal instanceof AppUserDetails userDetails) {
+                responseDto.setStoreId(userDetails.getStoreId()); //
+            }
+            return responseDto;
         } finally {
             // 無論認證成功或失敗，最後都要清除 ThreadLocal，避免記憶體洩漏
             BrandContextHolder.clear();

@@ -5,20 +5,31 @@
     <title>KDS 廚房顯示系統 (測試)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
-    <style>
-        body { font-family: Arial, sans-serif; padding: 10px; }
-        .order-card { border: 1px solid #333; border-radius: 5px; padding: 10px; margin: 10px; width: 250px; float: left; }
-        .order-card.completed { background-color: #d4edda; }
-        .order-card.cancelled { background-color: #f8d7da; text-decoration: line-through; }
-        .order-card h3 { margin-top: 0; }
-    </style>
+
+    <link rel="stylesheet" href="../css/pages/kds.css" />
 </head>
 <body>
-<h1>KDS 廚房顯示系統 (店家 1 專用)</h1>
-<div id="connection-status" style="color: red;">尚未連線</div>
-<hr />
-<div id="order-wall"></div>
+<div class="kds-header">
+    <h1>KDS 廚房顯示 (店家 1)</h1>
+    <div id="connection-status" class="status-disconnected">
+        尚未連線
+    </div>
+</div>
 
-<script src="../js/kds.js"></script>
+<div class="kds-main-layout">
+    <div class="kds-column" id="preparing-column">
+        <h2 class="column-title">製作中 (PREPARING)</h2>
+        <div class="kds-card-list" id="preparing-list">
+        </div>
+    </div>
+
+    <div class="kds-column" id="pickup-column">
+        <h2 class="column-title">待取餐 (READY_FOR_PICKUP)</h2>
+        <div class="kds-card-list" id="pickup-list">
+        </div>
+    </div>
+</div>
+
+<script src="../js/kds.js" type="module"></script>
 </body>
 </html>

@@ -164,3 +164,42 @@ export async function findMemberByPhone(phone) {
     }
     return response.json();
 }
+
+/**
+ * 根據狀態查詢訂單列表
+ * (對應 OrderController GET /api/v1/orders?storeId=...&status=...)
+ * @param {number} storeId
+ * @param {string} status (e.g., "PREPARING", "READY_FOR_PICKUP")
+ */
+export async function getOrdersByStatus(storeId, status) {
+    const response = await fetchWithAuth(
+        `/api/v1/orders?storeId=${storeId}&status=${status}`,
+        { method: "GET" }
+    );
+    if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`取得 ${status} 訂單失敗: ${errorBody}`);
+    }
+    return response.json();
+}
+
+/**
+ * 更新訂單狀態
+ * (對應 OrderController PATCH /api/v1/orders/{orderId}/status)
+ * @param {number} orderId
+ * @param {string} newStatus (e.g., "READY_FOR_PICKUP", "CLOSED")
+ */
+export async function updateOrderStatus(orderId, newStatus) {
+    const response = await fetchWithAuth(
+        `/api/v1/orders/${orderId}/status`,
+        {
+            method: "PATCH",
+            body: JSON.stringify({ status: newStatus }),
+        }
+    );
+    if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`更新訂單狀態為 ${newStatus} 失敗: ${errorBody}`);
+    }
+    return response.json();
+}

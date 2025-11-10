@@ -6,9 +6,12 @@ import lombok.Data;
 public class JwtAuthResponseDto {
     private String accessToken;
     private String tokenType="Bearer";
+    private Long storeId;
 
     public JwtAuthResponseDto(String accessToken){
+
         this.accessToken = accessToken;
+        this.storeId = null;
     }
 
 

@@ -1,90 +1,182 @@
-// 檔案： frontend/js/kds.js (新檔案)
+// 檔案： frontend/js/kds.js (修改後)
+
+import { getOrdersByStatus, updateOrderStatus } from "./api.js";
+import { connectToWebSocket } from "./ws-client.js";
+
+const MY_STORE_ID = localStorage.getItem("storeId");
+
 document.addEventListener("DOMContentLoaded", () => {
-    const orderWall = document.getElementById("order-wall");
+    if (!MY_STORE_ID) {
+        const errorMsg = "錯誤：找不到店家 ID (storeId)。KDS 無法啟動。\n將導回登入頁。";
+        console.error(errorMsg);
+        alert(errorMsg);
+        window.location.href = "login.html";
+        return; // 中斷執行
+    }
+    // DOM 元素
+    const preparingListEl = document.getElementById("preparing-list");
+    const pickupListEl = document.getElementById("pickup-list");
     const statusEl = document.getElementById("connection-status");
 
-    // !!! 假設 KDS 螢幕是給 "店家 1" 用的
-    const MY_STORE_ID = 1;
+    // 假設 KDS 螢幕是給 "店家 1" 用的
 
-    // 1. 從 localStorage 取得 JWT (必須先登入 POS)
-    const token = localStorage.getItem("accessToken");
-    if (!token) {
-        statusEl.textContent = "錯誤：請先登入 POS 系統取得 Token";
-        return;
+    /**
+     * 1. 頁面載入時，抓取所有 "製作中" 和 "待取餐" 的訂單
+     */
+    async function loadInitialOrders() {
+        try {
+            // 平行抓取
+            const [preparingOrders, pickupOrders] = await Promise.all([
+                getOrdersByStatus(MY_STORE_ID, "PREPARING"),
+                getOrdersByStatus(MY_STORE_ID, "READY_FOR_PICKUP")
+            ]);
+
+            preparingListEl.innerHTML = "";
+            pickupListEl.innerHTML = "";
+
+            preparingOrders.forEach(order => renderOrderCard(order, preparingListEl));
+            pickupOrders.forEach(order => renderOrderCard(order, pickupListEl));
+
+        } catch (error) {
+            console.error("載入初始訂單失敗:", error);
+            preparingListEl.innerHTML = `<p class="error">${error.message}</p>`;
+        }
     }
 
-    function connect() {
-        statusEl.textContent = "連線中...";
+    /**
+     * 2. 渲染訂單卡片
+     */
+    function renderOrderCard(order, targetListElement) {
+        const orderId = `kds-order-${order.orderId}`;
 
-        // 2. 建立 SockJS 連線 (指向 WebSocketConfig 的端點)
-        const socket = new SockJS("http://localhost:8080/ws-kds");
-        const stompClient = Stomp.over(socket);
-        stompClient.debug = null; // (設為 console.log 可看詳細日誌)
+        // 避免重複渲染
+        if (document.getElementById(orderId)) return;
 
-        // 3. 【關鍵】設定 STOMP 連線標頭，帶入 JWT
-        const headers = {
-            "Authorization": `Bearer ${token}`
-        };
+        const card = document.createElement("div");
+        card.id = orderId;
+        card.className = "kds-card";
 
-        stompClient.connect(headers,
-            // 4. 連線成功
-            (frame) => {
-                statusEl.textContent = "已連線 (KDS - Store 1)";
-                statusEl.style.color = "green";
+        // 組合品項 HTML
+        let itemsHtml = order.items.map(item => `
+            <li>
+                <strong>${item.productName} (x${item.quantity})</strong>
+                ${item.options.length > 0 ?
+            `<div class="kds-item-options">${item.options.map(opt => opt.optionName).join(", ")}</div>` : ''
+        }
+                ${item.notes ?
+            `<div class="kds-item-notes">備註: ${item.notes}</div>` : ''
+        }
+            </li>
+        `).join("");
 
-                // 5. 【關鍵】訂閱 "我這家店" 的主題
-                const topic = `/topic/kds/store/${MY_STORE_ID}`;
-                console.log("訂閱:", topic);
+        // 根據狀態決定是否顯示按鈕
+        const buttonHtml = order.status === "PREPARING" ?
+            `<button class="kds-complete-btn" data-order-id="${order.orderId}">製作完成</button>` :
+            ''; // 待取餐狀態 KDS 不需按鈕
 
-                stompClient.subscribe(topic, (message) => {
-                    // 6. 收到訊息時的處理
-                    const kdsMessage = JSON.parse(message.body);
-                    handleKdsMessage(kdsMessage.action, kdsMessage.payload);
-                });
+        card.innerHTML = `
+            <h3>#${order.orderNumber}</h3>
+            <ul>${itemsHtml}</ul>
+            ${buttonHtml}
+        `;
+
+        // 新訂單放在最前面
+        targetListElement.prepend(card);
+    }
+
+    /**
+     * 3. 處理 WebSocket 訊息
+     */
+    function handleKdsMessage(action, order) {
+        const orderId = `kds-order-${order.orderId}`;
+        const existingCard = document.getElementById(orderId);
+
+        console.log("KDS 收到 WS 訊息:", action, order.orderNumber);
+
+        if (action === "NEW_ORDER") {
+            // 新訂單 -> 加入 "製作中"
+            renderOrderCard(order, preparingListEl);
+
+        } else if (action === "MOVE_TO_PICKUP") {
+            // 製作完成 -> 從 "製作中" 移到 "待取餐"
+            if (existingCard) {
+                existingCard.remove(); // 從舊列表移除
+            }
+            renderOrderCard(order, pickupListEl); // 渲染到新列表
+
+        } else if (action === "CANCEL_ORDER") {
+            // 訂單取消
+            if (existingCard) {
+                existingCard.classList.add("cancelled");
+                // 移除所有按鈕
+                const btn = existingCard.querySelector("button");
+                if (btn) btn.remove();
+            }
+
+        } else if (action === "REMOVE_FROM_PICKUP") {
+            // 顧客已取餐
+            if (existingCard) {
+                existingCard.remove(); // 從 "待取餐" 移除
+            }
+        }
+    }
+
+    /**
+     * 4. 處理 KDS 上的「製作完成」按鈕點擊
+     */
+    async function handleCompleteProduction(event) {
+        const button = event.target.closest(".kds-complete-btn");
+        if (!button) return;
+
+        const orderId = button.dataset.orderId;
+        button.disabled = true;
+        button.textContent = "傳送中...";
+
+        try {
+            // 【關鍵】呼叫 API，將狀態從 PREPARING -> READY_FOR_PICKUP
+            await updateOrderStatus(orderId, "READY_FOR_PICKUP");
+
+            // 成功！
+            // 我們不需要手動移動卡片，因為後端會發布 "MOVE_TO_PICKUP" 事件，
+            // handleKdsMessage() 會自動處理 UI 更新
+
+        } catch (error) {
+            console.error("更新訂單為 READY_FOR_PICKUP 失敗:", error);
+            alert(`訂單 ${orderId} 更新失敗: ${error.message}`);
+            button.disabled = false;
+            button.textContent = "製作完成";
+        }
+    }
+
+    /**
+     * 5. 啟動 WebSocket 連線
+     */
+    function startWebSocket() {
+        connectToWebSocket(
+            MY_STORE_ID,
+            // onMessage
+            (action, payload) => handleKdsMessage(action, payload),
+            // onConnect
+            () => {
+                statusEl.textContent = `已連線 (店家 ${MY_STORE_ID})`;
+                statusEl.className = "status-connected";
             },
-            // 7. 連線失敗
+            // onError
             (error) => {
-                console.error("連線失敗:", error);
-                statusEl.textContent = "連線失敗，5 秒後重試";
-                statusEl.style.color = "red";
-                setTimeout(connect, 5000); // 5秒後重試
+                statusEl.textContent = `連線中斷: ${error} (5秒後重試)`;
+                statusEl.className = "status-disconnected";
             }
         );
     }
 
-    function handleKdsMessage(action, order) {
-        const orderId = `order-${order.orderId}`;
-        let card = document.getElementById(orderId);
+    // --- 啟動程序 ---
 
-        if (action === "NEW_ORDER") {
-            if (card) return; // (如果重複收到，忽略)
+    // 1. 綁定按鈕點擊 (使用事件委派)
+    preparingListEl.addEventListener("click", handleCompleteProduction);
 
-            card = document.createElement("div");
-            card.id = orderId;
-            card.className = "order-card";
+    // 2. 載入初始訂單
+    loadInitialOrders();
 
-            let itemsHtml = order.items.map(item =>
-                `<li>${item.productName} (x${item.quantity})</li>`
-            ).join("");
-
-            card.innerHTML = `
-                <h3>#${order.orderNumber}</h3>
-                <ul>${itemsHtml}</ul>
-            `;
-            orderWall.prepend(card); // 新訂單放在最前面
-
-        } else if (action === "COMPLETE_ORDER") {
-            if (!card) return;
-            card.classList.add("completed");
-            card.innerHTML += "<p><strong>已完成</strong></p>";
-
-        } else if (action === "CANCEL_ORDER") {
-            if (!card) return;
-            card.classList.add("cancelled");
-            card.innerHTML += "<p><strong>已取消</strong></p>";
-        }
-    }
-
-    // 啟動連線
-    connect();
+    // 3. 啟動 WS
+    startWebSocket();
 });

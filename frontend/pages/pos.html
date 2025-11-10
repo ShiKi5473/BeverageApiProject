@@ -9,10 +9,16 @@
     <link rel="stylesheet" href="../css/components/productCard.css" />
     <link rel="stylesheet" href="../css/components/modal.css" />
     <link rel="stylesheet" href="../css/pages/pos.css" />
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
 </head>
 <body>
+
 <div class="pos-layout">
+
     <div class="pos-main-content">
+
         <aside class="category-sidebar" id="category-sidebar">
             <h2>商品分類</h2>
             <ul id="category-list">
@@ -26,18 +32,27 @@
 
         <aside class="cart-sidebar" id="cart-sidebar">
             <h2>購物車</h2>
-            <div id="cart-items"></div>
+            <div id="cart-items">
+                <p class='cart-empty'>購物車是空的</p> </div>
             <div class="cart-total">
                 <p>總計: <span id="cart-total-amount">NT$ 0</span></p>
                 <button id="hold-button" class="btn-hold">暫存訂單</button>
                 <button id="checkout-button">結帳</button>
             </div>
+
+            <div class="pickup-section">
+                <h3 class="pickup-title">待取餐 (READY)</h3> <div id="pickup-list">
+                <p class="pickup-empty">目前沒有待取餐點</p>
+            </div>
+            </div>
         </aside>
+
     </div>
 
     <div class="modal-overlay" id="modal-overlay" style="display: none">
         <div class="modal-content" id="modal-content"></div>
     </div>
+
 </div>
 
 <script src="../js/pos.js" type="module"></script>

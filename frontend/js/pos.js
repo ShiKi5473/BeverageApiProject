@@ -2,19 +2,32 @@ import {
   getCategories,
   getPosProducts,
   createOrder,
+    getOrdersByStatus,
+    updateOrderStatus
 } from "./api.js";
 import { createProductCard } from "./components/ProductCard.js";
 import { createOptionsModalContent } from "./components/OptionsModal.js";
 import { createCartItem, updateCartTotal } from "./components/Cart.js";
 import { createNavbar } from "./components/Navbar.js";
+import { connectToWebSocket } from "./ws-client.js";
 
 let allProducts = [];
 let shoppingCart = [];
-//
 let currentModal = null;
 
+const MY_STORE_ID = localStorage.getItem("storeId");
+
 document.addEventListener("DOMContentLoaded", () => {
-  // 1. 取得元素
+    if (!MY_STORE_ID) {
+        // 可能是品牌管理員，或登入狀態異常
+        const errorMsg = "錯誤：找不到店家 ID (storeId)。\n\n品牌管理員帳號無法使用 POS 點餐系統。\n\n將導回登入頁。";
+        console.error(errorMsg);
+        alert(errorMsg);
+        window.location.href = "login.html";
+        return; // 中斷此腳本的後續執行
+    }
+
+    // 1. 取得元素
   const productGrid = document.getElementById("product-grid");
   const posLayout = document.querySelector(".pos-layout");
   const mainContent = document.querySelector(".pos-main-content");
@@ -24,6 +37,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const modalOverlay = document.getElementById("modal-overlay");
   const modalContent = document.getElementById("modal-content");
 
+    const pickupListEl = document.getElementById("pickup-list");
+    const cartEmptyEl = document.querySelector(".cart-empty");
   const handleLogout = () => {
     localStorage.removeItem("accessToken");
     localStorage.removeItem("brandId");
@@ -235,18 +250,118 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  loadAllData();
+    async function loadPickupOrders() {
+        try {
+            const orders = await getOrdersByStatus(MY_STORE_ID, "READY_FOR_PICKUP");
+            pickupListEl.innerHTML = ""; // 清空
+            if (orders.length === 0) {
+                pickupListEl.innerHTML = "<p class='pickup-empty'>目前沒有待取餐點</p>";
+            } else {
+                orders.forEach(renderPickupItem);
+            }
+        } catch (e) {
+            pickupListEl.innerHTML = `<p class="error">${e.message}</p>`;
+        }
+    }
+
+    /**
+     * 7. 【新增】渲染單一待取餐項目
+     */
+    function renderPickupItem(order) {
+        const orderId = `pickup-order-${order.orderId}`;
+        if (document.getElementById(orderId)) return; // 避免重複
+
+        // 移除 "empty" 提示
+        const emptyEl = pickupListEl.querySelector(".pickup-empty");
+        if (emptyEl) emptyEl.remove();
+
+        const itemEl = document.createElement("div");
+        itemEl.id = orderId;
+        itemEl.className = "pickup-item";
+        itemEl.innerHTML = `
+          <span class="pickup-item-number">#${order.orderNumber}</span>
+          <button class="btn-complete-pickup" data-order-id="${order.orderId}">完成取餐</button>
+      `;
+        pickupListEl.prepend(itemEl); // 新的放最上面
+    }
+
+    /**
+     * 8. 【新增】處理 WebSocket 訊息
+     */
+    function handlePosWebSocketMessage(action, order) {
+        console.log("POS 收到 WS 訊息:", action, order.orderNumber);
+        const orderElId = `pickup-order-${order.orderId}`;
+        const existingEl = document.getElementById(orderElId);
+
+        if (action === "MOVE_TO_PICKUP") {
+            // KDS 製作完成 -> 加入待取餐
+            if (!existingEl) {
+                renderPickupItem(order);
+            }
+        } else if (action === "REMOVE_FROM_PICKUP" || action === "CANCEL_ORDER") {
+            // 顧客已取餐 (CLOSED) 或 訂單取消 (CANCELLED)
+            if (existingEl) {
+                existingEl.remove();
+            }
+            // 檢查列表是否空了
+            if (pickupListEl.children.length === 0) {
+                pickupListEl.innerHTML = "<p class='pickup-empty'>目前沒有待取餐點</p>";
+            }
+        }
+        // POS 不需要處理 NEW_ORDER (因為 KDS 會處理)
+    }
+
+    /**
+     * 9. 【新增】處理 POS 上的「完成取餐」按鈕點擊
+     */
+    async function handleCompletePickup(event) {
+        const button = event.target.closest(".btn-complete-pickup");
+        if (!button) return;
+
+        const orderId = button.dataset.orderId;
+        button.disabled = true;
+        button.textContent = "處理中...";
+
+        try {
+            // 【關鍵】呼叫 API，將狀態從 READY_FOR_PICKUP -> CLOSED
+            await updateOrderStatus(orderId, "CLOSED");
+
+            // 成功！
+            // 後端會發布 "REMOVE_FROM_PICKUP" 事件，
+            // handlePosWebSocketMessage() 會自動處理 UI 更新 (移除卡片)
+
+        } catch (error) {
+            console.error("更新訂單為 CLOSED 失敗:", error);
+            alert(`訂單 ${orderId} 更新失敗: ${error.message}`);
+            button.disabled = false;
+            button.textContent = "完成取餐";
+        }
+    }
+
+    // --- 10. 啟動程序 ---
+
+    // 綁定「結帳」和「暫存」按鈕
     const checkoutButton = document.getElementById("checkout-button");
     const holdButton = document.getElementById("hold-button");
+    checkoutButton.addEventListener("click", () => submitOrder('CHECKOUT'));
+    holdButton.addEventListener("click", () => submitOrder('HELD'));
 
-    // 1. 綁定 "結帳" 按鈕
-    checkoutButton.addEventListener("click", () => {
-        submitOrder('CHECKOUT'); // 傳入 'CHECKOUT'，會被轉為 'PENDING'
-    });
+    // 【新增】綁定「完成取餐」按鈕 (使用事件委派)
+    pickupListEl.addEventListener("click", handleCompletePickup);
 
-    // 2. 綁定 "暫存訂單" 按鈕
-    holdButton.addEventListener("click", () => {
-        submitOrder('HELD'); // 傳入 'HELD'
-    });
-  renderCart();
+    // 載入初始資料
+    loadAllData(); // 載入商品
+    renderCart();  // 渲染空購物車
+    loadPickupOrders(); // 【新增】載入待取餐列表
+
+    // 【新增】啟動 WebSocket
+    connectToWebSocket(
+        MY_STORE_ID,
+        // onMessage
+        (action, payload) => handlePosWebSocketMessage(action, payload),
+        // onConnect
+        () => { console.log("POS WebSocket 已連線"); },
+        // onError
+        (error) => { console.error("POS WebSocket 連線失敗:", error); }
+    );
 });
