@@ -43,9 +43,7 @@ public class ProductService {
                 Brand brand = brandRepository.findById(brandId)
                                 .orElseThrow(() -> new RuntimeException("找不到品牌，ID：" + brandId));
 
-                Set<Category> categories = categoryRepository.findAllById(request.getCategoryIds())
-                                .stream()
-                                .collect(Collectors.toSet());
+            Set<Category> categories = categoryRepository.findByBrand_BrandIdAndCategoryIdIn(brandId, request.getCategoryIds());
 
                 if (categories.size() != request.getCategoryIds().size()) {
                         throw new RuntimeException("部分分類 ID 無效");

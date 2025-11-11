@@ -9,7 +9,6 @@ import tw.niels.beverage_api_project.modules.order.dto.CreateOrderRequestDto;
 import tw.niels.beverage_api_project.modules.order.dto.OrderTotalDto;
 import tw.niels.beverage_api_project.modules.order.dto.ProcessPaymentRequestDto;
 import tw.niels.beverage_api_project.modules.order.entity.Order;
-import tw.niels.beverage_api_project.modules.order.entity.OrderItem;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
 import tw.niels.beverage_api_project.modules.order.repository.OrderRepository;
 import tw.niels.beverage_api_project.modules.order.state.OrderState;
@@ -102,7 +101,9 @@ public class OrderService {
     // 從 Security Context 取得當前登入的員工 User Entity
     private User getCurrentStaff() {
         Long currentUserId = helperService.getCurrentUserId();
-        return userRepository.findById(currentUserId)
+        Long currentBrandId = helperService.getCurrentBrandId();
+
+        return userRepository.findByBrand_BrandIdAndUserId(currentBrandId, currentUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("找不到當前登入的員工資訊"));
 
     }
