@@ -2,19 +2,18 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8" />
-    <title>KDS 廚房顯示系統 (測試)</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <title>KDS 廚房顯示系統</title>
 
     <link rel="stylesheet" href="../css/pages/kds.css" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" />
+
+
 </head>
 <body>
-<div class="kds-header">
-    <h1>KDS 廚房顯示 </h1>
-    <div id="connection-status" class="status-disconnected">
-        尚未連線
-    </div>
-</div>
+<md-top-app-bar variant="small">
+    <h1 slot="headline">KDS 廚房顯示</h1>
+    <md-chip id="connection-status" slot="action" label="尚未連線" class="status-disconnected"></md-chip>
+</md-top-app-bar>
 
 <div class="kds-main-layout">
     <div class="kds-column" id="preparing-column">

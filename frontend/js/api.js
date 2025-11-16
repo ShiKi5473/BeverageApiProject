@@ -1,5 +1,4 @@
-// 定義後端 API 的基礎 URL
-const API_BASE_URL = "http://localhost:8080";
+
 
 /**
  * 處理 API 請求的主函式
@@ -26,10 +25,8 @@ async function fetchWithAuth(endpoint, options = {}) {
     Authorization: `Bearer ${token}`, // 附加 Bearer Token [cite: shiki5473/beverageapiproject/BeverageApiProject-frontendPosView/src/main/java/tw/niels/beverage_api_project/security/jwt/JwtAuthenticationFilter.java]
   };
 
-  // 4. 【修改】 組合完整的 API 網址
-  //    後端現在會自動從 Token 讀取 brandId，不再需要 {brandId} 佔位符
-  const url = `${API_BASE_URL}${endpoint}`; // <-- 【簡化】
-
+  // 4.
+    const url = endpoint; // <-- 直接使用 endpoint
   try {
     // 5. 發送請求
     const response = await fetch(url, { ...options, headers });

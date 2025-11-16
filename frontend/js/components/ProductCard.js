@@ -8,6 +8,8 @@ export function createProductCard(product) {
   const productCard = document.createElement("div");
   productCard.className = "product-card";
 
+  productCard.dataset.productId = product.id;
+
   const imageHtml = product.imgUrl
     ? `<img src="${product.imgUrl}" alt="${product.name}" class="product-image">`
     : '<div class="product-image-placeholder"></div>';

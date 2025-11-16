@@ -1,8 +1,6 @@
 // 檔案： frontend/js/ws-client.js (新檔案)
-
-// 引入 Stomp 和 SockJS (請確保 HTML 中已引入)
-// <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
-// <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+import Stomp from 'stompjs';
+import SockJS from 'sockjs-client/dist/sockjs-runtime.js';
 
 /**
  * 連線到 WebSocket 服務

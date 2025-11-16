@@ -35,4 +35,9 @@ public abstract class AbstractOrderState implements OrderState {
     public void cancel(Order order) {
         throw new BadRequestException("訂單狀態為 " + getStatus() + "，無法取消。");
     }
+
+    @Override
+    public void accept(Order order) {
+        throw new BadRequestException("訂單狀態為 " + getStatus() + "，無法執行接單動作。");
+    }
 }

@@ -16,9 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // DOM 元素
     const preparingListEl = document.getElementById("preparing-list");
     const pickupListEl = document.getElementById("pickup-list");
-    const statusEl = document.getElementById("connection-status");
-
-    // 假設 KDS 螢幕是給 "店家 1" 用的
+    const statusChip = document.getElementById("connection-status");
 
     /**
      * 1. 頁面載入時，抓取所有 "製作中" 和 "待取餐" 的訂單
@@ -52,7 +50,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // 避免重複渲染
         if (document.getElementById(orderId)) return;
 
-        const card = document.createElement("div");
+        const card = document.createElement("md-filled-card");
         card.id = orderId;
         card.className = "kds-card";
 
@@ -71,8 +69,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // 根據狀態決定是否顯示按鈕
         const buttonHtml = order.status === "PREPARING" ?
-            `<button class="kds-complete-btn" data-order-id="${order.orderId}">製作完成</button>` :
-            ''; // 待取餐狀態 KDS 不需按鈕
+            `<md-filled-button class="kds-complete-btn" data-order-id="${order.orderId}" style="width: 100%; margin-top: 15px;">
+                製作完成
+            </md-filled-button>` :
+            '';
 
         card.innerHTML = `
             <h3>#${order.orderNumber}</h3>
@@ -158,13 +158,17 @@ document.addEventListener("DOMContentLoaded", () => {
             (action, payload) => handleKdsMessage(action, payload),
             // onConnect
             () => {
-                statusEl.textContent = `已連線 (店家 ${MY_STORE_ID})`;
-                statusEl.className = "status-connected";
+                // 【修改】更新 <md-chip>
+                statusChip.label = `已連線 (店家 ${MY_STORE_ID})`;
+                statusChip.classList.remove("status-disconnected");
+                statusChip.classList.add("status-connected");
             },
             // onError
             (error) => {
-                statusEl.textContent = `連線中斷: ${error} (5秒後重試)`;
-                statusEl.className = "status-disconnected";
+                // 【修改】更新 <md-chip>
+                statusChip.label = `連線中斷: ${error} (5秒後重試)`;
+                statusChip.classList.remove("status-connected");
+                statusChip.classList.add("status-disconnected");
             }
         );
     }

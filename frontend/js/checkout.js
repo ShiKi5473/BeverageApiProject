@@ -4,8 +4,9 @@ import {
     processPayment,
     findMemberByPhone
 } from "./api.js";
-// 【新增】匯入 Navbar
 import { createNavbar } from "./components/Navbar.js";
+
+const paymentMethodChips = document.getElementById("payment-method-chips");
 
 document.addEventListener("DOMContentLoaded", async () => {
 
@@ -330,6 +331,21 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (confirm("確定要取消結帳並返回點餐頁嗎？ (此訂單將維持 PENDING 狀態)")) {
             window.location.href = "pos.html";        }
     });
+
+    paymentMethodChips.addEventListener("change", (e) => {
+        const selectedChip = e.target.closest("md-filter-chip[selected]");
+
+        if (selectedChip) {
+            selectedPaymentMethod = selectedChip.dataset.method;
+        } else {
+            selectedPaymentMethod = null; // 沒有選中
+        }
+
+        // 顯示/隱藏現金計算機
+        cashCalculatorEl.style.display = (selectedPaymentMethod === "CASH") ? "block" : "none";
+        updateCalculatorDisplay(); // 更新顯示和按鈕狀態
+    });
+
 
     // --- 6. 啟動 ---
     loadOrderData();

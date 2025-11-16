@@ -1,3 +1,19 @@
+
+import '@material/web/top-app-bar/top-app-bar.js';
+import '@material/web/icon/icon.js';
+import '@material/web/iconbutton/icon-button.js';
+import '@material/web/list/list.js';
+import '@material/web/list/list-item.js';
+import '@material/web/button/filled-button.js';
+import '@material/web/button/outlined-button.js';
+import '@material/web/dialog/dialog.js';
+import '@material/web/divider/divider.js';
+
+
+import '@material/web/chips/chip-set.js';
+import '@material/web/chips/filter-chip.js';
+import '@material/web/textfield/filled-text-field.js';
+
 import {
   getCategories,
   getPosProducts,
@@ -16,6 +32,11 @@ let shoppingCart = [];
 let currentModal = null;
 
 const MY_STORE_ID = localStorage.getItem("storeId");
+
+const optionsDialog = document.getElementById("options-dialog");
+const dialogContentSlot = document.getElementById("dialog-content-slot");
+const modalCloseButton = document.getElementById("modal-close-btn");
+const modalAddButton = document.getElementById("modal-add-btn");
 
 document.addEventListener("DOMContentLoaded", () => {
     if (!MY_STORE_ID) {
@@ -105,95 +126,122 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // 4.
-  function renderCategoryList(categories) {
-    categoryList.innerHTML = "";
-    const allLi = document.createElement("li");
-    allLi.innerHTML = `<a href="#" data-category-id="all" class="active">全部商品</a>`;
-    categoryList.appendChild(allLi);
-    categories.forEach((category) => {
-      const li = document.createElement("li");
-      li.innerHTML = `<a href="#" data-category-id="${category.categoryId}">${category.name}</a>`;
-      categoryList.appendChild(li);
-    });
-  }
+    function renderCategoryList(categories) {
+        categoryList.innerHTML = ""; // 清空
+
+        // "全部商品"
+        const allLi = document.createElement("md-list-item");
+        allLi.headline = "全部商品";
+        allLi.dataset.categoryId = "all";
+        allLi.classList.add("active"); // 您可能需要 CSS 調整 .active 樣式
+        categoryList.appendChild(allLi);
+
+        // 其他分類
+        categories.forEach((category) => {
+            const li = document.createElement("md-list-item");
+            li.headline = category.name;
+            li.dataset.categoryId = category.categoryId;
+            categoryList.appendChild(li);
+        });
+    }
 
   // 5.
   function renderProducts(categoryId) {
-    productGrid.innerHTML = "";
-    const productsToRender =
-      categoryId === "all"
-        ? allProducts
-        : allProducts.filter(
-            (product) =>
-              product.categories &&
-              product.categories.some((cat) => cat.categoryId === Number(categoryId))
-          );
+      // 1. 取得最新資料 (邏輯不變)
+      const productsToRender =
+          categoryId === "all"
+              ? allProducts
+              : allProducts.filter(
+                  (product) =>
+                      product.categories &&
+                      product.categories.some((cat) => cat.categoryId === Number(categoryId))
+              );
 
-    if (productsToRender.length === 0) {
-      productGrid.innerHTML = "<p>這個分類沒有商品</p>";
-      return;
-    }
-    productsToRender.forEach((product) => {
-      const productCard = createProductCard(product);
-      productCard.addEventListener("click", () => {
-        openOptionsModal(product); //
+      // 2. 建立一個「新資料的 ID 集合」，方便快速查找
+      const newIdSet = new Set(productsToRender.map(p => p.id));
+
+      // 3. 建立一個「當前畫面上所有卡片的 Map」，方便快速存取
+      //    Map<productId, domElement>
+      const existingCardMap = new Map();
+      for (const cardElement of productGrid.children) {
+          const productId = cardElement.dataset.productId;
+          if (productId) {
+              existingCardMap.set(Number(productId), cardElement);
+          }
+      }
+
+      // 4. 【移除階段】
+      // 檢查畫面上舊的卡片，如果「不在」新的資料集合中，就移除它
+      existingCardMap.forEach((cardElement, productId) => {
+          if (!newIdSet.has(productId)) {
+              cardElement.remove();
+          }
       });
-      productGrid.appendChild(productCard);
-    });
+
+      // 5. 【新增階段】
+      // 遍歷「新資料」，如果畫面上「沒有」這張卡，就建立並新增它
+      productsToRender.forEach((product) => {
+          if (!existingCardMap.has(product.id)) {
+              const productCard = createProductCard(product);
+              productCard.addEventListener("click", () => {
+                  openOptionsModal(product);
+              });
+              productGrid.appendChild(productCard);
+          }
+          // 如果已存在 (existingCardMap.has(product.id) 為 true)，
+          // 我們就什麼都不做，DOM 節點會被原地保留，這就是效能的來源！
+      });
+
+      // 處理空狀態
+      if (productGrid.children.length === 0) {
+          productGrid.innerHTML = "<p>這個分類沒有商品</p>";
+      }
   }
 
   // 6.
-  function addCategoryClickListeners() {
-    categoryList.addEventListener("click", (event) => {
-      event.preventDefault();
-      const target = event.target;
-      if (target.tagName === "A") {
-        categoryList
-          .querySelectorAll("a")
-          .forEach((a) => a.classList.remove("active"));
-        target.classList.add("active");
-        const selectedCategoryId = target.getAttribute("data-category-id");
-        renderProducts(selectedCategoryId);
-      }
-    });
-  }
+    function addCategoryClickListeners() {
+        categoryList.addEventListener("click", (event) => {
+            // event.preventDefault(); // MWC 元件可能不需要
+            const target = event.target.closest("md-list-item"); // 找 <md-list-item>
+            if (target) {
+                categoryList
+                    .querySelectorAll("md-list-item")
+                    .forEach((a) => a.classList.remove("active"));
+                target.classList.add("active");
 
-  function openOptionsModal(product) {
-    // 1.
-    currentModal = createOptionsModalContent(product);
-
-    // 2.
-    modalContent.innerHTML = "";
-    modalContent.appendChild(currentModal.element);
-
-    // 3.
-    const addToCartButton = document.createElement("button");
-    addToCartButton.textContent = "加入購物車";
-    addToCartButton.className = "modal-add-btn";
-    addToCartButton.onclick = () => {
-      handleAddToCart(product, currentModal.getSelectedData());
-    };
-    modalContent.appendChild(addToCartButton);
-
-    const closeButton = document.createElement("button");
-    closeButton.textContent = "取消";
-    closeButton.className = "modal-close-btn";
-    closeButton.onclick = closeModal;
-    modalContent.appendChild(closeButton);
-
-    modalOverlay.style.display = "flex";
-  }
-
-  function closeModal() {
-    modalOverlay.style.display = "none";
-    currentModal = null; //
-  }
-
-  modalOverlay.addEventListener("click", (event) => {
-    if (event.target === modalOverlay) {
-      closeModal();
+                const selectedCategoryId = target.getAttribute("data-category-id");
+                renderProducts(selectedCategoryId);
+            }
+        });
     }
-  });
+
+    function openOptionsModal(product) {
+        // 1. 建立 modal 內容 (來自 OptionsModal.js)
+        currentModal = createOptionsModalContent(product);
+
+        // 2. 將內容注入 dialog
+        dialogContentSlot.innerHTML = ""; // 清空舊內容
+        dialogContentSlot.appendChild(currentModal.element);
+
+        // 3. 【修改】移除舊的按鈕建立邏輯，改為替 dialog 的按鈕綁定新事件
+        //    (我們需要移除舊監聽器，或用 .cloneNode(true) 取代按鈕來重設)
+
+        // 簡單起見，我們直接重設按鈕的監聽器
+        modalAddButton.onclick = () => {
+            handleAddToCart(product, currentModal.getSelectedData());
+        };
+        modalCloseButton.onclick = closeModal;
+
+        // 4. 顯示 dialog
+        optionsDialog.show();
+    }
+
+    function closeModal() {
+        optionsDialog.close();
+        currentModal = null; // 清理
+    }
+
+
 
   function handleAddToCart(product, selectedData) {
     const allOptions = product.optionGroups.flatMap((group) => group.options);

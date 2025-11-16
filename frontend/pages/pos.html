@@ -4,26 +4,23 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>POS 點餐系統</title>
+
     <link rel="stylesheet" href="../css/base.css" />
-    <link rel="stylesheet" href="../css/components/navbar.css" />
     <link rel="stylesheet" href="../css/components/productCard.css" />
-    <link rel="stylesheet" href="../css/components/modal.css" />
     <link rel="stylesheet" href="../css/pages/pos.css" />
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" />
+
 </head>
 <body>
 
 <div class="pos-layout">
-
     <div class="pos-main-content">
 
         <aside class="category-sidebar" id="category-sidebar">
             <h2>商品分類</h2>
-            <ul id="category-list">
-                <li><a href="#" data-category-id="all" class="active">全部商品</a></li>
-            </ul>
+            <md-list id="category-list">
+            </md-list>
         </aside>
 
         <main class="product-grid" id="product-grid">
@@ -33,25 +30,38 @@
         <aside class="cart-sidebar" id="cart-sidebar">
             <h2>購物車</h2>
             <div id="cart-items">
-                <p class='cart-empty'>購物車是空的</p> </div>
+                <p class='cart-empty'>購物車是空的</p>
+            </div>
             <div class="cart-total">
                 <p>總計: <span id="cart-total-amount">NT$ 0</span></p>
-                <button id="hold-button" class="btn-hold">暫存訂單</button>
-                <button id="checkout-button">結帳</button>
+                <md-outlined-button id="hold-button" style="width: 100%;">
+                    暫存訂單
+                </md-outlined-button>
+                <md-filled-button id="checkout-button" style="width: 100%; margin-top: 10px;">
+                    結帳
+                </md-filled-button>
             </div>
 
+            <md-divider style="margin-top: 20px;"></md-divider>
+
             <div class="pickup-section">
-                <h3 class="pickup-title">待取餐 (READY)</h3> <div id="pickup-list">
-                <p class="pickup-empty">目前沒有待取餐點</p>
-            </div>
+                <h3 class="pickup-title">待取餐 (READY)</h3>
+                <md-list id="pickup-list">
+                    <p class="pickup-empty">目前沒有待取餐點</p>
+                </md-list>
             </div>
         </aside>
 
     </div>
 
-    <div class="modal-overlay" id="modal-overlay" style="display: none">
-        <div class="modal-content" id="modal-content"></div>
-    </div>
+    <md-dialog id="options-dialog">
+        <div slot="content" id="dialog-content-slot">
+        </div>
+        <div slot="actions">
+            <md-outlined-button id="modal-close-btn">取消</md-outlined-button>
+            <md-filled-button id="modal-add-btn">加入購物車</md-filled-button>
+        </div>
+    </md-dialog>
 
 </div>
 

@@ -4,9 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>訂單結帳</title>
+
     <link rel="stylesheet" href="../css/base.css" />
-    <link rel="stylesheet" href="../css/components/navbar.css" />
     <link rel="stylesheet" href="../css/pages/checkout.css" />
+
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" />
+
 </head>
 <body>
 <div class="pos-layout" id="checkout-layout">
@@ -37,28 +40,29 @@
             <section id="member-section">
                 <h2>會員</h2>
                 <div class="form-group">
-                    <label for="member-phone">會員手機</label>
-                    <input type="text" id="member-phone" placeholder="輸入手機號碼" />
-                    <button type="button" id="find-member-btn">查詢</button>
+                    <md-filled-text-field id="member-phone" label="會員手機" style="width: 100%;"></md-filled-text-field>
+                    <md-filled-tonal-button id="find-member-btn" style="width: 100%; margin-top: 10px;">
+                        查詢
+                    </md-filled-tonal-button>
                 </div>
                 <div id="member-display" style="display: none;">
                     <hr>
                     <h3 id="member-name"></h3>
                     <p>可用點數: <strong id="member-points-balance">0</strong> 點</p>
                     <div class="form-group">
-                        <label for="points-to-use">使用點數</label>
-                        <input type="number" id="points-to-use" value="0" min="0" />
+                        <md-filled-text-field id="points-to-use" label="使用點數" type="number" value="0" min="0" style="width: 100%;"></md-filled-text-field>
                         <span id="points-error" class="error"></span>
                     </div>
                 </div>
                 <span id="member-info-text" class="member-info-text"></span>
             </section>
+
             <section id="invoice-section">
                 <h2>發票設定</h2>
                 <div class="form-group">
                     <p style="color: #888;">(發票功能未來將在此處設定)</p>
-                    <button type="button" class="option-btn" disabled>二聯式發票</button>
-                    <button type="button" class="option-btn" disabled>三聯式發票</button>
+                    <md-filter-chip label="二聯式發票" disabled></md-filter-chip>
+                    <md-filter-chip label="三聯式發票" disabled></md-filter-chip>
                 </div>
             </section>
         </main>
@@ -67,11 +71,12 @@
             <h2>付款</h2>
             <div class="form-group">
                 <label>付款方式</label>
-                <div class="option-buttons-container">
-                    <button type="button" class="option-btn payment-btn" data-method="CASH">現金</button>
-                    <button type="button" class="option-btn payment-btn" data-method="CREDIT_CARD">信用卡</button>
-                </div>
+                <md-chip-set id="payment-method-chips" single-select>
+                    <md-filter-chip label="現金" data-method="CASH"></md-filter-chip>
+                    <md-filter-chip label="信用卡" data-method="CREDIT_CARD"></md-filter-chip>
+                </md-chip-set>
             </div>
+
             <div id="cash-calculator" style="display: none;">
                 <div class="calculator-display">
                     <div class="display-row">
@@ -83,30 +88,34 @@
                         <span id="calc-display-change">$0</span>
                     </div>
                 </div>
+
                 <div class="calculator-grid">
-                    <button class="calc-btn" data-val="1">1</button>
-                    <button class="calc-btn" data-val="2">2</button>
-                    <button class="calc-btn" data-val="3">3</button>
-                    <button class="calc-btn fast" data-fast="1000">$1000</button>
-                    <button class="calc-btn" data-val="4">4</button>
-                    <button class="calc-btn" data-val="5">5</button>
-                    <button class="calc-btn" data-val="6">6</button>
-                    <button class="calc-btn fast" data-fast="500">$500</button>
-                    <button class="calc-btn" data-val="7">7</button>
-                    <button class="calc-btn" data-val="8">8</button>
-                    <button class="calc-btn" data-val="9">9</button>
-                    <button class="calc-btn fast" data-fast="100">$100</button>
-                    <button class="calc-btn" data-val="00">00</button>
-                    <button class="calc-btn" data-val="0">0</button>
-                    <button class="calc-btn" data-val="clear">C</button>
-                    <button class="calc-btn exact" data-val="exact">剛好</button>
+                    <md-outlined-button class="calc-btn" data-val="1">1</md-outlined-button>
+                    <md-outlined-button class="calc-btn" data-val="2">2</md-outlined-button>
+                    <md-outlined-button class="calc-btn" data-val="3">3</md-outlined-button>
+                    <md-outlined-button class="calc-btn fast" data-fast="1000">$1000</md-outlined-button>
+                    <md-outlined-button class="calc-btn" data-val="4">4</md-outlined-button>
+                    <md-outlined-button class="calc-btn" data-val="5">5</md-outlined-button>
+                    <md-outlined-button class="calc-btn" data-val="6">6</md-outlined-button>
+                    <md-outlined-button class="calc-btn fast" data-fast="500">$500</md-outlined-button>
+                    <md-outlined-button class="calc-btn" data-val="7">7</md-outlined-button>
+                    <md-outlined-button class="calc-btn" data-val="8">8</md-outlined-button>
+                    <md-outlined-button class="calc-btn" data-val="9">9</md-outlined-button>
+                    <md-outlined-button class="calc-btn fast" data-fast="100">$100</md-outlined-button>
+                    <md-outlined-button class="calc-btn" data-val="00">00</md-outlined-button>
+                    <md-outlined-button class="calc-btn" data-val="0">0</md-outlined-button>
+                    <md-outlined-button class="calc-btn" data-val="clear">C</md-outlined-button>
+                    <md-outlined-button class="calc-btn exact" data-val="exact">剛好</md-outlined-button>
                 </div>
             </div>
-            <button id="confirm-payment-button" class="checkout-confirm-btn" disabled>
-                <span id="confirm-btn-text">請選擇付款方式</span>
-                <strong id="confirm-btn-amount">NT$ 0</strong>
-            </button>
-            <button id="cancel-button" class="checkout-cancel-btn">取消結帳</button>
+
+            <md-filled-button id="confirm-payment-button" class="checkout-confirm-btn" disabled>
+                <span slot="label" id="confirm-btn-text">請選擇付款方式</span>
+                <strong id="confirm-btn-amount" style="margin-left: auto; font-size: 1.2em;">NT$ 0</strong>
+            </md-filled-button>
+            <md-text-button id="cancel-button" class="checkout-cancel-btn">
+                取消結帳
+            </md-text-button>
         </aside>
     </div>
 </div>

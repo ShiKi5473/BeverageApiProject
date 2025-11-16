@@ -1,88 +1,85 @@
 import { createQuantitySelector } from "./QuantitySelector.js";
 
+// 為 <md-chip> 建立的輔助函式
+function createChip(option) {
+    const chip = document.createElement("md-filter-chip");
+    let labelText = option.optionName;
+    if (option.priceAdjustment > 0) {
+        labelText += ` (+NT$ ${option.priceAdjustment})`;
+    }
+    chip.label = labelText;
+    chip.dataset.optionId = option.optionId;
+    return chip;
+}
+
 /**
- * 建立客製化選項 Modal 的 "內容"
- * @param {object} product - 商品物件 (來自 API)
- * @returns { {element: HTMLElement, getSelectedData: () => object} }
+ * 建立客製化選項 Modal 的 "內容" (MWC 版本)
  */
 export function createOptionsModalContent(product) {
-  // 1. 建立根元素
-  const modalContent = document.createElement("div");
+    // 1. 建立根元素
+    const modalContent = document.createElement("div");
 
-  // 2. 建立標題
-  const title = document.createElement("h3");
-  title.textContent = product.name;
-  modalContent.appendChild(title);
+    // 2. 建立標題
+    const title = document.createElement("h3");
+    title.textContent = product.name;
+    modalContent.appendChild(title);
 
-  // 3. 遍歷 OptionGroups
-  product.optionGroups.forEach((group) => {
-    const groupContainer = document.createElement("div");
-    groupContainer.className = "option-group";
+    // 3. 遍歷 OptionGroups
+    product.optionGroups.forEach((group) => {
+        const groupContainer = document.createElement("div");
+        groupContainer.className = "option-group";
 
-    const groupTitle = document.createElement("h4");
-    const selectionType = group.selectionType === "SINGLE" ? "單選" : "多選";
-    groupTitle.textContent = `${group.name} (${selectionType})`;
-    groupContainer.appendChild(groupTitle);
+        const groupTitle = document.createElement("h4");
+        const selectionType = group.selectionType === "SINGLE" ? "單選" : "多選";
+        groupTitle.textContent = `${group.name} (${selectionType})`;
+        groupContainer.appendChild(groupTitle);
 
-    const buttonsContainer = document.createElement("div");
-    buttonsContainer.className = "option-buttons-container";
+        // 【修改】建立 <md-chip-set>
+        const chipSet = document.createElement("md-chip-set");
+        groupContainer.appendChild(chipSet);
 
-    group.options.forEach((option) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "option-btn";
-      let labelText = option.optionName;
-      if (option.priceAdjustment > 0) {
-        labelText += ` (+NT$ ${option.priceAdjustment})`;
-      }
-      button.textContent = labelText;
-      button.dataset.optionId = option.optionId;
-      buttonsContainer.appendChild(button);
+        // 處理單選/多選
+        if (group.selectionType === "SINGLE") {
+            chipSet.singleSelect = true;
+        }
+
+        // 加入 Chip
+        group.options.forEach((option) => {
+            const chip = createChip(option);
+            chipSet.appendChild(chip);
+        });
+
+        modalContent.appendChild(groupContainer);
     });
 
-    buttonsContainer.addEventListener("click", (event) => {
-      const clickedButton = event.target.closest(".option-btn");
-      if (!clickedButton) return;
-      if (group.selectionType === "SINGLE") {
-        buttonsContainer
-          .querySelectorAll(".option-btn")
-          .forEach((btn) => btn.classList.remove("active"));
-        clickedButton.classList.add("active");
-      } else {
-        clickedButton.classList.toggle("active");
-      }
-    });
+    // 4. 建立數量選擇器 (可以保留原樣，或也用 MWC 替換)
+    const quantitySelector = createQuantitySelector(1);
+    modalContent.appendChild(quantitySelector.element);
 
-    groupContainer.appendChild(buttonsContainer);
-    modalContent.appendChild(groupContainer);
-  });
+    // 5. 建立備註 (替換為 <md-filled-text-field>)
+    const notesInput = document.createElement("md-filled-text-field");
+    notesInput.label = "備註...";
+    notesInput.className = "modal-notes";
+    notesInput.style.width = "100%";
+    modalContent.appendChild(notesInput);
 
-  // 4. 建立數量選擇器
-  const quantitySelector = createQuantitySelector(1);
-  modalContent.appendChild(quantitySelector.element);
+    // 6. 取得資料的函式
+    const getSelectedData = () => {
+        // 【修改】從 <md-filter-chip> 取得選中項
+        const selectedChips = Array.from(
+            modalContent.querySelectorAll("md-filter-chip[selected]")
+        );
+        const selectedOptionIds = selectedChips.map((chip) => chip.dataset.optionId);
 
-  // 5. 建立備註
-  const notesInput = document.createElement("input");
-  notesInput.type = "text";
-  notesInput.placeholder = "備註...";
-  notesInput.className = "modal-notes";
-  modalContent.appendChild(notesInput);
-
-  // 6.
-  const getSelectedData = () => {
-    const selectedOptionIds = Array.from(
-      modalContent.querySelectorAll(".option-btn.active")
-    ).map((btn) => btn.dataset.optionId);
+        return {
+            quantity: quantitySelector.getQuantity(),
+            notes: notesInput.value, // .value 依然可用
+            selectedOptionIds: selectedOptionIds,
+        };
+    };
 
     return {
-      quantity: quantitySelector.getQuantity(),
-      notes: notesInput.value,
-      selectedOptionIds: selectedOptionIds,
+        element: modalContent,
+        getSelectedData: getSelectedData,
     };
-  };
-
-  return {
-    element: modalContent,
-    getSelectedData: getSelectedData,
-  };
 }
