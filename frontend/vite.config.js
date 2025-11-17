@@ -2,6 +2,38 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+    define: {
+        // 告訴 Vite 將 'global' 替換為 'window'
+        // 這可以修復 sockjs-client 的問題
+        global: 'window',
+    },
+    optimizeDeps: {
+        include: [
+            // --- POS / Navbar / OptionsModal ---
+            '@material/web/icon/icon.js',
+            '@material/web/iconbutton/icon-button.js',
+            '@material/web/list/list.js',
+            '@material/web/list/list-item.js',
+            '@material/web/button/filled-button.js',
+            '@material/web/button/outlined-button.js',
+            '@material/web/dialog/dialog.js',
+            '@material/web/divider/divider.js',
+            '@material/web/chips/chip-set.js',
+            '@material/web/chips/filter-chip.js',
+            '@material/web/textfield/filled-text-field.js',
+
+            // --- KDS ---
+            '@material/web/chips/assist-chip.js',
+            '@material/web/labs/card/filled-card.js',
+
+            // --- Checkout ---
+            '@material/web/button/filled-tonal-button.js',
+            '@material/web/button/text-button.js'
+
+            // 注意：auth.js 用到的元件 (filled-text-field, filled-button)
+            // 已經包含在上面了，不需重複。
+        ]
+    },
     server: {
         // 我們在開發時，前端伺服器會開在 5173 (Vite 預設)
         port: 5173,
@@ -26,10 +58,10 @@ export default defineConfig({
         // 讓 Vite 知道我們的多頁面入口
         rollupOptions: {
             input: {
-                login: 'frontend/pages/login.html',
-                pos: 'frontend/pages/pos.html',
-                checkout: 'frontend/pages/checkout.html',
-                kds: 'frontend/pages/kds.html',
+                login: 'pages/login.html',
+                pos: 'pages/pos.html',
+                checkout: 'pages/checkout.html',
+                kds: 'pages/kds.html',
             }
         }
     }

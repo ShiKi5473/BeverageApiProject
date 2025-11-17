@@ -1,4 +1,6 @@
-// 檔案： frontend/js/kds.js (修改後)
+import '@material/web/chips/assist-chip.js';
+import '@material/web/labs/card/filled-card.js';
+import '@material/web/button/filled-button.js';
 
 import { getOrdersByStatus, updateOrderStatus } from "./api.js";
 import { connectToWebSocket } from "./ws-client.js";

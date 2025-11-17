@@ -1,6 +1,6 @@
 // 檔案： frontend/js/ws-client.js (新檔案)
 import Stomp from 'stompjs';
-import SockJS from 'sockjs-client/dist/sockjs-runtime.js';
+import SockJS from 'sockjs-client'
 
 /**
  * 連線到 WebSocket 服務

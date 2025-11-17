@@ -1,4 +1,6 @@
-// 等待 HTML 內容完全載入後執行
+import '@material/web/textfield/filled-text-field.js';
+import '@material/web/button/filled-button.js';
+
 document.addEventListener("DOMContentLoaded", () => {
   // 1. 取得登入表單元素
   const loginForm = document.getElementById("login-form");

@@ -1,25 +1,28 @@
+// 【修改】移除 top-app-bar.js，因為它不存在
+import '@material/web/iconbutton/icon-button.js';
+import '@material/web/icon/icon.js';
+
 /**
- * 建立一個可複用的導覽列元件 (MWC 版本)
+ * 建立一個可複用的導覽列元件 (標準 HTML <header> 版本)
  * @param {string} title - 顯示在導覽列上的標題
  * @param {function} onLogout - 點擊登出按鈕時要執行的回呼函式
- * @returns {HTMLElement} - <md-top-app-bar> 元素
+ * @returns {HTMLElement} - <header> 元素
  */
 export function createNavbar(title, onLogout) {
-    // 1. 建立 Top App Bar 容器
-    const topAppBar = document.createElement("md-top-app-bar");
-    topAppBar.setAttribute("variant", "small"); // 您可以試試 "medium" 或 "large"
-    topAppBar.style.position = "static";
+    // 1. 【修改】建立 <header> 容器
+    const header = document.createElement("header");
+    // 我們借用 kds.css 或 navbar.css 中的樣式
+    // 假設 .pos-navbar (from navbar.css) 是我們想要的
+    header.className = "pos-navbar";
 
     // 2. 建立標題
     const h1 = document.createElement("h1");
     h1.textContent = title;
-    h1.slot = "headline"; // MWC Top App Bar 的標題 slot
-    topAppBar.appendChild(h1);
+    header.appendChild(h1);
 
     // 3. 建立登出按鈕 (使用 Icon Button)
     const logoutButton = document.createElement("md-icon-button");
     logoutButton.id = "logout-button";
-    logoutButton.slot = "action"; // MWC 的 "操作按鈕" slot
 
     // 4. 建立登出圖示
     const icon = document.createElement("md-icon");
@@ -31,8 +34,8 @@ export function createNavbar(title, onLogout) {
         logoutButton.addEventListener("click", onLogout);
     }
 
-    // 6. 附加到 Top App Bar
-    topAppBar.appendChild(logoutButton);
+    // 6. 附加到 <header>
+    header.appendChild(logoutButton);
 
-    return topAppBar;
+    return header;
 }

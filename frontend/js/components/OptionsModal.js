@@ -1,3 +1,7 @@
+import '@material/web/chips/filter-chip.js';
+import '@material/web/chips/chip-set.js';
+import '@material/web/textfield/filled-text-field.js';
+
 import { createQuantitySelector } from "./QuantitySelector.js";
 
 // 為 <md-chip> 建立的輔助函式

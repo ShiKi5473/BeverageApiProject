@@ -94,8 +94,8 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(Arrays.asList(
                 "http://localhost:63342",
                 "http://127.0.0.1:63342",
-                "http://localhost:3000",
-                "http://127.0.0.1:3000"
+                "http://localhost:5173",
+                "http://127.0.0.1:5173"
         ));
         // 允許所有標準的 HTTP 方法
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS", "HEAD"));

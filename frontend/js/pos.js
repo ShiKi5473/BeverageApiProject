@@ -1,5 +1,4 @@
 
-import '@material/web/top-app-bar/top-app-bar.js';
 import '@material/web/icon/icon.js';
 import '@material/web/iconbutton/icon-button.js';
 import '@material/web/list/list.js';

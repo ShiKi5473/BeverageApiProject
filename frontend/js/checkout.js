@@ -1,3 +1,15 @@
+import '@material/web/iconbutton/icon-button.js';
+import '@material/web/icon/icon.js';
+
+// 2. 為了 checkout.html 頁面本身
+import '@material/web/textfield/filled-text-field.js';
+import '@material/web/button/filled-tonal-button.js';
+import '@material/web/chips/chip-set.js';
+import '@material/web/chips/filter-chip.js';
+import '@material/web/button/outlined-button.js';
+import '@material/web/button/filled-button.js';
+import '@material/web/button/text-button.js';
+
 // 匯入 API
 import {
     getOrderDetails,
