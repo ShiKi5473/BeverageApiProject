@@ -32,23 +32,34 @@
     padding-bottom: 10px;
     flex-shrink: 0;
 }
-.category-sidebar ul {
+#category-list {
     list-style: none;
     padding: 0;
     margin: 0;
     overflow-y: auto;
-    flex-grow: 1;
+    flex-grow: 1;      /* 關鍵：讓列表填滿空間 */
 }
-.category-sidebar li a {
+
+/* 【修改】將 .category-sidebar li a 改為 .category-sidebar md-list-item */
+.category-sidebar md-list-item {
     display: block;
-    padding: 10px;
+    padding: 10px;         /* 關鍵：補上 padding 讓按鈕有高度 */
     text-decoration: none;
-    color: #333;
+    --md-list-item-headline-color: #333;
+    color: #333;          /* 關鍵：補上 color 讓文字顯示 */
     border-radius: 4px;
+    cursor: pointer;
+
 }
-.category-sidebar li a:hover,
-.category-sidebar li a.active {
+
+/* 【修改】更新 hover 和 active 狀態 */
+.category-sidebar md-list-item:hover {
     background-color: #e9ecef;
+}
+
+.category-sidebar md-list-item.active {
+    background-color: #e0eafc; /* 使用上次建議的藍色背景 */
+    --md-list-item-headline-color: #333;
     font-weight: bold;
 }
 

@@ -54,11 +54,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const categoryList = document.getElementById("category-list");
   const cartItemsContainer = document.getElementById("cart-items");
   const cartTotalAmount = document.getElementById("cart-total-amount");
-  const modalOverlay = document.getElementById("modal-overlay");
-  const modalContent = document.getElementById("modal-content");
+
 
     const pickupListEl = document.getElementById("pickup-list");
-    const cartEmptyEl = document.querySelector(".cart-empty");
   const handleLogout = () => {
     localStorage.removeItem("accessToken");
     localStorage.removeItem("brandId");
@@ -107,7 +105,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // 3.
   async function loadAllData() {
     productGrid.innerHTML = "<p>正在載入資料...</p>";
-    categoryList.innerHTML = "<li><a>載入中...</a></li>";
+    categoryList.innerHTML = `<md-list-item headline="載入中..."></md-list-item>`;
     try {
       const [products, categories] = await Promise.all([
         getPosProducts(),
@@ -120,7 +118,7 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (error) {
       console.error("載入資料時發生錯誤:", error);
       productGrid.innerHTML = `<p class="error">資料載入失敗: ${error.message}</p>`;
-      categoryList.innerHTML = "<li><a>載入失敗</a></li>";
+        categoryList.innerHTML = `<md-list-item headline="載入失敗"></md-list-item>`;
     }
   }
 
@@ -130,16 +128,35 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // "全部商品"
         const allLi = document.createElement("md-list-item");
-        allLi.headline = "全部商品";
+        allLi.setAttribute("headline", "全部商品");
         allLi.dataset.categoryId = "all";
         allLi.classList.add("active"); // 您可能需要 CSS 調整 .active 樣式
+
+        // 1. 建立一個 <div> (或 <span>)
+        const allLiText = document.createElement("div");
+        // 2. 告訴它要被放入 "headline" 插槽
+        allLiText.setAttribute("slot", "headline");
+        // 3. 設定文字內容
+        allLiText.textContent = "全部商品";
+        // 4. 將這個 <div> 放入 <md-list-item> 中
+        allLi.appendChild(allLiText);
+
         categoryList.appendChild(allLi);
 
         // 其他分類
         categories.forEach((category) => {
             const li = document.createElement("md-list-item");
-            li.headline = category.name;
             li.dataset.categoryId = category.categoryId;
+
+            // 1. 建立一個 <div>
+            const liText = document.createElement("div");
+            // 2. 告訴它要被放入 "headline" 插槽
+            liText.setAttribute("slot", "headline");
+            // 3. 設定文字內容
+            liText.textContent = category.name;
+            // 4. 將這個 <div> 放入 <md-list-item> 中
+            li.appendChild(liText);
+
             categoryList.appendChild(li);
         });
     }
@@ -155,6 +172,13 @@ document.addEventListener("DOMContentLoaded", () => {
                       product.categories &&
                       product.categories.some((cat) => cat.categoryId === Number(categoryId))
               );
+
+      for (const child of Array.from(productGrid.children)) {
+          // 如果這個子元素「沒有」data-product-id，就代表它是 <p> 標籤，移除它
+          if (!child.dataset.productId) {
+              child.remove();
+          }
+      }
 
       // 2. 建立一個「新資料的 ID 集合」，方便快速查找
       const newIdSet = new Set(productsToRender.map(p => p.id));

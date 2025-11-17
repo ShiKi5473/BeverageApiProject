@@ -34,7 +34,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     // --- 2. 取得 DOM 元素 ---
     const layoutEl = document.getElementById("checkout-layout");
     const mainEl = document.getElementById("checkout-main");
-    const loadingMask = document.getElementById("loading-mask"); // (您 HTML 中沒有，但邏輯保留)
     const checkoutContent = document.getElementById("checkout-main"); // (改為抓 main)
 
     // 左欄
@@ -56,7 +55,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     const memberInfoTextEl = document.getElementById("member-info-text");
 
     // 右欄
-    const paymentButtonsContainer = document.querySelector(".option-buttons-container");
     const cashCalculatorEl = document.getElementById("cash-calculator");
     const calcDisplayReceivedEl = document.getElementById("calc-display-received");
     const calcDisplayChangeEl = document.getElementById("calc-display-change");
@@ -320,22 +318,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     findMemberBtn.addEventListener("click", handleFindMember);
     pointsToUseInput.addEventListener("input", updateAllTotals);
 
-    // 右欄
-    paymentButtonsContainer.addEventListener("click", (e) => {
-        const btn = e.target.closest(".payment-btn");
-        if (btn) {
-            paymentButtonsContainer
-                .querySelectorAll(".payment-btn")
-                .forEach((b) => b.classList.remove("active"));
-            btn.classList.add("active");
-
-            selectedPaymentMethod = btn.dataset.method;
-
-            // 顯示/隱藏現金計算機
-            cashCalculatorEl.style.display = (selectedPaymentMethod === "CASH") ? "block" : "none";
-            updateCalculatorDisplay(); // 更新顯示和按鈕狀態
-        }
-    });
 
     calculatorGrid.addEventListener("click", handleCalculatorClick);
     confirmPaymentButton.addEventListener("click", handleConfirmPayment);
