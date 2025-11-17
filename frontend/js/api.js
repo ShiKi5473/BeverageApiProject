@@ -26,10 +26,9 @@ async function fetchWithAuth(endpoint, options = {}) {
   };
 
   // 4.
-    const url = endpoint; // <-- 直接使用 endpoint
   try {
     // 5. 發送請求
-    const response = await fetch(url, { ...options, headers });
+    const response = await fetch(endpoint, { ...options, headers });
 
     // 6. 檢查 401 (未授權) 錯誤
     if (response.status === 401) {
@@ -119,6 +118,24 @@ export async function createOrder(orderData) {
     if (!response.ok) {
         const errorBody = await response.text();
         throw new Error(`建立訂單失敗: ${errorBody}`);
+    }
+    return response.json();
+}
+
+/**
+ * 執行 POS 現場「一步到位」結帳
+ * (對應 OrderController @PostMapping("/pos-checkout"))
+ * @param {object} checkoutData - 包含 items, memberId, pointsToUse, paymentMethod 的 DTO
+ */
+export async function posCheckoutComplete(checkoutData) {
+    const response = await fetchWithAuth("/api/v1/orders/pos-checkout", {
+        method: "POST",
+        body: JSON.stringify(checkoutData),
+    });
+
+    if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`結帳失敗: ${errorBody}`);
     }
     return response.json();
 }

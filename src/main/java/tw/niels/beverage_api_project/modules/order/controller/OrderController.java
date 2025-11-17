@@ -41,6 +41,20 @@ public class OrderController {
     }
 
     /**
+     * 處理來自 POS 的「一步到位」結帳。
+     * 建立訂單並直接設為 PREPARING。
+     * (這個 API 取代了舊的 [createOrder(PENDING) -> getOrder -> processPayment] 流程)
+     */
+    @PostMapping("/pos-checkout") // 【新增端點】
+    @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
+    public ResponseEntity<OrderResponseDto> performPosCheckout(
+            @Valid @RequestBody PosCheckoutRequestDto requestDto) {
+
+        Order newOrder = orderService.completePosCheckout(requestDto);
+        return new ResponseEntity<>(OrderResponseDto.fromEntity(newOrder), HttpStatus.CREATED);
+    }
+
+    /**
      * 預先計算訂單總金額
      */
     @PostMapping("/calculate")

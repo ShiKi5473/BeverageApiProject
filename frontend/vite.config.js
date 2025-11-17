@@ -3,8 +3,7 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
     define: {
-        // 告訴 Vite 將 'global' 替換為 'window'
-        // 這可以修復 sockjs-client 的問題
+
         global: 'window',
     },
     optimizeDeps: {

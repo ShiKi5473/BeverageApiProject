@@ -12,8 +12,7 @@ import '@material/web/button/text-button.js';
 
 // 匯入 API
 import {
-    getOrderDetails,
-    processPayment,
+    posCheckoutComplete,
     findMemberByPhone
 } from "./api.js";
 import { createNavbar } from "./components/Navbar.js";
@@ -23,7 +22,7 @@ const paymentMethodChips = document.getElementById("payment-method-chips");
 document.addEventListener("DOMContentLoaded", async () => {
 
     // --- 1. 狀態變數 ---
-    let currentOrder = null;
+    let currentCartItems = [];
     let currentMember = null;
     let selectedPaymentMethod = null;
     let originalTotalAmount = 0; // 訂單原始小計
@@ -43,6 +42,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const discountRowEl = document.getElementById("discount-row");
     const discountAmountEl = document.getElementById("discount-amount");
     const finalTotalEl = document.getElementById("final-total");
+    const holdAndReturnButton = document.getElementById("hold-and-return-button");
 
     // 中欄
     const memberPhoneInput = document.getElementById("member-phone");
@@ -78,39 +78,45 @@ document.addEventListener("DOMContentLoaded", async () => {
     // --- 4. 核心功能函式 ---
 
     /**
-     * 載入訂單資料並渲染頁面
+     * 從 localStorage 載入購物車資料並渲染頁面
      */
-    async function loadOrderData() {
+    function loadCartData() {
         try {
-            const params = new URLSearchParams(window.location.search);
-            const orderId = params.get("orderId");
-
-            if (!orderId) {
-                throw new Error("缺少訂單 ID");
+            const cartJson = localStorage.getItem("cartForCheckout");
+            if (!cartJson) {
+                throw new Error("找不到購物車資料");
             }
 
-            const order = await getOrderDetails(Number(orderId));
-            currentOrder = order;
-            originalTotalAmount = order.totalAmount;
+            const cartItems = JSON.parse(cartJson);
+            if (!cartItems || cartItems.length === 0) {
+                throw new Error("購物車是空的");
+            }
+
+            currentCartItems = cartItems;
+
+            // 【修改】在前端計算總金額
+            originalTotalAmount = currentCartItems.reduce((sum, item) => {
+                return sum + (item.unitPrice * item.quantity);
+            }, 0);
 
             // 填充左欄 (訂單明細)
-            itemCountEl.textContent = order.items.length;
-            renderOrderItems(order.items);
+            itemCountEl.textContent = currentCartItems.length;
+            renderOrderItems(currentCartItems);
 
             // 更新所有金額顯示
             updateAllTotals();
 
-            checkoutContent.style.display = "grid"; // (顯示三欄)
-            // loadingMask.style.display = "none"; // (如果您有 loading mask)
+            checkoutContent.style.display = "grid";
 
         } catch (error) {
-            alert(`載入訂單失敗: ${error.message}。即將返回點餐頁。`);
+            alert(`載入購物車失敗: ${error.message}。即將返回點餐頁。`);
             window.location.href = "pos.html";
         }
     }
 
     /**
      * 渲染訂單品項列表 (左欄)
+     * (使用 localStorage 的 'cartItem' 結構)
      */
     function renderOrderItems(items) {
         itemsListEl.innerHTML = ""; // 清空
@@ -119,15 +125,14 @@ document.addEventListener("DOMContentLoaded", async () => {
             return;
         }
         items.forEach(item => {
-            const optionsStr = item.options.map(opt => opt.optionName).join(", ");
+            const optionsStr = item.selectedOptions.map(opt => opt.optionName).join(", "); // <--【修正】'selectedOptions'
             const itemEl = document.createElement("div");
             itemEl.className = "checkout-item";
             itemEl.innerHTML = `
         <div class="checkout-item-details">
-          <span class="checkout-item-name">${item.productName} (x${item.quantity})</span>
-          ${optionsStr ? `<span class="checkout-item-options">${optionsStr}</span>` : ''}
+          <span class="checkout-item-name">${item.name} (x${item.quantity})</span> ${optionsStr ? `<span class="checkout-item-options">${optionsStr}</span>` : ''}
         </div>
-        <span class="checkout-item-subtotal">NT$ ${item.subtotal}</span>
+        <span class="checkout-item-subtotal">NT$ ${item.unitPrice * item.quantity}</span> 
       `;
             itemsListEl.appendChild(itemEl);
         });
@@ -284,7 +289,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     /**
-     * 處理最終付款
+     * 處理最終付款 (呼叫新 API)
      */
     async function handleConfirmPayment() {
         if (confirmPaymentButton.disabled) return;
@@ -292,17 +297,33 @@ document.addEventListener("DOMContentLoaded", async () => {
         confirmPaymentButton.disabled = true;
         confirmBtnTextEl.textContent = "付款處理中...";
 
-        const paymentData = {
+        // 1. 【修改】建立 OrderItemDto
+        const itemsDto = currentCartItems.map(item => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            notes: item.notes,
+            optionIds: item.selectedOptions.map(opt => opt.optionId) // 轉換
+        }));
+
+        // 2. 【修改】建立 PosCheckoutRequestDto
+        const checkoutData = {
+            items: itemsDto,
             memberId: currentMember ? currentMember.userId : null,
             pointsToUse: pointsToUseInput.valueAsNumber || 0,
             paymentMethod: selectedPaymentMethod,
         };
 
         try {
-            const paidOrder = await processPayment(currentOrder.orderId, paymentData);
+            // 3. 【修改】呼叫新 API
+            const paidOrder = await posCheckoutComplete(checkoutData);
+
             alert(
                 `付款成功！ 訂單 ${paidOrder.orderNumber} 狀態已更新為 ${paidOrder.status}`
             );
+
+            // 4. 【修改】清除 localStorage
+            localStorage.removeItem("cartForCheckout");
+
             window.location.href = "pos.html";
         } catch (error) {
             alert(`付款失敗: ${error.message}`);
@@ -321,9 +342,18 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     calculatorGrid.addEventListener("click", handleCalculatorClick);
     confirmPaymentButton.addEventListener("click", handleConfirmPayment);
-    cancelButton.addEventListener("click", () => {
-        if (confirm("確定要取消結帳並返回點餐頁嗎？ (此訂單將維持 PENDING 狀態)")) {
-            window.location.href = "pos.html";        }
+
+    holdAndReturnButton.addEventListener("click", () => {
+        // 不清除 localStorage，直接返回
+        window.location.href = "pos.html";
+    });
+
+
+    cancelButton.addEventListener("click", async () => {
+        if (confirm("確定要取消結帳嗎？\n(購物車將被清空)")) {
+            localStorage.removeItem("cartForCheckout");
+            window.location.href = "pos.html";
+        }
     });
 
     paymentMethodChips.addEventListener("change", (e) => {
@@ -342,5 +372,5 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 
     // --- 6. 啟動 ---
-    loadOrderData();
+    loadCartData();
 });

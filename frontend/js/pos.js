@@ -56,7 +56,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const cartTotalAmount = document.getElementById("cart-total-amount");
 
 
-    const pickupListEl = document.getElementById("pickup-list");
+  const pickupListEl = document.getElementById("pickup-list");
   const handleLogout = () => {
     localStorage.removeItem("accessToken");
     localStorage.removeItem("brandId");
@@ -64,8 +64,10 @@ document.addEventListener("DOMContentLoaded", () => {
   };
   const navbar = createNavbar("POS 點餐系統", handleLogout);
   posLayout.insertBefore(navbar, mainContent);
-
-  async function submitOrder(action) {
+    /**
+     * 「僅」用於暫存訂單 (HELD)
+     */
+  async function holdOrder(action) {
     if (shoppingCart.length === 0) {
       alert("購物車是空的！");
       return;
@@ -81,25 +83,41 @@ document.addEventListener("DOMContentLoaded", () => {
     //
     const createOrderRequest = {
       items: orderItemsDto,
-      status: (action === 'HELD') ? 'HELD' : 'PENDING'
-    };
+        status: 'HELD'
+        };
 
     try {
         const newOrder = await createOrder(createOrderRequest);
-        if (action === 'HELD') {
-            // 暫存成功
-            alert(`訂單 ${newOrder.orderNumber} 已暫存`);
-            shoppingCart = [];
-            renderCart();
-        } else {
-            window.location.href = `checkout.html?orderId=${newOrder.orderId}`;
-        }
+        alert(`訂單 ${newOrder.orderNumber} 已暫存`);
+        shoppingCart = [];
+        renderCart();
     }catch (error) {
         console.error(` ${action} 失敗:`, error);
         alert(` ${action} 失敗: ${error.message}`);
     }
   }
 
+    /**
+     * 處理點擊「結帳」按鈕的邏輯
+     */
+    function goToCheckout() {
+        if (shoppingCart.length === 0) {
+            alert("購物車是空的！");
+            return;
+        }
+
+        try {
+            // 1. 將購物車存入 localStorage
+            localStorage.setItem("cartForCheckout", JSON.stringify(shoppingCart));
+
+            // 2. 跳轉到結帳頁 (不需要 orderId)
+            window.location.href = "checkout.html";
+
+        } catch (e) {
+            alert("儲存購物車失敗，可能是瀏覽器空間不足。");
+            console.error("無法儲存 localStorage:", e);
+        }
+    }
 
 
   // 3.
@@ -414,18 +432,37 @@ document.addEventListener("DOMContentLoaded", () => {
     // 綁定「結帳」和「暫存」按鈕
     const checkoutButton = document.getElementById("checkout-button");
     const holdButton = document.getElementById("hold-button");
-    checkoutButton.addEventListener("click", () => submitOrder('CHECKOUT'));
-    holdButton.addEventListener("click", () => submitOrder('HELD'));
+    checkoutButton.addEventListener("click", goToCheckout);
+    holdButton.addEventListener("click", holdOrder);
 
     // 【新增】綁定「完成取餐」按鈕 (使用事件委派)
     pickupListEl.addEventListener("click", handleCompletePickup);
 
     // 載入初始資料
     loadAllData(); // 載入商品
-    renderCart();  // 渲染空購物車
-    loadPickupOrders(); // 【新增】載入待取餐列表
+    loadPickupOrders(); // 載入待取餐列表
 
-    // 【新增】啟動 WebSocket
+    const restoredCartJson = localStorage.getItem("cartForCheckout");
+
+    if (restoredCartJson) {
+        try {
+            // 如果有，將其解析並放回 shoppingCart 變數
+            shoppingCart = JSON.parse(restoredCartJson);
+            // 注意：我們「不」清除 localStorage，這樣使用者重新整理頁面時購物車還在
+            // localStorage.removeItem("cartForCheckout");
+        } catch (e) {
+            console.error("解析還原的購物車失敗:", e);
+            shoppingCart = []; // 如果解析失敗，清空
+        }
+    } else {
+        // 如果 localStorage 中沒有，才初始化為空陣列
+        // (這可以防止 shoppingCart 變數在 restoredCartJson 存在時被重置回 [])
+        shoppingCart = [];
+    }
+
+    renderCart();  // 渲染空購物車
+
+    // 啟動 WebSocket
     connectToWebSocket(
         MY_STORE_ID,
         // onMessage

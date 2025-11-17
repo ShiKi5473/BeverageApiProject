@@ -1,24 +1,30 @@
 package tw.niels.beverage_api_project.modules.order.service;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tw.niels.beverage_api_project.common.exception.BadRequestException;
 import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
 import tw.niels.beverage_api_project.common.service.ControllerHelperService;
+import tw.niels.beverage_api_project.modules.member.service.MemberPointService;
 import tw.niels.beverage_api_project.modules.order.dto.CreateOrderRequestDto;
 import tw.niels.beverage_api_project.modules.order.dto.OrderTotalDto;
+import tw.niels.beverage_api_project.modules.order.dto.PosCheckoutRequestDto;
 import tw.niels.beverage_api_project.modules.order.dto.ProcessPaymentRequestDto;
 import tw.niels.beverage_api_project.modules.order.entity.Order;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
 import tw.niels.beverage_api_project.modules.order.repository.OrderRepository;
+import tw.niels.beverage_api_project.modules.order.repository.PaymentMethodRepository;
 import tw.niels.beverage_api_project.modules.order.state.OrderState;
 import tw.niels.beverage_api_project.modules.order.state.OrderStateFactory;
 import tw.niels.beverage_api_project.modules.store.entity.Store;
 import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
 import tw.niels.beverage_api_project.modules.user.entity.User;
 import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
-
+import tw.niels.beverage_api_project.modules.order.entity.PaymentMethodEntity;
+import tw.niels.beverage_api_project.modules.order.event.OrderStateChangedEvent;
 import java.math.BigDecimal;
+
 import java.text.SimpleDateFormat;
 import java.util.*;
 
@@ -31,12 +37,18 @@ public class OrderService {
     private final OrderNumberService orderNumberService;
     private final OrderStateFactory  orderStateFactory;
     private final OrderItemProcessorService orderItemProcessorService;
+    private final ApplicationEventPublisher eventPublisher;
+    private final PaymentMethodRepository paymentMethodRepository;
+    private final MemberPointService memberPointService;
 
     public OrderService(OrderRepository orderRepository, StoreRepository storeRepository, UserRepository userRepository,
                         ControllerHelperService helperService,
                         OrderNumberService orderNumberService,
                         OrderStateFactory orderStateFactory,
-                        OrderItemProcessorService orderItemProcessorService) {
+                        OrderItemProcessorService orderItemProcessorService,
+                        ApplicationEventPublisher eventPublisher,
+                        PaymentMethodRepository paymentMethodRepository,
+                        MemberPointService memberPointService) {
         this.orderRepository = orderRepository;
         this.storeRepository = storeRepository;
         this.userRepository = userRepository;
@@ -44,6 +56,9 @@ public class OrderService {
         this.orderNumberService = orderNumberService;
         this.orderStateFactory = orderStateFactory;
         this.orderItemProcessorService = orderItemProcessorService;
+        this.eventPublisher = eventPublisher;
+        this.paymentMethodRepository = paymentMethodRepository;
+        this.memberPointService = memberPointService;
     }
 
 
@@ -85,6 +100,78 @@ public class OrderService {
         // 儲存訂單
         return orderRepository.save(order);
     }
+
+    /**
+     * 處理 POS 的「一步到位」結帳。
+     * 這是一個單一交易，包含建立、計算、扣點、付款和發布事件。
+     */
+    @Transactional
+    public Order completePosCheckout(PosCheckoutRequestDto requestDto) {
+        User staff = getCurrentStaff();
+        Long brandId = staff.getBrand().getBrandId();
+        Long storeId = helperService.getCurrentStoreId();
+
+        if (storeId == null) {
+            throw new BadRequestException("此帳號未綁定店家，無法建立訂單。");
+        }
+        Store store = storeRepository.findByBrand_BrandIdAndStoreId(brandId, storeId)
+                .orElseThrow(() -> new ResourceNotFoundException("找不到店家 (JWT storeId: " + storeId + ")"));
+
+        // 1. 建立 Order Entity
+        Order order = new Order();
+        order.setBrand(staff.getBrand());
+        order.setStore(store);
+        order.setStaff(staff);
+        order.setOrderNumber(generateOrderNumber(store.getStoreId()));
+
+        // 2. 處理品項 (複用現有邏輯)
+        OrderItemProcessorService.ProcessedItemsResult result =
+                orderItemProcessorService.processOrderItems(order, requestDto.getItems(), brandId);
+        order.setItems(result.orderItems);
+        order.setTotalAmount(result.totalAmount);
+
+        // 3. 處理付款與會員 (複用 AbstractPrePaymentState 的邏輯)
+        PaymentMethodEntity paymentMethodEntity = paymentMethodRepository.findByCode(requestDto.getPaymentMethod())
+                .orElseThrow(() -> new BadRequestException("無效的支付方式代碼：" + requestDto.getPaymentMethod()));
+        order.setPaymentMethod(paymentMethodEntity);
+
+        User member = null;
+        BigDecimal discountAmount = BigDecimal.ZERO;
+        Long pointsToUse = 0L;
+
+        if (requestDto.getMemberId() != null) {
+            member = userRepository.findByBrand_BrandIdAndUserId(brandId, requestDto.getMemberId())
+                    .filter(user -> user.getMemberProfile() != null)
+                    .orElseThrow(() -> new ResourceNotFoundException("找不到會員，ID：" + requestDto.getMemberId()));
+            order.setMember(member);
+
+            if (requestDto.getPointsToUse() > 0) {
+                pointsToUse = requestDto.getPointsToUse();
+                discountAmount = memberPointService.calculateDiscountAmount(pointsToUse);
+                memberPointService.usePoints(member, order, pointsToUse);
+            }
+        }
+        order.setPointsUsed(pointsToUse);
+        order.setDiscountAmount(discountAmount);
+        BigDecimal finalAmount = order.getTotalAmount().subtract(discountAmount);
+        if (finalAmount.compareTo(BigDecimal.ZERO) < 0) {
+            finalAmount = BigDecimal.ZERO;
+        }
+        order.setFinalAmount(finalAmount);
+
+        // 4. 【關鍵】直接將狀態設為 PREPARING
+        order.setStatus(OrderStatus.PREPARING);
+        order.setPointsEarned(0L); // 點數在 CLOSED 狀態才賺取
+
+        // 5. 儲存
+        Order savedOrder = orderRepository.save(order);
+
+        // 6. 發布事件 (通知 KDS)
+        eventPublisher.publishEvent(new OrderStateChangedEvent(savedOrder, null, OrderStatus.PREPARING));
+
+        return savedOrder;
+    }
+
 
     // 產生一個訂單號碼
     private String generateOrderNumber(Long storeId) {

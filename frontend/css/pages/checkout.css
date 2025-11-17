@@ -26,6 +26,7 @@
     overflow-y: hidden;
     height: 100%;
     box-sizing: border-box;
+
 }
 .checkout-column-left h2 {
     margin-top: 0;
@@ -33,6 +34,17 @@
     border-bottom: 1px solid #eee;
     padding-bottom: 10px;
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.checkout-column-left h2 md-outlined-button {
+    /* margin-left: auto; (上面 h2 已用 justify-content) */
+
+    /* 縮小按鈕的 padding 和字體 */
+    --md-outlined-button-label-text-size: 0.8em;
+    --md-outlined-button-horizontal-padding: 12px;
+    height: 32px; /* 讓按鈕小一點 */
 }
 #order-items-list {
     flex-grow: 1;
