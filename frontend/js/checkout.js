@@ -33,7 +33,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // --- 2. 取得 DOM 元素 ---
     const layoutEl = document.getElementById("checkout-layout");
     const mainEl = document.getElementById("checkout-main");
-    const checkoutContent = document.getElementById("checkout-main"); // (改為抓 main)
+    const checkoutContent = document.getElementById("checkout-main");
 
     // 左欄
     const itemCountEl = document.getElementById("item-count");
@@ -94,7 +94,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             currentCartItems = cartItems;
 
-            // 【修改】在前端計算總金額
+            // 計算總金額
             originalTotalAmount = currentCartItems.reduce((sum, item) => {
                 return sum + (item.unitPrice * item.quantity);
             }, 0);
@@ -116,7 +116,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     /**
      * 渲染訂單品項列表 (左欄)
-     * (使用 localStorage 的 'cartItem' 結構)
      */
     function renderOrderItems(items) {
         itemsListEl.innerHTML = ""; // 清空
@@ -125,7 +124,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             return;
         }
         items.forEach(item => {
-            const optionsStr = item.selectedOptions.map(opt => opt.optionName).join(", "); // <--【修正】'selectedOptions'
+            const optionsStr = item.selectedOptions.map(opt => opt.optionName).join(", ");
             const itemEl = document.createElement("div");
             itemEl.className = "checkout-item";
             itemEl.innerHTML = `
@@ -178,9 +177,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     /**
      * (核心) 更新所有金額顯示
-     * 1. 計算點數折抵
-     * 2. 計算最終金額
-     * 3. 更新左欄、右欄按鈕、計算機
      */
     function updateAllTotals() {
         let pointsToUse = pointsToUseInput.valueAsNumber || 0;
@@ -194,7 +190,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             pointsErrorEl.textContent = "";
         }
 
-        // 規則：10 點折 1 元 (來自 MemberPointService.java)
+        // 規則：10 點折 1 元
         pointsDiscount = Math.floor(pointsToUse / 10);
         finalAmount = originalTotalAmount - pointsDiscount;
 
@@ -211,7 +207,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         // 更新右欄結帳按鈕
         confirmBtnAmountEl.textContent = `NT$ ${finalAmount}`;
 
-        // 更新計算機
+        // 更新計算機與按鈕狀態
         updateCalculatorDisplay();
     }
 
@@ -245,16 +241,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         const fastVal = button.dataset.fast;
 
         if (fastVal) {
-            // 快速鍵
             cashReceived = Number(fastVal);
         } else if (val === 'clear') {
-            // 清除
             cashReceived = 0;
         } else if (val === 'exact') {
-            // 剛好
             cashReceived = finalAmount;
         } else {
-            // 數字鍵
             let currentStr = String(cashReceived);
             if (currentStr === '0') currentStr = '';
             currentStr += val;
@@ -289,7 +281,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     /**
-     * 處理最終付款 (呼叫新 API)
+     * 處理最終付款
      */
     async function handleConfirmPayment() {
         if (confirmPaymentButton.disabled) return;
@@ -297,15 +289,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         confirmPaymentButton.disabled = true;
         confirmBtnTextEl.textContent = "付款處理中...";
 
-        // 1. 【修改】建立 OrderItemDto
         const itemsDto = currentCartItems.map(item => ({
             productId: item.productId,
             quantity: item.quantity,
             notes: item.notes,
-            optionIds: item.selectedOptions.map(opt => opt.optionId) // 轉換
+            optionIds: item.selectedOptions.map(opt => opt.optionId)
         }));
 
-        // 2. 【修改】建立 PosCheckoutRequestDto
         const checkoutData = {
             items: itemsDto,
             memberId: currentMember ? currentMember.userId : null,
@@ -314,16 +304,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         };
 
         try {
-            // 3. 【修改】呼叫新 API
             const paidOrder = await posCheckoutComplete(checkoutData);
-
             alert(
                 `付款成功！ 訂單 ${paidOrder.orderNumber} 狀態已更新為 ${paidOrder.status}`
             );
-
-            // 4. 【修改】清除 localStorage
             localStorage.removeItem("cartForCheckout");
-
             window.location.href = "pos.html";
         } catch (error) {
             alert(`付款失敗: ${error.message}`);
@@ -339,15 +324,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     findMemberBtn.addEventListener("click", handleFindMember);
     pointsToUseInput.addEventListener("input", updateAllTotals);
 
-
     calculatorGrid.addEventListener("click", handleCalculatorClick);
     confirmPaymentButton.addEventListener("click", handleConfirmPayment);
 
     holdAndReturnButton.addEventListener("click", () => {
-        // 不清除 localStorage，直接返回
         window.location.href = "pos.html";
     });
-
 
     cancelButton.addEventListener("click", async () => {
         if (confirm("確定要取消結帳嗎？\n(購物車將被清空)")) {
@@ -356,18 +338,25 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
     });
 
-    paymentMethodChips.addEventListener("change", (e) => {
-        const selectedChip = e.target.closest("md-filter-chip[selected]");
+    // 【修正重點】改用 click 事件 + 遍歷檢查 .selected 屬性
+    paymentMethodChips.addEventListener("click", () => {
+        // 由於 DOM 更新可能有微小延遲，使用 requestAnimationFrame 或 setTimeout 確保抓到最新狀態
+        requestAnimationFrame(() => {
+            const chips = Array.from(paymentMethodChips.querySelectorAll("md-filter-chip"));
+            const selectedChip = chips.find(chip => chip.selected);
 
-        if (selectedChip) {
-            selectedPaymentMethod = selectedChip.dataset.method;
-        } else {
-            selectedPaymentMethod = null; // 沒有選中
-        }
+            if (selectedChip) {
+                selectedPaymentMethod = selectedChip.dataset.method;
+            } else {
+                selectedPaymentMethod = null;
+            }
 
-        // 顯示/隱藏現金計算機
-        cashCalculatorEl.style.display = (selectedPaymentMethod === "CASH") ? "block" : "none";
-        updateCalculatorDisplay(); // 更新顯示和按鈕狀態
+            // 顯示/隱藏現金計算機
+            cashCalculatorEl.style.display = (selectedPaymentMethod === "CASH") ? "block" : "none";
+
+            // 觸發更新按鈕狀態 (信用卡會在此被啟用)
+            updateCalculatorDisplay();
+        });
     });
 
 

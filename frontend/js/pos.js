@@ -1,4 +1,3 @@
-
 import '@material/web/icon/icon.js';
 import '@material/web/iconbutton/icon-button.js';
 import '@material/web/list/list.js';
@@ -7,24 +6,23 @@ import '@material/web/button/filled-button.js';
 import '@material/web/button/outlined-button.js';
 import '@material/web/dialog/dialog.js';
 import '@material/web/divider/divider.js';
-
-
 import '@material/web/chips/chip-set.js';
 import '@material/web/chips/filter-chip.js';
 import '@material/web/textfield/filled-text-field.js';
 
 import {
-  getCategories,
-  getPosProducts,
-  createOrder,
+    getCategories,
+    getPosProducts,
+    createOrder,
     getOrdersByStatus,
-    updateOrderStatus
+    updateOrderStatus // 雖然 pos.js 主要用來顯示待取餐，但如果需要在這頁完成取餐也需要這個
 } from "./api.js";
 import { createProductCard } from "./components/ProductCard.js";
 import { createOptionsModalContent } from "./components/OptionsModal.js";
 import { createCartItem, updateCartTotal } from "./components/Cart.js";
 import { createNavbar } from "./components/Navbar.js";
-import { connectToWebSocket } from "./ws-client.js";
+// 【修改 1】移除 WebSocket
+// import { connectToWebSocket } from "./ws-client.js";
 
 let allProducts = [];
 let shoppingCart = [];
@@ -39,217 +37,155 @@ const modalAddButton = document.getElementById("modal-add-btn");
 
 document.addEventListener("DOMContentLoaded", () => {
     if (!MY_STORE_ID) {
-        // 可能是品牌管理員，或登入狀態異常
         const errorMsg = "錯誤：找不到店家 ID (storeId)。\n\n品牌管理員帳號無法使用 POS 點餐系統。\n\n將導回登入頁。";
         console.error(errorMsg);
         alert(errorMsg);
         window.location.href = "login.html";
-        return; // 中斷此腳本的後續執行
+        return;
     }
 
     // 1. 取得元素
-  const productGrid = document.getElementById("product-grid");
-  const posLayout = document.querySelector(".pos-layout");
-  const mainContent = document.querySelector(".pos-main-content");
-  const categoryList = document.getElementById("category-list");
-  const cartItemsContainer = document.getElementById("cart-items");
-  const cartTotalAmount = document.getElementById("cart-total-amount");
+    const productGrid = document.getElementById("product-grid");
+    const posLayout = document.querySelector(".pos-layout");
+    const mainContent = document.querySelector(".pos-main-content");
+    const categoryList = document.getElementById("category-list");
+    const cartItemsContainer = document.getElementById("cart-items");
+    const cartTotalAmount = document.getElementById("cart-total-amount");
+    const pickupListEl = document.getElementById("pickup-list");
 
+    const handleLogout = () => {
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("brandId");
+        window.location.href = "login.html";
+    };
+    const navbar = createNavbar("POS 點餐系統", handleLogout);
+    posLayout.insertBefore(navbar, mainContent);
 
-  const pickupListEl = document.getElementById("pickup-list");
-  const handleLogout = () => {
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("brandId");
-      window.location.href = "login.html";
-  };
-  const navbar = createNavbar("POS 點餐系統", handleLogout);
-  posLayout.insertBefore(navbar, mainContent);
+    // ... (holdOrder, goToCheckout, loadAllData, renderCategoryList, renderProducts 函式保持不變) ...
+    // 為了節省篇幅，這裡省略中間未變動的商品渲染邏輯，請保留原本的代碼
+
     /**
      * 「僅」用於暫存訂單 (HELD)
      */
-  async function holdOrder(action) {
-    if (shoppingCart.length === 0) {
-      alert("購物車是空的！");
-      return;
-    }
-
-    const orderItemsDto = shoppingCart.map((item) => ({
-      productId: item.productId,
-      quantity: item.quantity,
-      notes: item.notes,
-      optionIds: item.selectedOptions.map((opt) => opt.optionId),
-    }));
-
-    //
-    const createOrderRequest = {
-      items: orderItemsDto,
-        status: 'HELD'
+    async function holdOrder(action) {
+        if (shoppingCart.length === 0) {
+            alert("購物車是空的！");
+            return;
+        }
+        const orderItemsDto = shoppingCart.map((item) => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            notes: item.notes,
+            optionIds: item.selectedOptions.map((opt) => opt.optionId),
+        }));
+        const createOrderRequest = {
+            items: orderItemsDto,
+            status: 'HELD'
         };
-
-    try {
-        const newOrder = await createOrder(createOrderRequest);
-        alert(`訂單 ${newOrder.orderNumber} 已暫存`);
-        shoppingCart = [];
-        renderCart();
-    }catch (error) {
-        console.error(` ${action} 失敗:`, error);
-        alert(` ${action} 失敗: ${error.message}`);
+        try {
+            const newOrder = await createOrder(createOrderRequest);
+            alert(`訂單 ${newOrder.orderNumber} 已暫存`);
+            shoppingCart = [];
+            renderCart();
+        } catch (error) {
+            console.error(` ${action} 失敗:`, error);
+            alert(` ${action} 失敗: ${error.message}`);
+        }
     }
-  }
 
-    /**
-     * 處理點擊「結帳」按鈕的邏輯
-     */
     function goToCheckout() {
         if (shoppingCart.length === 0) {
             alert("購物車是空的！");
             return;
         }
-
         try {
-            // 1. 將購物車存入 localStorage
             localStorage.setItem("cartForCheckout", JSON.stringify(shoppingCart));
-
-            // 2. 跳轉到結帳頁 (不需要 orderId)
             window.location.href = "checkout.html";
-
         } catch (e) {
             alert("儲存購物車失敗，可能是瀏覽器空間不足。");
             console.error("無法儲存 localStorage:", e);
         }
     }
 
-
-  // 3.
-  async function loadAllData() {
-    productGrid.innerHTML = "<p>正在載入資料...</p>";
-    categoryList.innerHTML = `<md-list-item headline="載入中..."></md-list-item>`;
-    try {
-      const [products, categories] = await Promise.all([
-        getPosProducts(),
-        getCategories(),
-      ]);
-      allProducts = products;
-      renderCategoryList(categories);
-      renderProducts("all");
-      addCategoryClickListeners();
-    } catch (error) {
-      console.error("載入資料時發生錯誤:", error);
-      productGrid.innerHTML = `<p class="error">資料載入失敗: ${error.message}</p>`;
-        categoryList.innerHTML = `<md-list-item headline="載入失敗"></md-list-item>`;
+    async function loadAllData() {
+        productGrid.innerHTML = "<p>正在載入資料...</p>";
+        categoryList.innerHTML = `<md-list-item headline="載入中..."></md-list-item>`;
+        try {
+            const [products, categories] = await Promise.all([
+                getPosProducts(),
+                getCategories(),
+            ]);
+            allProducts = products;
+            renderCategoryList(categories);
+            renderProducts("all");
+            addCategoryClickListeners();
+        } catch (error) {
+            console.error("載入資料時發生錯誤:", error);
+            productGrid.innerHTML = `<p class="error">資料載入失敗: ${error.message}</p>`;
+            categoryList.innerHTML = `<md-list-item headline="載入失敗"></md-list-item>`;
+        }
     }
-  }
 
-  // 4.
     function renderCategoryList(categories) {
-        categoryList.innerHTML = ""; // 清空
-
-        // "全部商品"
+        categoryList.innerHTML = "";
         const allLi = document.createElement("md-list-item");
         allLi.setAttribute("headline", "全部商品");
         allLi.dataset.categoryId = "all";
-        allLi.classList.add("active"); // 您可能需要 CSS 調整 .active 樣式
-
-        // 1. 建立一個 <div> (或 <span>)
+        allLi.classList.add("active");
         const allLiText = document.createElement("div");
-        // 2. 告訴它要被放入 "headline" 插槽
         allLiText.setAttribute("slot", "headline");
-        // 3. 設定文字內容
         allLiText.textContent = "全部商品";
-        // 4. 將這個 <div> 放入 <md-list-item> 中
         allLi.appendChild(allLiText);
-
         categoryList.appendChild(allLi);
 
-        // 其他分類
         categories.forEach((category) => {
             const li = document.createElement("md-list-item");
             li.dataset.categoryId = category.categoryId;
-
-            // 1. 建立一個 <div>
             const liText = document.createElement("div");
-            // 2. 告訴它要被放入 "headline" 插槽
             liText.setAttribute("slot", "headline");
-            // 3. 設定文字內容
             liText.textContent = category.name;
-            // 4. 將這個 <div> 放入 <md-list-item> 中
             li.appendChild(liText);
-
             categoryList.appendChild(li);
         });
     }
 
-  // 5.
-  function renderProducts(categoryId) {
-      // 1. 取得最新資料 (邏輯不變)
-      const productsToRender =
-          categoryId === "all"
-              ? allProducts
-              : allProducts.filter(
-                  (product) =>
-                      product.categories &&
-                      product.categories.some((cat) => cat.categoryId === Number(categoryId))
-              );
+    function renderProducts(categoryId) {
+        const productsToRender = categoryId === "all"
+            ? allProducts
+            : allProducts.filter((product) => product.categories && product.categories.some((cat) => cat.categoryId === Number(categoryId)));
 
-      for (const child of Array.from(productGrid.children)) {
-          // 如果這個子元素「沒有」data-product-id，就代表它是 <p> 標籤，移除它
-          if (!child.dataset.productId) {
-              child.remove();
-          }
-      }
+        for (const child of Array.from(productGrid.children)) {
+            if (!child.dataset.productId) child.remove();
+        }
+        const newIdSet = new Set(productsToRender.map(p => p.id));
+        const existingCardMap = new Map();
+        for (const cardElement of productGrid.children) {
+            const productId = cardElement.dataset.productId;
+            if (productId) existingCardMap.set(Number(productId), cardElement);
+        }
+        existingCardMap.forEach((cardElement, productId) => {
+            if (!newIdSet.has(productId)) cardElement.remove();
+        });
+        productsToRender.forEach((product) => {
+            if (!existingCardMap.has(product.id)) {
+                const productCard = createProductCard(product);
+                productCard.addEventListener("click", () => {
+                    openOptionsModal(product);
+                });
+                productGrid.appendChild(productCard);
+            }
+        });
+        if (productGrid.children.length === 0) {
+            productGrid.innerHTML = "<p>這個分類沒有商品</p>";
+        }
+    }
 
-      // 2. 建立一個「新資料的 ID 集合」，方便快速查找
-      const newIdSet = new Set(productsToRender.map(p => p.id));
-
-      // 3. 建立一個「當前畫面上所有卡片的 Map」，方便快速存取
-      //    Map<productId, domElement>
-      const existingCardMap = new Map();
-      for (const cardElement of productGrid.children) {
-          const productId = cardElement.dataset.productId;
-          if (productId) {
-              existingCardMap.set(Number(productId), cardElement);
-          }
-      }
-
-      // 4. 【移除階段】
-      // 檢查畫面上舊的卡片，如果「不在」新的資料集合中，就移除它
-      existingCardMap.forEach((cardElement, productId) => {
-          if (!newIdSet.has(productId)) {
-              cardElement.remove();
-          }
-      });
-
-      // 5. 【新增階段】
-      // 遍歷「新資料」，如果畫面上「沒有」這張卡，就建立並新增它
-      productsToRender.forEach((product) => {
-          if (!existingCardMap.has(product.id)) {
-              const productCard = createProductCard(product);
-              productCard.addEventListener("click", () => {
-                  openOptionsModal(product);
-              });
-              productGrid.appendChild(productCard);
-          }
-          // 如果已存在 (existingCardMap.has(product.id) 為 true)，
-          // 我們就什麼都不做，DOM 節點會被原地保留，這就是效能的來源！
-      });
-
-      // 處理空狀態
-      if (productGrid.children.length === 0) {
-          productGrid.innerHTML = "<p>這個分類沒有商品</p>";
-      }
-  }
-
-  // 6.
     function addCategoryClickListeners() {
         categoryList.addEventListener("click", (event) => {
-            // event.preventDefault(); // MWC 元件可能不需要
-            const target = event.target.closest("md-list-item"); // 找 <md-list-item>
+            const target = event.target.closest("md-list-item");
             if (target) {
-                categoryList
-                    .querySelectorAll("md-list-item")
-                    .forEach((a) => a.classList.remove("active"));
+                categoryList.querySelectorAll("md-list-item").forEach((a) => a.classList.remove("active"));
                 target.classList.add("active");
-
                 const selectedCategoryId = target.getAttribute("data-category-id");
                 renderProducts(selectedCategoryId);
             }
@@ -257,88 +193,73 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function openOptionsModal(product) {
-        // 1. 建立 modal 內容 (來自 OptionsModal.js)
         currentModal = createOptionsModalContent(product);
-
-        // 2. 將內容注入 dialog
-        dialogContentSlot.innerHTML = ""; // 清空舊內容
+        dialogContentSlot.innerHTML = "";
         dialogContentSlot.appendChild(currentModal.element);
-
-        // 3. 【修改】移除舊的按鈕建立邏輯，改為替 dialog 的按鈕綁定新事件
-        //    (我們需要移除舊監聽器，或用 .cloneNode(true) 取代按鈕來重設)
-
-        // 簡單起見，我們直接重設按鈕的監聽器
         modalAddButton.onclick = () => {
             handleAddToCart(product, currentModal.getSelectedData());
         };
         modalCloseButton.onclick = closeModal;
-
-        // 4. 顯示 dialog
         optionsDialog.show();
     }
 
     function closeModal() {
         optionsDialog.close();
-        currentModal = null; // 清理
+        currentModal = null;
     }
 
-
-
-  function handleAddToCart(product, selectedData) {
-    const allOptions = product.optionGroups.flatMap((group) => group.options);
-    const selectedOptions = allOptions.filter((option) =>
-      selectedData.selectedOptionIds.includes(String(option.optionId))
-    );
-
-    const optionPriceAdjustment = selectedOptions.reduce(
-      (sum, opt) => sum + opt.priceAdjustment,
-      0
-    );
-    const unitPrice = product.basePrice + optionPriceAdjustment;
-
-    const cartItem = {
-      id: Date.now(),
-      productId: product.id,
-      name: product.name,
-      quantity: selectedData.quantity,
-      unitPrice: unitPrice,
-      selectedOptions: selectedOptions,
-      notes: selectedData.notes,
-    };
-
-    shoppingCart.push(cartItem);
-    renderCart();
-    closeModal();
-  }
-
-  function renderCart() {
-    cartItemsContainer.innerHTML = "";
-    if (shoppingCart.length === 0) {
-      cartItemsContainer.innerHTML = "<p class='cart-empty'>購物車是空的</p>";
-    } else {
-      shoppingCart.forEach((item) => {
-        //
-        const itemElement = createCartItem(item);
-        cartItemsContainer.appendChild(itemElement);
-      });
+    function handleAddToCart(product, selectedData) {
+        const allOptions = product.optionGroups.flatMap((group) => group.options);
+        const selectedOptions = allOptions.filter((option) =>
+            selectedData.selectedOptionIds.includes(String(option.optionId))
+        );
+        const optionPriceAdjustment = selectedOptions.reduce((sum, opt) => sum + opt.priceAdjustment, 0);
+        const unitPrice = product.basePrice + optionPriceAdjustment;
+        const cartItem = {
+            id: Date.now(),
+            productId: product.id,
+            name: product.name,
+            quantity: selectedData.quantity,
+            unitPrice: unitPrice,
+            selectedOptions: selectedOptions,
+            notes: selectedData.notes,
+        };
+        shoppingCart.push(cartItem);
+        renderCart();
+        closeModal();
     }
-    //
-    updateCartTotal(shoppingCart, cartTotalAmount);
-  }
 
-  function handleRemoveFromCart(cartId) {
-    shoppingCart = shoppingCart.filter((item) => item.id !== cartId);
-    renderCart();
-  }
-
-  cartItemsContainer.addEventListener("click", (event) => {
-    const removeButton = event.target.closest(".cart-item-remove-btn");
-    if (removeButton) {
-      const cartId = Number(removeButton.dataset.cartId);
-      handleRemoveFromCart(cartId);
+    function renderCart() {
+        cartItemsContainer.innerHTML = "";
+        if (shoppingCart.length === 0) {
+            cartItemsContainer.innerHTML = "<p class='cart-empty'>購物車是空的</p>";
+        } else {
+            shoppingCart.forEach((item) => {
+                const itemElement = createCartItem(item);
+                cartItemsContainer.appendChild(itemElement);
+            });
+        }
+        updateCartTotal(shoppingCart, cartTotalAmount);
     }
-  });
 
+    function handleRemoveFromCart(cartId) {
+        shoppingCart = shoppingCart.filter((item) => item.id !== cartId);
+        renderCart();
+    }
+
+    cartItemsContainer.addEventListener("click", (event) => {
+        const removeButton = event.target.closest(".cart-item-remove-btn");
+        if (removeButton) {
+            const cartId = Number(removeButton.dataset.cartId);
+            handleRemoveFromCart(cartId);
+        }
+    });
+
+    // ... (以上為商品相關邏輯) ...
+
+    /**
+     * 載入待取餐訂單 (READY_FOR_PICKUP)
+     */
     async function loadPickupOrders() {
         try {
             const orders = await getOrdersByStatus(MY_STORE_ID, "READY_FOR_PICKUP");
@@ -354,13 +275,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     /**
-     * 7. 【新增】渲染單一待取餐項目
+     * 渲染單一待取餐項目
      */
     function renderPickupItem(order) {
         const orderId = `pickup-order-${order.orderId}`;
-        if (document.getElementById(orderId)) return; // 避免重複
+        if (document.getElementById(orderId)) return;
 
-        // 移除 "empty" 提示
         const emptyEl = pickupListEl.querySelector(".pickup-empty");
         if (emptyEl) emptyEl.remove();
 
@@ -371,14 +291,41 @@ document.addEventListener("DOMContentLoaded", () => {
           <span class="pickup-item-number">#${order.orderNumber}</span>
           <button class="btn-complete-pickup" data-order-id="${order.orderId}">完成取餐</button>
       `;
-        pickupListEl.prepend(itemEl); // 新的放最上面
+        pickupListEl.prepend(itemEl);
     }
 
     /**
-     * 8. 【新增】處理 WebSocket 訊息
+     * 【修改 2】啟動 SSE 連線 (取代 WebSocket)
      */
-    function handlePosWebSocketMessage(action, order) {
-        console.log("POS 收到 WS 訊息:", action, order.orderNumber);
+    function startSse() {
+        const token = localStorage.getItem("accessToken");
+        if (!token) return;
+
+        // 使用與 kds.js 相同的 SSE 端點
+        const eventSource = new EventSource(`/api/v1/kds/stream?token=${token}`);
+
+        eventSource.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                handlePosSseMessage(data.action, data.payload);
+            } catch (e) {
+                console.error("POS SSE 訊息解析失敗:", e);
+            }
+        };
+
+        eventSource.onerror = (err) => {
+            console.error("POS SSE 連線錯誤 (將自動重連):", err);
+            if (eventSource.readyState === EventSource.CLOSED) {
+                // Token 可能過期，可考慮導向登入或提示
+            }
+        };
+    }
+
+    /**
+     * 【修改 3】處理 SSE 訊息 (原 handlePosWebSocketMessage)
+     */
+    function handlePosSseMessage(action, order) {
+        console.log("POS 收到 SSE 訊息:", action, order.orderNumber);
         const orderElId = `pickup-order-${order.orderId}`;
         const existingEl = document.getElementById(orderElId);
 
@@ -401,7 +348,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     /**
-     * 9. 【新增】處理 POS 上的「完成取餐」按鈕點擊
+     * 處理 POS 上的「完成取餐」按鈕點擊
      */
     async function handleCompletePickup(event) {
         const button = event.target.closest(".btn-complete-pickup");
@@ -412,13 +359,8 @@ document.addEventListener("DOMContentLoaded", () => {
         button.textContent = "處理中...";
 
         try {
-            // 【關鍵】呼叫 API，將狀態從 READY_FOR_PICKUP -> CLOSED
             await updateOrderStatus(orderId, "CLOSED");
-
-            // 成功！
-            // 後端會發布 "REMOVE_FROM_PICKUP" 事件，
-            // handlePosWebSocketMessage() 會自動處理 UI 更新 (移除卡片)
-
+            // 成功！SSE "REMOVE_FROM_PICKUP" 事件會自動更新 UI
         } catch (error) {
             console.error("更新訂單為 CLOSED 失敗:", error);
             alert(`訂單 ${orderId} 更新失敗: ${error.message}`);
@@ -429,47 +371,28 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // --- 10. 啟動程序 ---
 
-    // 綁定「結帳」和「暫存」按鈕
     const checkoutButton = document.getElementById("checkout-button");
     const holdButton = document.getElementById("hold-button");
     checkoutButton.addEventListener("click", goToCheckout);
     holdButton.addEventListener("click", holdOrder);
-
-    // 【新增】綁定「完成取餐」按鈕 (使用事件委派)
     pickupListEl.addEventListener("click", handleCompletePickup);
 
-    // 載入初始資料
-    loadAllData(); // 載入商品
-    loadPickupOrders(); // 載入待取餐列表
+    loadAllData();
+    loadPickupOrders();
 
     const restoredCartJson = localStorage.getItem("cartForCheckout");
-
     if (restoredCartJson) {
         try {
-            // 如果有，將其解析並放回 shoppingCart 變數
             shoppingCart = JSON.parse(restoredCartJson);
-            // 注意：我們「不」清除 localStorage，這樣使用者重新整理頁面時購物車還在
-            // localStorage.removeItem("cartForCheckout");
         } catch (e) {
-            console.error("解析還原的購物車失敗:", e);
-            shoppingCart = []; // 如果解析失敗，清空
+            shoppingCart = [];
         }
     } else {
-        // 如果 localStorage 中沒有，才初始化為空陣列
-        // (這可以防止 shoppingCart 變數在 restoredCartJson 存在時被重置回 [])
         shoppingCart = [];
     }
 
-    renderCart();  // 渲染空購物車
+    renderCart();
 
-    // 啟動 WebSocket
-    connectToWebSocket(
-        MY_STORE_ID,
-        // onMessage
-        (action, payload) => handlePosWebSocketMessage(action, payload),
-        // onConnect
-        () => { console.log("POS WebSocket 已連線"); },
-        // onError
-        (error) => { console.error("POS WebSocket 連線失敗:", error); }
-    );
+    // 【修改 4】啟動 SSE
+    startSse();
 });

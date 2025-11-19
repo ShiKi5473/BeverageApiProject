@@ -122,7 +122,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             // 截取 "Bearer " 之後的部分，即為實際的 JWT Token
             return bearerToken.substring(7);
         }
-
+        // 支援從 Query Parameter 讀取 Token (給 SSE 使用)
+        String paramToken = request.getParameter("token");
+        if (StringUtils.hasText(paramToken)) {
+            return paramToken;
+        }
         return null;
     }
 }

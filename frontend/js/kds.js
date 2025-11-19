@@ -3,7 +3,8 @@ import '@material/web/labs/card/filled-card.js';
 import '@material/web/button/filled-button.js';
 
 import { getOrdersByStatus, updateOrderStatus } from "./api.js";
-import { connectToWebSocket } from "./ws-client.js";
+// 【修改 1】移除 WebSocket 的 import
+// import { connectToWebSocket } from "./ws-client.js";
 
 const MY_STORE_ID = localStorage.getItem("storeId");
 
@@ -41,6 +42,53 @@ document.addEventListener("DOMContentLoaded", () => {
             console.error("載入初始訂單失敗:", error);
             preparingListEl.innerHTML = `<p class="error">${error.message}</p>`;
         }
+    }
+
+    /**
+     * 【修改 2】啟動 SSE 連線 (取代 startWebSocket)
+     */
+    function startSse() {
+        const token = localStorage.getItem("accessToken");
+        if (!token) {
+            console.error("SSE 啟動失敗：找不到 Token");
+            return;
+        }
+
+        console.log("嘗試建立 SSE 連線...");
+        // 將 token 帶在 URL 上 (需配合後端 JwtAuthenticationFilter 修改)
+        const eventSource = new EventSource(`/api/v1/kds/stream?token=${token}`);
+
+        // 1. 連線成功
+        eventSource.onopen = () => {
+            console.log("SSE 已連線");
+            statusChip.label = `SSE 已連線 (店家 ${MY_STORE_ID})`;
+            statusChip.classList.remove("status-disconnected");
+            statusChip.classList.add("status-connected");
+        };
+
+        // 2. 收到訊息
+        eventSource.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                // 呼叫原本的邏輯處理畫面更新
+                handleKdsMessage(data.action, data.payload);
+            } catch (e) {
+                console.error("SSE 訊息解析失敗:", e);
+            }
+        };
+
+        // 3. 連線錯誤
+        eventSource.onerror = (err) => {
+            console.error("SSE 連線錯誤:", err);
+            statusChip.label = `連線中斷 (重試中...)`;
+            statusChip.classList.remove("status-connected");
+            statusChip.classList.add("status-disconnected");
+
+            // EventSource 預設會自動重連，但如果 Token 失效可能需要額外處理 (例如關閉連線)
+            if (eventSource.readyState === EventSource.CLOSED) {
+                statusChip.label = `連線已關閉`;
+            }
+        };
     }
 
     /**
@@ -87,39 +135,30 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     /**
-     * 3. 處理 WebSocket 訊息
+     * 3. 處理 KDS 訊息 (邏輯不變，只是來源變成了 SSE)
      */
     function handleKdsMessage(action, order) {
         const orderId = `kds-order-${order.orderId}`;
         const existingCard = document.getElementById(orderId);
 
-        console.log("KDS 收到 WS 訊息:", action, order.orderNumber);
+        console.log("KDS 收到訊息:", action, order.orderNumber);
 
         if (action === "NEW_ORDER") {
-            // 新訂單 -> 加入 "製作中"
             renderOrderCard(order, preparingListEl);
 
         } else if (action === "MOVE_TO_PICKUP") {
-            // 製作完成 -> 從 "製作中" 移到 "待取餐"
-            if (existingCard) {
-                existingCard.remove(); // 從舊列表移除
-            }
-            renderOrderCard(order, pickupListEl); // 渲染到新列表
+            if (existingCard) existingCard.remove();
+            renderOrderCard(order, pickupListEl);
 
         } else if (action === "CANCEL_ORDER") {
-            // 訂單取消
             if (existingCard) {
                 existingCard.classList.add("cancelled");
-                // 移除所有按鈕
-                const btn = existingCard.querySelector("button");
+                const btn = existingCard.querySelector("md-filled-button"); // 注意這裡選取器可能要對應您的按鈕標籤
                 if (btn) btn.remove();
             }
 
         } else if (action === "REMOVE_FROM_PICKUP") {
-            // 顧客已取餐
-            if (existingCard) {
-                existingCard.remove(); // 從 "待取餐" 移除
-            }
+            if (existingCard) existingCard.remove();
         }
     }
 
@@ -135,54 +174,25 @@ document.addEventListener("DOMContentLoaded", () => {
         button.textContent = "傳送中...";
 
         try {
-            // 【關鍵】呼叫 API，將狀態從 PREPARING -> READY_FOR_PICKUP
+            // 呼叫 API，將狀態從 PREPARING -> READY_FOR_PICKUP
             await updateOrderStatus(orderId, "READY_FOR_PICKUP");
-
-            // 成功！
-            // 我們不需要手動移動卡片，因為後端會發布 "MOVE_TO_PICKUP" 事件，
-            // handleKdsMessage() 會自動處理 UI 更新
-
+            // 成功後不需手動移卡片，等待 SSE 的 MOVE_TO_PICKUP 事件
         } catch (error) {
-            console.error("更新訂單為 READY_FOR_PICKUP 失敗:", error);
+            console.error("更新訂單失敗:", error);
             alert(`訂單 ${orderId} 更新失敗: ${error.message}`);
             button.disabled = false;
             button.textContent = "製作完成";
         }
     }
 
-    /**
-     * 5. 啟動 WebSocket 連線
-     */
-    function startWebSocket() {
-        connectToWebSocket(
-            MY_STORE_ID,
-            // onMessage
-            (action, payload) => handleKdsMessage(action, payload),
-            // onConnect
-            () => {
-                // 【修改】更新 <md-chip>
-                statusChip.label = `已連線 (店家 ${MY_STORE_ID})`;
-                statusChip.classList.remove("status-disconnected");
-                statusChip.classList.add("status-connected");
-            },
-            // onError
-            (error) => {
-                // 【修改】更新 <md-chip>
-                statusChip.label = `連線中斷: ${error} (5秒後重試)`;
-                statusChip.classList.remove("status-connected");
-                statusChip.classList.add("status-disconnected");
-            }
-        );
-    }
-
     // --- 啟動程序 ---
 
-    // 1. 綁定按鈕點擊 (使用事件委派)
+    // 1. 綁定按鈕點擊
     preparingListEl.addEventListener("click", handleCompleteProduction);
 
     // 2. 載入初始訂單
     loadInitialOrders();
 
-    // 3. 啟動 WS
-    startWebSocket();
+    // 3. 【修改 3】啟動 SSE (不再呼叫 startWebSocket)
+    startSse();
 });

@@ -1,85 +1,109 @@
-// 建議放在：tw/niels/beverage_api_project/modules/kds/service/
 package tw.niels.beverage_api_project.modules.kds.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import tw.niels.beverage_api_project.modules.kds.dto.KdsOrderDto;
+import tw.niels.beverage_api_project.modules.kds.strategy.KdsEventStrategy;
 import tw.niels.beverage_api_project.modules.order.entity.Order;
-import tw.niels.beverage_api_project.modules.order.event.OrderStateChangedEvent;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
+import tw.niels.beverage_api_project.modules.order.event.OrderStateChangedEvent;
+
+import java.io.IOException;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 @Service
 public class KdsService {
 
     private static final Logger logger = LoggerFactory.getLogger(KdsService.class);
-    private final SimpMessagingTemplate messagingTemplate;
 
-    public  KdsService(SimpMessagingTemplate messagingTemplate) {
-        this.messagingTemplate = messagingTemplate;
+    // SSE 連線管理
+    private final Map<Long, List<SseEmitter>> storeEmitters = new ConcurrentHashMap<>();
+
+    private final Map<OrderStatus, KdsEventStrategy> strategyMap = new EnumMap<>(OrderStatus.class);
+
+    public KdsService(List<KdsEventStrategy> strategies) {
+        for (KdsEventStrategy strategy : strategies) {
+            strategyMap.put(strategy.getHandledStatus(), strategy);
+        }
     }
 
-
     /**
-     * 【關鍵】這就是觀察者！
-     * 此方法會 "訂閱" OrderStateChangedEvent 事件。
-     * 當任何地方 (例如 OrderState) publish 了這個事件，Spring 會自動呼叫此方法。
+     * 觀察者模式：監聽訂單狀態變更事件
      */
     @EventListener
     public void handleOrderStateChange(OrderStateChangedEvent event) {
         Order order = event.getOrder();
         OrderStatus newStatus = event.getNewStatus();
 
-        String kdsTopic = "/topic/kds/store/" + order.getStore().getStoreId();
-        KdsOrderDto kdsOrderDto = KdsOrderDto.fromEntity(order);
-        switch (newStatus) {
-            case PREPARING:
-                // 現場/線上訂單付款完成
-                logger.info("[KDS] 推送新訂單: #{} 至 {}", order.getOrderNumber(), kdsTopic);
-                KdsOrderDto kdsDto;
-                messagingTemplate.convertAndSend(kdsTopic,
-                        new KdsMessage("NEW_ORDER", kdsOrderDto));
-                break;
+        // 2. 獲取 Store ID，用於推送到正確的店家
+        Long storeId = order.getStore().getStoreId();
 
-            case READY_FOR_PICKUP:
-                // 【新增】KDS 製作完成
-                logger.info("[KDS] 訂單製作完成: #{} 至 {}", order.getOrderNumber(), kdsTopic);
+        KdsEventStrategy strategy = strategyMap.get(newStatus);
 
-                // KDS 螢幕將訂單移至 "待取餐"
-                messagingTemplate.convertAndSend(kdsTopic,
-                        new KdsMessage("MOVE_TO_PICKUP", kdsOrderDto));
+        // 2. 如果有找到策略，就執行並發送；沒找到代表該狀態不需要通知 KDS (如 PENDING)
+        if (strategy != null) {
+            KdsMessage message = strategy.createMessage(order);
 
-                // (未來) 在此觸發線上點餐顧客的「取餐通知」
-                // customerNotificationService.notifyCustomer(order, "您的餐點已可取用！");
-                break;
+            logger.info("[KDS] SSE 推送動作: {} (單號: #{}) 至店家 {}",
+                    message.getAction(), order.getOrderNumber(), storeId);
 
-            case CLOSED:
-                // 【修改】POS 確認顧客已取餐
-                logger.info("[KDS] 訂單已結案: #{} 至 {}", order.getOrderNumber(), kdsTopic);
-
-                // KDS 螢幕可以將訂單從 "待取餐" 列表中移除
-                messagingTemplate.convertAndSend(kdsTopic,
-                        new KdsMessage("REMOVE_FROM_PICKUP", kdsOrderDto));
-                break;
-
-            case CANCELLED:
-                // 訂單在任何階段被取消
-                logger.info("[KDS] 推送取消訂單: #{} 至 {}", order.getOrderNumber(), kdsTopic);
-                messagingTemplate.convertAndSend(kdsTopic,
-                        new KdsMessage("CANCEL_ORDER", kdsOrderDto));
-                break;
-
-            default:
-                break;
+            sendToStore(storeId, message);
         }
-
-
-
     }
-    private static class KdsMessage {
-        private String action; // "NEW_ORDER", "CANCEL_ORDER", "COMPLETE_ORDER"
+
+    /**
+     * 註冊新的 SSE 連線 (由 Controller 呼叫)
+     */
+    public void addEmitter(Long storeId, SseEmitter emitter) {
+        storeEmitters.computeIfAbsent(storeId, k -> new CopyOnWriteArrayList<>()).add(emitter);
+
+        logger.info("店家 {} 新增 SSE 連線。目前連線數: {}", storeId, storeEmitters.get(storeId).size());
+
+        // 設定移除回調
+        emitter.onCompletion(() -> removeEmitter(storeId, emitter));
+        emitter.onTimeout(() -> removeEmitter(storeId, emitter));
+        emitter.onError((e) -> removeEmitter(storeId, emitter));
+    }
+
+    private void removeEmitter(Long storeId, SseEmitter emitter) {
+        List<SseEmitter> emitters = storeEmitters.get(storeId);
+        if (emitters != null) {
+            emitters.remove(emitter);
+            logger.debug("店家 {} 移除 SSE 連線", storeId);
+        }
+    }
+
+    /**
+     * 實際發送 SSE 訊息的方法
+     */
+    private void sendToStore(Long storeId, KdsMessage message) {
+        List<SseEmitter> emitters = storeEmitters.get(storeId);
+        if (emitters != null && !emitters.isEmpty()) {
+            // 使用 CopyOnWriteArrayList 的特性，避免 ConcurrentModificationException
+            for (SseEmitter emitter : emitters) {
+                try {
+                    // 發送物件，Spring 會自動轉為 JSON
+                    emitter.send(message);
+                } catch (IOException e) {
+                    // 發送失敗通常代表連線已斷，移除該 emitter
+                    emitter.completeWithError(e);
+                    removeEmitter(storeId, emitter);
+                }
+            }
+        }
+    }
+
+    // 內部類別用於封裝 SSE 訊息格式
+    // 建議加上 Getter 確保 Jackson 能序列化成 JSON
+    public static class KdsMessage {
+        private String action;
         private KdsOrderDto payload;
 
         public KdsMessage(String action, KdsOrderDto payload) {
@@ -90,6 +114,4 @@ public class KdsService {
         public String getAction() { return action; }
         public KdsOrderDto getPayload() { return payload; }
     }
-
-        // 注意：PENDING 或 HELD 狀態可能不需要通知 KDS，因為廚房還不用動作
-    }
+}
