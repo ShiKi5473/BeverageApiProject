@@ -20,9 +20,9 @@ public class MemberPointService {
     private final MemberProfileRepository memberProfileRepository;
     private final MemberPointLogRepository memberPointLogRepository;
 
-    // TODO: 定義點數規則，例如 1 元積 1 點，10 點折 1 元
-    private static final BigDecimal POINTS_PER_DOLLAR = BigDecimal.ONE; // 每 1 元累積 1 點
-    private static final BigDecimal DOLLARS_PER_10_POINTS = BigDecimal.ONE; // 每 10 點折抵 1 元
+    // 預設規則 (當品牌沒有設定檔時使用)
+    private static final BigDecimal DEFAULT_EARN_RATE = BigDecimal.ONE;
+    private static final BigDecimal DEFAULT_REDEEM_RATE = new BigDecimal("0.1");
 
     public MemberPointService(MemberProfileRepository memberProfileRepository,
             MemberPointLogRepository memberPointLogRepository) {
@@ -36,12 +36,15 @@ public class MemberPointService {
      * @param pointsToUse 要使用的點數
      * @return 可折抵的金額
      */
-    public BigDecimal calculateDiscountAmount(Long pointsToUse) {
-        if (pointsToUse == null || pointsToUse <= 0) {
-            return BigDecimal.ZERO;
+    public BigDecimal calculateDiscountAmount(Long pointsToUse, Order order) {
+        if (pointsToUse == null || pointsToUse <= 0) return BigDecimal.ZERO;
+        // 取得規則
+        BigDecimal rate = DEFAULT_REDEEM_RATE;
+        if (order.getBrand().getPointConfig() != null) {
+            rate = order.getBrand().getPointConfig().getRedeemRate();
         }
-        // 計算可折抵金額 (例如：每 10 點折 1 元)
-        return DOLLARS_PER_10_POINTS.multiply(new BigDecimal(pointsToUse / 10)); // 整數除法取商
+
+        return new BigDecimal(pointsToUse).multiply(rate);
     }
 
     /**
@@ -50,12 +53,20 @@ public class MemberPointService {
      * @param finalAmount 訂單最終金額
      * @return 應獲得的點數
      */
-    public Long calculatePointsEarned(BigDecimal finalAmount) {
-        if (finalAmount == null || finalAmount.compareTo(BigDecimal.ZERO) <= 0) {
-            return 0L;
+    public Long calculatePointsEarned(BigDecimal finalAmount, Order order) {
+        if (finalAmount == null || finalAmount.compareTo(BigDecimal.ZERO) <= 0) return 0L;
+
+        // 取得規則
+        BigDecimal rate = DEFAULT_EARN_RATE;
+        if (order.getBrand().getPointConfig() != null) {
+            rate = order.getBrand().getPointConfig().getEarnRate();
         }
-        // 計算應獲得點數 (例如：每 1 元積 1 點，無條件捨去)
-        return finalAmount.multiply(POINTS_PER_DOLLAR).longValue();
+
+        if (rate.compareTo(BigDecimal.ZERO) == 0) return 0L;
+
+        // 計算邏輯： 消費金額 / 累積門檻
+        // 例如 earnRate = 30 (每30元1點)，消費 100 元 -> 100 / 30 = 3 點
+        return finalAmount.divide(rate, 0, java.math.RoundingMode.FLOOR).longValue();
     }
     /**
      * 【新方法】

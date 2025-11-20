@@ -159,7 +159,7 @@ public class OrderService {
 
             if (requestDto.getPointsToUse() > 0) {
                 pointsToUse = requestDto.getPointsToUse();
-                discountAmount = memberPointService.calculateDiscountAmount(pointsToUse);
+                discountAmount = memberPointService.calculateDiscountAmount(pointsToUse, order);
                 memberPointService.usePoints(member, order, pointsToUse);
             }
         }

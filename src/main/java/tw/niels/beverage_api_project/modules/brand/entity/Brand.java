@@ -2,15 +2,9 @@ package tw.niels.beverage_api_project.modules.brand.entity;
 
 import java.util.Date;
 
+import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
-
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "brands")
@@ -37,8 +31,12 @@ public class Brand {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private Date updatedAt;
+    @OneToOne(mappedBy = "brand", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private BrandPointConfig pointConfig;
 
-    // Getters and Setters
+    // Getter & Setter
+
+
     public Long getBrandId() {
         return brandId;
     }
@@ -85,5 +83,15 @@ public class Brand {
 
     public void setUpdatedAt(Date updatedAt) {
         this.updatedAt = updatedAt;
+    }
+    public BrandPointConfig getPointConfig() {
+        return pointConfig;
+    }
+
+    public void setPointConfig(BrandPointConfig pointConfig) {
+        this.pointConfig = pointConfig;
+        if (pointConfig != null) {
+            pointConfig.setBrand(this); // 維護雙向關係
+        }
     }
 }

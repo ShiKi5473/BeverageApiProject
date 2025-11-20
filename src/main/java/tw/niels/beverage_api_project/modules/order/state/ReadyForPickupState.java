@@ -36,7 +36,7 @@ public class ReadyForPickupState extends AbstractOrderState {
         // 【移入】這是從 PreparingState 搬過來的邏輯
         order.setCompletedTime(new Date()); // 設定訂單的最終完成時間
         if (order.getMember() != null) {
-            Long pointsEarned = memberPointService.calculatePointsEarned(order.getFinalAmount());
+            Long pointsEarned = memberPointService.calculatePointsEarned(order.getFinalAmount(), order);
             order.setPointsEarned(pointsEarned);
             if (pointsEarned > 0) {
                 memberPointService.earnPoints(order.getMember(), order, pointsEarned);
