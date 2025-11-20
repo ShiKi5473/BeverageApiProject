@@ -12,6 +12,9 @@ import tw.niels.beverage_api_project.modules.product.entity.ProductOption;
 import tw.niels.beverage_api_project.modules.product.repository.ProductOptionRepository;
 import tw.niels.beverage_api_project.modules.product.repository.ProductRepository;
 
+import org.jsoup.Jsoup;
+import org.jsoup.safety.Safelist;
+
 import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.List;
@@ -60,12 +63,13 @@ public class OrderItemProcessorService {
             orderItem.setOrder(order);
             orderItem.setProduct(product);
             orderItem.setQuantity(itemDto.getQuantity());
-// 【新增】簡易的 XSS 防護：移除所有 HTML 標籤
+            //XSS 防護：移除所有 HTML 標籤
             String notes = itemDto.getNotes();
             if (notes != null) {
-                notes = notes.replaceAll("<[^>]*>", ""); // 移除所有 <...> 標籤
+                // 使用 Safelist.none() 清除所有 HTML 標籤，僅保留純文字
+                notes = Jsoup.clean(notes, Safelist.none());
             }
-            orderItem.setNotes(notes); // 儲存清理過的 notes
+            orderItem.setNotes(notes);
             BigDecimal optionsPrice = BigDecimal.ZERO;
             if (itemDto.getOptionIds() != null && !itemDto.getOptionIds().isEmpty()) {
                 Set<ProductOption> options = productOptionRepository.findByOptionIdIn(itemDto.getOptionIds());

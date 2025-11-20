@@ -81,10 +81,7 @@ public class OrderController {
         Long brandId = helperService.getCurrentBrandId();
 
         // TODO: 在 Service 層或 Controller 層加入更嚴格的權限檢查：
-        // 檢查 userDetails 中的 storeId (如果有的話) 是否與請求的 storeId 一致，或者角色是否為 BRAND_ADMIN
-        // 例如: if (!userDetails.getRole().equals("BRAND_ADMIN") &&
-        // !userDetails.getStoreId().equals(storeId)) { throw new
-        // AccessDeniedException(...) }
+        helperService.validateStoreAccess(storeId);
 
         Optional<OrderStatus> statusOptional = Optional.ofNullable(status); // 將可能為 null 的 status 轉為 Optional
 

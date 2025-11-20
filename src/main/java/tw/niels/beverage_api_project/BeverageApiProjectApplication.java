@@ -9,7 +9,6 @@ public class BeverageApiProjectApplication {
 
 
 	public static void main(String[] args) {
- String plainPassword = "superadmin123";
         SpringApplication.run(BeverageApiProjectApplication.class, args);
 	}
 

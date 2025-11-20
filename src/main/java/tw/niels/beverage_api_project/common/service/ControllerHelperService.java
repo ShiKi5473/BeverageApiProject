@@ -3,6 +3,7 @@ package tw.niels.beverage_api_project.common.service; // 建議放在 common 套
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+import tw.niels.beverage_api_project.common.exception.BadRequestException;
 import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
 import tw.niels.beverage_api_project.security.AppUserDetails;
 
@@ -49,5 +50,32 @@ public class ControllerHelperService {
      */
     public Long getCurrentStoreId() {
         return getCurrentUserDetails().getStoreId();
+    }
+
+    public void validateStoreAccess(Long targetStoreId) {
+        AppUserDetails userDetails = getCurrentUserDetails();
+        Long currentUserStoreId = userDetails.getStoreId();
+
+        // 情況 1: 如果是「已綁定店家」的員工 (STAFF, MANAGER)
+        if (currentUserStoreId != null) {
+            if (!currentUserStoreId.equals(targetStoreId)) {
+                throw new BadRequestException("無權限存取該店家的資料 (ID: " + targetStoreId + ")");
+            }
+            // 通過檢查
+            return;
+        }
+
+        // 情況 2: 如果「沒有綁定店家」 (storeId == null)
+        // 我們必須確保他真的是「品牌管理員」或「平台管理員」，而不是資料異常的員工
+        boolean isAdmin = userDetails.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_BRAND_ADMIN") ||
+                        a.getAuthority().equals("ROLE_PLATFORM_ADMIN"));
+
+        if (!isAdmin) {
+            // 如果 storeId 是 null，但他又不是管理員 -> 視為異常或權限不足
+            throw new BadRequestException("帳號權限異常：非管理員帳號必須綁定店家。");
+        }
+
+        // 品牌管理員 -> 允許通過 (後續交由 BrandId 進行資料隔離)
     }
 }
