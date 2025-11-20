@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -39,6 +40,16 @@ public class GlobalExceptionHandler {
                 authentication, ex);
         return new ResponseEntity<>(ex.getMessage(), HttpStatus.NOT_FOUND);
         // throw ex; // 重新拋出，讓 Spring 根據 @ResponseStatus(HttpStatus.NOT_FOUND) 處理
+    }
+
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<Object> handleOptimisticLockingFailureException(
+            ObjectOptimisticLockingFailureException ex, WebRequest request) {
+
+        logger.warn("並發更新衝突: {}", ex.getMessage());
+
+        // 回傳 HTTP 409 Conflict
+        return new ResponseEntity<>("系統忙碌中，點數更新失敗，請稍後重試。", HttpStatus.CONFLICT);
     }
 
     // (可選) 處理其他未預期的異常

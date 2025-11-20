@@ -2,19 +2,10 @@ package tw.niels.beverage_api_project.modules.user.entity.profile;
 
 import java.util.Date;
 
+import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.MapsId;
-import jakarta.persistence.OneToOne;
-import jakarta.persistence.Table;
 import tw.niels.beverage_api_project.modules.user.entity.User;
 import tw.niels.beverage_api_project.modules.user.enums.Gender;
 
@@ -23,7 +14,7 @@ import tw.niels.beverage_api_project.modules.user.enums.Gender;
 public class MemberProfile {
 
     public MemberProfile() {
-    };
+    }
 
     @Id
     @Column(name = "user_id")
@@ -56,6 +47,9 @@ public class MemberProfile {
 
     @Column(name = "is_deleted", nullable = false)
     private Boolean isDeleted = false;
+
+    @Version
+    private Integer version;
 
     // Getters and Setters
     public Long getUserId() {
@@ -129,4 +123,11 @@ public class MemberProfile {
     public void setDeleted(Boolean deleted) {
         isDeleted = deleted;
     }
+
+    public Integer getVersion() {
+        return version;
+    }
+
+    public void setVersion(Integer version) {
+        this.version = version;}
 }

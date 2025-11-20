@@ -1,6 +1,9 @@
 package tw.niels.beverage_api_project.modules.order.service;
 
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tw.niels.beverage_api_project.common.exception.BadRequestException;
@@ -62,7 +65,11 @@ public class OrderService {
     }
 
 
-
+    @Retryable(
+            retryFor = ObjectOptimisticLockingFailureException.class,
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 100)
+    )
     @Transactional
     public Order createOrder(CreateOrderRequestDto requestDto) {
         User staff = getCurrentStaff();
@@ -105,6 +112,11 @@ public class OrderService {
      * 處理 POS 的「一步到位」結帳。
      * 這是一個單一交易，包含建立、計算、扣點、付款和發布事件。
      */
+    @Retryable(
+            retryFor = ObjectOptimisticLockingFailureException.class,
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 100)
+    )
     @Transactional
     public Order completePosCheckout(PosCheckoutRequestDto requestDto) {
         User staff = getCurrentStaff();

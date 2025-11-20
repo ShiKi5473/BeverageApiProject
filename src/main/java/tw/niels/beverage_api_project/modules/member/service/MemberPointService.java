@@ -71,7 +71,7 @@ public class MemberPointService {
             return; // 沒有會員或沒有使用點數，直接返回
         }
 
-        MemberProfile profile = memberProfileRepository.findByIdForUpdate(member.getUserId())
+        MemberProfile profile = memberProfileRepository.findById(member.getUserId())
                 .orElseThrow(() -> new BadRequestException("使用者 ID " + member.getUserId() + " 不是會員"));
         if (profile == null) {
             System.err.println("警告：試圖為非會員 User ID " + member.getUserId() + " 退還點數");
@@ -102,7 +102,7 @@ public class MemberPointService {
             return; // 沒有會員或沒使用點數，直接返回
         }
 
-        MemberProfile profile = memberProfileRepository.findByIdForUpdate(member.getUserId())
+        MemberProfile profile = memberProfileRepository.findById(member.getUserId())
                 .orElseThrow(() -> new BadRequestException("使用者 ID " + member.getUserId() + " 不是會員"));
 
         if (profile == null) {
@@ -137,7 +137,7 @@ public class MemberPointService {
             return; // 沒有會員或沒賺取點數，直接返回
         }
 
-        MemberProfile profile = memberProfileRepository.findByIdForUpdate(member.getUserId())
+        MemberProfile profile = memberProfileRepository.findById(member.getUserId())
                 .orElseThrow(() -> new BadRequestException("使用者 ID " + member.getUserId() + " 不是會員"));
         if (profile == null) {
             // 理論上此時 profile 不應為 null，但還是加上防禦性檢查

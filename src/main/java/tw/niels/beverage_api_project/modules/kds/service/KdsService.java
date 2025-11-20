@@ -1,8 +1,11 @@
 package tw.niels.beverage_api_project.modules.kds.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import tw.niels.beverage_api_project.modules.kds.dto.KdsOrderDto;
@@ -22,39 +25,57 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class KdsService {
 
     private static final Logger logger = LoggerFactory.getLogger(KdsService.class);
+    private final StringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
 
     // SSE 連線管理
     private final Map<Long, List<SseEmitter>> storeEmitters = new ConcurrentHashMap<>();
-
     private final Map<OrderStatus, KdsEventStrategy> strategyMap = new EnumMap<>(OrderStatus.class);
 
-    public KdsService(List<KdsEventStrategy> strategies) {
+    public KdsService(List<KdsEventStrategy> strategies,
+                      StringRedisTemplate redisTemplate,
+                      ObjectMapper objectMapper) {
         for (KdsEventStrategy strategy : strategies) {
             strategyMap.put(strategy.getHandledStatus(), strategy);
         }
+        this.redisTemplate = redisTemplate;
+        this.objectMapper = objectMapper;
     }
 
     /**
      * 觀察者模式：監聽訂單狀態變更事件
      */
+    // 「發送 Redis 訊息」
     @EventListener
     public void handleOrderStateChange(OrderStateChangedEvent event) {
         Order order = event.getOrder();
         OrderStatus newStatus = event.getNewStatus();
-
-        // 2. 獲取 Store ID，用於推送到正確的店家
         Long storeId = order.getStore().getStoreId();
 
         KdsEventStrategy strategy = strategyMap.get(newStatus);
-
-        // 2. 如果有找到策略，就執行並發送；沒找到代表該狀態不需要通知 KDS (如 PENDING)
         if (strategy != null) {
             KdsMessage message = strategy.createMessage(order);
+            // 封裝 StoreId 以便接收端過濾
+            KdsBroadcastMessage broadcastMsg = new KdsBroadcastMessage(storeId, message);
 
-            logger.info("[KDS] SSE 推送動作: {} (單號: #{}) 至店家 {}",
-                    message.getAction(), order.getOrderNumber(), storeId);
+            try {
+                String json = objectMapper.writeValueAsString(broadcastMsg);
+                // 發布到 Redis
+                redisTemplate.convertAndSend("kds-events", json);
+            } catch (JsonProcessingException e) {
+                logger.error("JSON 序列化失敗", e);
+            }
+        }
+    }
 
-            sendToStore(storeId, message);
+    // 處理來自 Redis 的訊息 (所有 Server 實例都會收到)
+    public void handleRedisMessage(String messageJson) {
+        try {
+            KdsBroadcastMessage msg = objectMapper.readValue(messageJson, KdsBroadcastMessage.class);
+            // 檢查這台 Server 有沒有連著該店家的 Emitter
+            sendToStore(msg.getStoreId(), msg.getKdsMessage());
+        } catch (Exception e) {
+            logger.error("處理 Redis 訊息失敗", e);
         }
     }
 
@@ -113,5 +134,26 @@ public class KdsService {
 
         public String getAction() { return action; }
         public KdsOrderDto getPayload() { return payload; }
+    }
+
+    public static class KdsBroadcastMessage {
+        private Long storeId;
+        private KdsMessage kdsMessage;
+
+        public KdsBroadcastMessage() {}
+
+        public KdsBroadcastMessage(Long storeId, KdsMessage kdsMessage) {
+            this.storeId = storeId;
+            this.kdsMessage = kdsMessage;
+        }
+        public Long getStoreId() { return storeId; }
+        public KdsMessage getKdsMessage() { return kdsMessage; }
+
+        public void setStoreId(Long storeId) {
+            this.storeId = storeId;
+        }
+        public void setKdsMessage(KdsMessage kdsMessage) {
+            this.kdsMessage = kdsMessage;
+        }
     }
 }
