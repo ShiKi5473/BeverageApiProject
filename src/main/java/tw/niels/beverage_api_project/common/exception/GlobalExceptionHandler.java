@@ -21,8 +21,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Object> handleBadRequestException(BadRequestException ex, WebRequest request) {
         // 記錄異常訊息和當前的 Authentication 狀態
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        logger.warn("Handling BadRequestException: '{}'. Current Authentication: {}", ex.getMessage(), authentication,
-                ex);
+        logger.warn("處理請求時發生錯誤: {}。路徑: {}", ex.getMessage(), request.getDescription(false));
 
         // 依賴 @ResponseStatus(HttpStatus.BAD_REQUEST) 返回 400
         // 您也可以在這裡手動構建 ResponseEntity

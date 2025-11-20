@@ -127,6 +127,8 @@ public class KdsService {
         private String action;
         private KdsOrderDto payload;
 
+        public KdsMessage(){}
+
         public KdsMessage(String action, KdsOrderDto payload) {
             this.action = action;
             this.payload = payload;
