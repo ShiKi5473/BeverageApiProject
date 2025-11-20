@@ -31,8 +31,7 @@ public class Brand {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private Date updatedAt;
-    @OneToOne(mappedBy = "brand", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private BrandPointConfig pointConfig;
+
 
     // Getter & Setter
 
@@ -84,14 +83,5 @@ public class Brand {
     public void setUpdatedAt(Date updatedAt) {
         this.updatedAt = updatedAt;
     }
-    public BrandPointConfig getPointConfig() {
-        return pointConfig;
-    }
 
-    public void setPointConfig(BrandPointConfig pointConfig) {
-        this.pointConfig = pointConfig;
-        if (pointConfig != null) {
-            pointConfig.setBrand(this); // 維護雙向關係
-        }
-    }
 }

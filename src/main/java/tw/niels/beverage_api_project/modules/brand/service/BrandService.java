@@ -11,15 +11,19 @@ import tw.niels.beverage_api_project.modules.brand.dto.CreateBrandRequestDto;
 import tw.niels.beverage_api_project.modules.brand.dto.UpdatePointConfigDto;
 import tw.niels.beverage_api_project.modules.brand.entity.Brand;
 import tw.niels.beverage_api_project.modules.brand.entity.BrandPointConfig;
+import tw.niels.beverage_api_project.modules.brand.repository.BrandPointConfigRepository;
 import tw.niels.beverage_api_project.modules.brand.repository.BrandRepository;
 
 @Service
 public class BrandService {
 
     private final BrandRepository brandRepository;
+    private final BrandPointConfigRepository brandPointConfigRepository;
 
-    public BrandService(BrandRepository brandRepository) {
+    public BrandService(BrandRepository brandRepository,
+                        BrandPointConfigRepository brandPointConfigRepository) {
         this.brandRepository = brandRepository;
+        this.brandPointConfigRepository = brandPointConfigRepository;
     }
 
     @Transactional // 建議加上交易註解
@@ -39,26 +43,26 @@ public class BrandService {
 
     @Transactional
     public BrandPointConfig updatePointConfig(Long brandId, UpdatePointConfigDto dto) {
+        // 1. 確保品牌存在
         Brand brand = brandRepository.findById(brandId)
                 .orElseThrow(() -> new ResourceNotFoundException("找不到品牌，ID：" + brandId));
 
-        BrandPointConfig config = brand.getPointConfig();
+        // 2. 直接從 config repository 查找 (因為 ID 是共享的，所以直接用 brandId)
+        BrandPointConfig config = brandPointConfigRepository.findById(brandId)
+                .orElse(null);
 
-        // 如果還沒有設定檔，就建立一個新的
+        // 3. 如果不存在則建立
         if (config == null) {
             config = new BrandPointConfig(brand);
-            brand.setPointConfig(config); // 維護雙向關聯
         }
 
-        // 更新數值
+        // 4. 更新數值
         config.setEarnRate(dto.getEarnRate());
         config.setRedeemRate(dto.getRedeemRate());
         config.setExpiryDays(dto.getExpiryDays());
 
-
-        brandRepository.save(brand);
-
-        return config;
+        // 5. 直接儲存 config
+        return brandPointConfigRepository.save(config);
     }
 
     public List<Brand> getAllBrands() {

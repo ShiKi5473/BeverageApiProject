@@ -7,6 +7,8 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import tw.niels.beverage_api_project.common.exception.BadRequestException;
+import tw.niels.beverage_api_project.modules.brand.entity.BrandPointConfig;
+import tw.niels.beverage_api_project.modules.brand.repository.BrandPointConfigRepository;
 import tw.niels.beverage_api_project.modules.member.entity.MemberPointLog;
 import tw.niels.beverage_api_project.modules.member.repository.MemberPointLogRepository;
 import tw.niels.beverage_api_project.modules.order.entity.Order;
@@ -19,15 +21,18 @@ public class MemberPointService {
 
     private final MemberProfileRepository memberProfileRepository;
     private final MemberPointLogRepository memberPointLogRepository;
+    private final BrandPointConfigRepository brandPointConfigRepository;
 
     // 預設規則 (當品牌沒有設定檔時使用)
     private static final BigDecimal DEFAULT_EARN_RATE = BigDecimal.ONE;
     private static final BigDecimal DEFAULT_REDEEM_RATE = new BigDecimal("0.1");
 
     public MemberPointService(MemberProfileRepository memberProfileRepository,
-            MemberPointLogRepository memberPointLogRepository) {
+                              MemberPointLogRepository memberPointLogRepository,
+                              BrandPointConfigRepository brandPointConfigRepository) {
         this.memberProfileRepository = memberProfileRepository;
         this.memberPointLogRepository = memberPointLogRepository;
+        this.brandPointConfigRepository = brandPointConfigRepository;
     }
 
     /**
@@ -40,10 +45,14 @@ public class MemberPointService {
         if (pointsToUse == null || pointsToUse <= 0) return BigDecimal.ZERO;
         // 取得規則
         BigDecimal rate = DEFAULT_REDEEM_RATE;
-        if (order.getBrand().getPointConfig() != null) {
-            rate = order.getBrand().getPointConfig().getRedeemRate();
-        }
+        if (order.getBrand() != null) {
+            BrandPointConfig config = brandPointConfigRepository.findById(order.getBrand().getBrandId())
+                    .orElse(null);
 
+            if (config != null) {
+                rate = config.getRedeemRate();
+            }
+        }
         return new BigDecimal(pointsToUse).multiply(rate);
     }
 
@@ -58,8 +67,13 @@ public class MemberPointService {
 
         // 取得規則
         BigDecimal rate = DEFAULT_EARN_RATE;
-        if (order.getBrand().getPointConfig() != null) {
-            rate = order.getBrand().getPointConfig().getEarnRate();
+        if (order.getBrand() != null) {
+            BrandPointConfig config = brandPointConfigRepository.findById(order.getBrand().getBrandId())
+                    .orElse(null);
+
+            if (config != null) {
+                rate = config.getEarnRate();
+            }
         }
 
         if (rate.compareTo(BigDecimal.ZERO) == 0) return 0L;
