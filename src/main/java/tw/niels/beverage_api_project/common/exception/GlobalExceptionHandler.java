@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.context.request.WebRequest;
 
+import java.util.Map;
+
 @ControllerAdvice // 標註為全局異常處理器
 public class GlobalExceptionHandler {
 
@@ -25,8 +27,8 @@ public class GlobalExceptionHandler {
 
         // 依賴 @ResponseStatus(HttpStatus.BAD_REQUEST) 返回 400
         // 您也可以在這裡手動構建 ResponseEntity
-        return new ResponseEntity<>(ex.getMessage(), HttpStatus.BAD_REQUEST);
-        // 如果 @ResponseStatus 不起作用，可以取消註解上面這行來強制返回 400
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", ex.getMessage()));        // 如果 @ResponseStatus 不起作用，可以取消註解上面這行來強制返回 400
         // 但理論上 Spring 會處理 @ResponseStatus
         // throw ex; // 重新拋出，讓 Spring 根據 @ResponseStatus 處理，或者被更高層級的處理器捕捉
     }
@@ -49,6 +51,13 @@ public class GlobalExceptionHandler {
 
         // 回傳 HTTP 409 Conflict
         return new ResponseEntity<>("系統忙碌中，點數更新失敗，請稍後重試。", HttpStatus.CONFLICT);
+    }
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Object> handleIllegalStateException(IllegalStateException ex, WebRequest request) {
+        logger.warn("操作請求無效/衝突: {}", ex.getMessage());
+        // 回傳 JSON 格式錯誤
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of("error", ex.getMessage()));
     }
 
     // (可選) 處理其他未預期的異常
