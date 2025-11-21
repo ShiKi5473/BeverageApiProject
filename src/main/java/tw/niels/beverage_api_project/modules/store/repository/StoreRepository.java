@@ -3,7 +3,10 @@ package tw.niels.beverage_api_project.modules.store.repository;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Repository;
 
@@ -13,6 +16,12 @@ import tw.niels.beverage_api_project.modules.store.entity.Store;
 public interface StoreRepository extends JpaRepository<Store, Long> {
     Optional<Store> findByBrand_BrandIdAndStoreId(Long brandId, Long storeId);
 
+    /**
+     * 【系統排程專用】查詢系統內所有分店。
+     * <p>此方法專供報表排程使用，繞過 findAll() 的安全限制。</p>
+     */
+    @Query("SELECT s FROM Store s")
+    Page<Store> findAllStoresForSystem(Pageable pageable);
     /**
      * 禁用預設的 findById，強迫使用 findByBrand_BrandIdAndStoreId()。
      */
