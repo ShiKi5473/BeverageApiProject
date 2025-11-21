@@ -5,178 +5,108 @@ import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.Data;
 import tw.niels.beverage_api_project.modules.order.entity.Order;
 import tw.niels.beverage_api_project.modules.order.entity.PaymentMethodEntity;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
 
+@Data
+@Schema(description = "訂單詳細資訊回應")
 public class OrderResponseDto {
 
+    @Schema(description = "訂單 ID", example = "1001")
     private Long orderId;
+
+    @Schema(description = "訂單編號 (流水號)", example = "1-20231020-0001")
     private String orderNumber;
+
+    @Schema(description = "分店 ID", example = "1")
     private Long storeId;
+
+    @Schema(description = "會員 ID", example = "5")
     private Long memberId;
+
+    @Schema(description = "經手員工 ID", example = "2")
     private Long staffId;
+
+    @Schema(description = "訂單狀態", example = "COMPLETED")
     private OrderStatus status;
+
+    @Schema(description = "總金額 (原價)", example = "150.00")
     private BigDecimal totalAmount;
+
+    @Schema(description = "折扣金額", example = "10.00")
     private BigDecimal discountAmount;
+
+    @Schema(description = "最終實收金額", example = "140.00")
     private BigDecimal finalAmount;
+
+    @Schema(description = "使用點數", example = "100")
     private Long pointsUsed;
+
+    @Schema(description = "獲得點數", example = "14")
     private Long pointsEarned;
+
+    @Schema(description = "付款方式")
     private PaymentMethodDto paymentMethod;
+
+    @Schema(description = "顧客備註", example = "飲料放管理室")
     private String customerNote;
+
+    @Schema(description = "下單時間")
     private Date orderTime;
+
+    @Schema(description = "完成時間")
     private Date completedTime;
+
+    @Schema(description = "訂單品項列表")
     private List<OrderItemResponseDto> items;
 
-    public PaymentMethodDto getPaymentMethod() {
-        return paymentMethod;
-    }
-
-    public void setPaymentMethod(PaymentMethodDto paymentMethod) {
-        this.paymentMethod = paymentMethod;
-    }
-
+    @Data
+    @Schema(description = "訂單內單一品項資訊")
     public static class OrderItemResponseDto {
+        @Schema(description = "訂單品項 ID")
         private Long orderItemId;
+        @Schema(description = "商品 ID")
         private Long productId;
+        @Schema(description = "商品名稱")
         private String productName;
+        @Schema(description = "數量")
         private Integer quantity;
+        @Schema(description = "單價 (含選項加價)")
         private BigDecimal unitPrice;
+        @Schema(description = "小計 (單價 x 數量)")
         private BigDecimal subtotal;
+        @Schema(description = "單品備註")
         private String notes;
+        @Schema(description = "已選選項列表")
         private List<OptionResponseDto> options;
-
-        // getter and setter for orderItemResponseDto
-        public Long getOrderItemId() {
-            return orderItemId;
-        }
-
-        public void setOrderItemId(Long orderItemId) {
-            this.orderItemId = orderItemId;
-        }
-
-        public Long getProductId() {
-            return productId;
-        }
-
-        public void setProductId(Long productId) {
-            this.productId = productId;
-        }
-
-        public String getProductName() {
-            return productName;
-        }
-
-        public void setProductName(String productName) {
-            this.productName = productName;
-        }
-
-        public Integer getQuantity() {
-            return quantity;
-        }
-
-        public void setQuantity(Integer quantity) {
-            this.quantity = quantity;
-        }
-
-        public BigDecimal getUnitPrice() {
-            return unitPrice;
-        }
-
-        public void setUnitPrice(BigDecimal unitPrice) {
-            this.unitPrice = unitPrice;
-        }
-
-        public BigDecimal getSubtotal() {
-            return subtotal;
-        }
-
-        public void setSubtotal(BigDecimal subtotal) {
-            this.subtotal = subtotal;
-        }
-
-        public String getNotes() {
-            return notes;
-        }
-
-        public void setNotes(String notes) {
-            this.notes = notes;
-        }
-
-        public List<OptionResponseDto> getOptions() {
-            return options;
-        }
-
-        public void setOptions(List<OptionResponseDto> options) {
-            this.options = options;
-        }
-
     }
 
-    private static class OptionResponseDto {
+    @Data
+    @Schema(description = "已選選項資訊")
+    public static class OptionResponseDto {
+        @Schema(description = "選項 ID")
         private Long optionId;
+        @Schema(description = "選項名稱 (如: 半糖)")
         private String optionName;
+        @Schema(description = "價格調整")
         private BigDecimal priceAdjustment;
-
-        // getter and setter for optionResponseDto
-        public Long getOptionId() {
-            return optionId;
-        }
-
-        public void setOptionId(Long optionId) {
-            this.optionId = optionId;
-        }
-
-        public String getOptionName() {
-            return optionName;
-        }
-
-        public void setOptionName(String optionName) {
-            this.optionName = optionName;
-        }
-
-        public BigDecimal getPriceAdjustment() {
-            return priceAdjustment;
-        }
-
-        public void setPriceAdjustment(BigDecimal priceAdjustment) {
-            this.priceAdjustment = priceAdjustment;
-        }
     }
 
+    @Data
+    @Schema(description = "付款方式資訊")
     public static class PaymentMethodDto {
+        @Schema(description = "付款方式 ID")
         private Integer id;
+        @Schema(description = "代碼", example = "CASH")
         private String code;
+        @Schema(description = "名稱", example = "現金")
         private String name;
 
-        // Getters & Setters
-        public Integer getId() {
-            return id;
-        }
-
-        public void setId(Integer id) {
-            this.id = id;
-        }
-
-        public String getCode() {
-            return code;
-        }
-
-        public void setCode(String code) {
-            this.code = code;
-        }
-
-        public String getName() {
-            return name;
-        }
-
-        public void setName(String name) {
-            this.name = name;
-        }
-
         public static PaymentMethodDto fromEntity(PaymentMethodEntity entity) {
-            if (entity == null)
-                return null;
+            if (entity == null) return null;
             PaymentMethodDto dto = new PaymentMethodDto();
             dto.setId(entity.getPaymentMethodId());
             dto.setCode(entity.getCode());
@@ -190,12 +120,8 @@ public class OrderResponseDto {
         dto.setOrderId(order.getOrderId());
         dto.setOrderNumber(order.getOrderNumber());
         dto.setStoreId(order.getStore().getStoreId());
-        if (order.getMember() != null) {
-            dto.setMemberId(order.getMember().getUserId());
-        }
-        if (order.getStaff() != null) {
-            dto.setStaffId(order.getStaff().getUserId());
-        }
+        if (order.getMember() != null) dto.setMemberId(order.getMember().getUserId());
+        if (order.getStaff() != null) dto.setStaffId(order.getStaff().getUserId());
         dto.setStatus(order.getStatus());
         dto.setTotalAmount(order.getTotalAmount());
         dto.setDiscountAmount(order.getDiscountAmount());
@@ -231,126 +157,4 @@ public class OrderResponseDto {
         dto.setItems(itemsDtos);
         return dto;
     }
-
-    // getter and setter for orderResponseDto
-    public Long getOrderId() {
-        return orderId;
-    }
-
-    public void setOrderId(Long orderId) {
-        this.orderId = orderId;
-    }
-
-    public String getOrderNumber() {
-        return orderNumber;
-    }
-
-    public void setOrderNumber(String orderNumber) {
-        this.orderNumber = orderNumber;
-    }
-
-    public Long getStoreId() {
-        return storeId;
-    }
-
-    public void setStoreId(Long storeId) {
-        this.storeId = storeId;
-    }
-
-    public Long getMemberId() {
-        return memberId;
-    }
-
-    public void setMemberId(Long memberId) {
-        this.memberId = memberId;
-    }
-
-    public Long getStaffId() {
-        return staffId;
-    }
-
-    public void setStaffId(Long staffId) {
-        this.staffId = staffId;
-    }
-
-    public OrderStatus getStatus() {
-        return status;
-    }
-
-    public void setStatus(OrderStatus status) {
-        this.status = status;
-    }
-
-    public BigDecimal getTotalAmount() {
-        return totalAmount;
-    }
-
-    public void setTotalAmount(BigDecimal totalAmount) {
-        this.totalAmount = totalAmount;
-    }
-
-    public BigDecimal getDiscountAmount() {
-        return discountAmount;
-    }
-
-    public void setDiscountAmount(BigDecimal discountAmount) {
-        this.discountAmount = discountAmount;
-    }
-
-    public BigDecimal getFinalAmount() {
-        return finalAmount;
-    }
-
-    public void setFinalAmount(BigDecimal finalAmount) {
-        this.finalAmount = finalAmount;
-    }
-
-    public Long getPointsUsed() {
-        return pointsUsed;
-    }
-
-    public void setPointsUsed(Long pointsUsed) {
-        this.pointsUsed = pointsUsed;
-    }
-
-    public Long getPointsEarned() {
-        return pointsEarned;
-    }
-
-    public void setPointsEarned(Long pointsEarned) {
-        this.pointsEarned = pointsEarned;
-    }
-
-    public String getCustomerNote() {
-        return customerNote;
-    }
-
-    public void setCustomerNote(String customerNote) {
-        this.customerNote = customerNote;
-    }
-
-    public Date getOrderTime() {
-        return orderTime;
-    }
-
-    public void setOrderTime(Date orderTime) {
-        this.orderTime = orderTime;
-    }
-
-    public Date getCompletedTime() {
-        return completedTime;
-    }
-
-    public void setCompletedTime(Date completedTime) {
-        this.completedTime = completedTime;
-    }
-
-    public List<OrderItemResponseDto> getItems() {
-        return items;
-    }
-
-    public void setItems(List<OrderItemResponseDto> items) {
-        this.items = items;
-    }
-
 }

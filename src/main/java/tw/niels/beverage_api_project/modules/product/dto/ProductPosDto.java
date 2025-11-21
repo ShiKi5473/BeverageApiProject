@@ -4,94 +4,42 @@ import java.math.BigDecimal;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import tw.niels.beverage_api_project.modules.product.entity.Product;
 
+@Data
+@NoArgsConstructor
+@Schema(description = "POS 端商品資料 (包含選項結構)")
 public class ProductPosDto {
+    @Schema(description = "商品 ID", example = "101")
     private Long id;
 
+    @Schema(description = "商品名稱", example = "珍珠奶茶")
     private String name;
 
+    @Schema(description = "基本價格", example = "50.00")
     private BigDecimal basePrice;
 
-    Set<OptionGroupResponseDto> optionGroups;
+    @Schema(description = "選項群組 (POS 選單用)")
+    private Set<OptionGroupResponseDto> optionGroups;
 
-    Set<CategoryBasicDto> categories;
+    @Schema(description = "所屬分類")
+    private Set<CategoryBasicDto> categories;
 
     public static ProductPosDto fromEntity(Product product) {
-        if (product == null)
-            return null;
-
+        if (product == null) return null;
         ProductPosDto dto = new ProductPosDto();
         dto.setId(product.getProductId());
-        dto.setName(product.getName()); // 這會使用 Product 的 String name
+        dto.setName(product.getName());
         dto.setBasePrice(product.getBasePrice());
-
-        // 轉換 OptionGroups
         if (product.getOptionGroups() != null) {
-            dto.setOptionGroups(
-                    product.getOptionGroups().stream()
-                            .map(OptionGroupResponseDto::fromEntity)
-                            .collect(Collectors.toSet()));
+            dto.setOptionGroups(product.getOptionGroups().stream().map(OptionGroupResponseDto::fromEntity).collect(Collectors.toSet()));
         }
-
         if (product.getCategories() != null) {
-            dto.setCategories(
-                    product.getCategories().stream()
-                            .map(CategoryBasicDto::fromEntity)
-                            .collect(Collectors.toSet()));
+            dto.setCategories(product.getCategories().stream().map(CategoryBasicDto::fromEntity).collect(Collectors.toSet()));
         }
         return dto;
-    }
-
-    public ProductPosDto(BigDecimal basePrice, Long id, String name, Set<OptionGroupResponseDto> optionGroups,
-            Set<CategoryBasicDto> categories) {
-        this.basePrice = basePrice;
-        this.id = id;
-        this.name = name;
-        this.optionGroups = optionGroups;
-        this.categories = categories;
-    }
-
-    public ProductPosDto() {
-    }
-
-    public Set<CategoryBasicDto> getCategories() {
-        return categories;
-    }
-
-    public void setCategories(Set<CategoryBasicDto> categories) {
-        this.categories = categories;
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public BigDecimal getBasePrice() {
-        return basePrice;
-    }
-
-    public void setBasePrice(BigDecimal basePrice) {
-        this.basePrice = basePrice;
-    }
-
-    public Set<OptionGroupResponseDto> getOptionGroups() {
-        return optionGroups;
-    }
-
-    public void setOptionGroups(Set<OptionGroupResponseDto> optionGroups) {
-        this.optionGroups = optionGroups;
     }
 }

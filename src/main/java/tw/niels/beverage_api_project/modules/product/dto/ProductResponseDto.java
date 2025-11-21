@@ -4,89 +4,41 @@ import java.math.BigDecimal;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.Data;
 import tw.niels.beverage_api_project.modules.product.entity.Product;
 import tw.niels.beverage_api_project.modules.product.enums.ProductStatus;
 
+@Data
+@Schema(description = "商品詳細資訊回應")
 public class ProductResponseDto {
 
+    @Schema(description = "商品 ID", example = "101")
     private Long productId;
+
+    @Schema(description = "商品名稱", example = "珍珠奶茶")
     private String name;
+
+    @Schema(description = "商品描述")
     private String description;
+
+    @Schema(description = "基本價格", example = "50.00")
     private BigDecimal basePrice;
+
+    @Schema(description = "圖片 URL")
     private String imageUrl;
+
+    @Schema(description = "商品狀態", example = "ACTIVE")
     private ProductStatus status;
+
+    @Schema(description = "所屬分類列表")
     private Set<CategoryBasicDto> categories;
+
+    @Schema(description = "關聯的客製化選項群組")
     private Set<OptionGroupResponseDto> optionGroups;
 
-    public Long getProductId() {
-        return productId;
-    }
-
-    public void setProductId(Long productId) {
-        this.productId = productId;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public BigDecimal getBasePrice() {
-        return basePrice;
-    }
-
-    public void setBasePrice(BigDecimal basePrice) {
-        this.basePrice = basePrice;
-    }
-
-    public String getImageUrl() {
-        return imageUrl;
-    }
-
-    public void setImageUrl(String imageUrl) {
-        this.imageUrl = imageUrl;
-    }
-
-    public ProductStatus getStatus() {
-        return status;
-    }
-
-    public void setStatus(ProductStatus status) {
-        this.status = status;
-    }
-
-    public Set<CategoryBasicDto> getCategories() {
-        return categories;
-    }
-
-    public void setCategories(Set<CategoryBasicDto> categories) {
-        this.categories = categories;
-    }
-
-    public Set<OptionGroupResponseDto> getOptionGroups() {
-        return optionGroups;
-    }
-
-    public void setOptionGroups(Set<OptionGroupResponseDto> optionGroups) {
-        this.optionGroups = optionGroups;
-    }
-
-    // 內部類別，只包含 Category 的基本資訊
-
     public static ProductResponseDto fromEntity(Product product) {
-        if (product == null)
-            return null;
+        if (product == null) return null;
         ProductResponseDto dto = new ProductResponseDto();
         dto.setProductId(product.getProductId());
         dto.setName(product.getName());
@@ -95,7 +47,6 @@ public class ProductResponseDto {
         dto.setImageUrl(product.getImageUrl());
         dto.setStatus(product.getStatus());
 
-        // 將 Category 轉換為 CategoryBasicDto
         if (product.getCategories() != null) {
             dto.setCategories(product.getCategories().stream()
                     .map(CategoryBasicDto::fromEntity)

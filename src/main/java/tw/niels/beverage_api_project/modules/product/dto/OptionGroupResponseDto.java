@@ -1,19 +1,35 @@
 package tw.niels.beverage_api_project.modules.product.dto;
 
-import java.util.Set;
-import java.util.stream.Collectors;
-
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.Data;
 import tw.niels.beverage_api_project.modules.product.entity.OptionGroup;
 import tw.niels.beverage_api_project.modules.product.enums.SelectionType;
 
+import java.util.Set;
+import java.util.stream.Collectors;
+
+@Data
+@Schema(description = "客製化選項群組 (如: 甜度)")
 public class OptionGroupResponseDto {
+
+    @Schema(description = "群組 ID", example = "5")
     private Long groupId;
+
+    @Schema(description = "群組名稱", example = "甜度")
     private String name;
+
+    @Schema(description = "選擇類型 (SINGLE: 單選, MULTIPLE: 多選)", example = "SINGLE")
     private SelectionType selectionType;
+
+    @Schema(description = "排序權重", example = "1")
     private Integer sortOrder;
+
+    @Schema(description = "包含的選項列表")
     private Set<ProductOptionResponseDto> options;
 
     public static OptionGroupResponseDto fromEntity(OptionGroup entity) {
+        if (entity == null) return null;
+
         OptionGroupResponseDto dto = new OptionGroupResponseDto();
         dto.setGroupId(entity.getGroupId());
         dto.setName(entity.getName());
@@ -26,45 +42,5 @@ public class OptionGroupResponseDto {
                     .collect(Collectors.toSet()));
         }
         return dto;
-    }
-
-    public Long getGroupId() {
-        return groupId;
-    }
-
-    public void setGroupId(Long groupId) {
-        this.groupId = groupId;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public SelectionType getSelectionType() {
-        return selectionType;
-    }
-
-    public void setSelectionType(SelectionType selectionType) {
-        this.selectionType = selectionType;
-    }
-
-    public Integer getSortOrder() {
-        return sortOrder;
-    }
-
-    public void setSortOrder(Integer sortOrder) {
-        this.sortOrder = sortOrder;
-    }
-
-    public Set<ProductOptionResponseDto> getOptions() {
-        return options;
-    }
-
-    public void setOptions(Set<ProductOptionResponseDto> options) {
-        this.options = options;
     }
 }

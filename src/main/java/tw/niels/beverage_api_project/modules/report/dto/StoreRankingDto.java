@@ -1,9 +1,11 @@
 package tw.niels.beverage_api_project.modules.report.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.Data;
 
 import java.math.BigDecimal;
 
+@Data
 @Schema(description = "分店營收排行資料")
 public class StoreRankingDto {
 
@@ -15,35 +17,4 @@ public class StoreRankingDto {
 
     @Schema(description = "總實收金額", example = "120000.00")
     private BigDecimal totalRevenue;
-
-    // 建構子：對應 Repository JPQL
-    public StoreRankingDto(Long storeId, BigDecimal totalRevenue) {
-        this.storeId = storeId;
-        this.totalRevenue = totalRevenue != null ? totalRevenue : BigDecimal.ZERO;
-    }
-
-    // Getters and Setters
-    public Long getStoreId() {
-        return storeId;
-    }
-
-    public void setStoreId(Long storeId) {
-        this.storeId = storeId;
-    }
-
-    public String getStoreName() {
-        return storeName;
-    }
-
-    public void setStoreName(String storeName) {
-        this.storeName = storeName;
-    }
-
-    public BigDecimal getTotalRevenue() {
-        return totalRevenue;
-    }
-
-    public void setTotalRevenue(BigDecimal totalRevenue) {
-        this.totalRevenue = totalRevenue;
-    }
 }

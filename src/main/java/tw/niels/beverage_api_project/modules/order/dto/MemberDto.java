@@ -1,20 +1,28 @@
 package tw.niels.beverage_api_project.modules.order.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.Data;
 import tw.niels.beverage_api_project.modules.user.entity.User;
 import tw.niels.beverage_api_project.modules.user.entity.profile.MemberProfile;
 
+@Data
+@Schema(description = "會員基本資訊 (用於 POS 查詢)")
 public class MemberDto {
+    @Schema(description = "會員 ID")
     private Long userId;
+    @Schema(description = "手機號碼")
     private String primaryPhone;
+    @Schema(description = "姓名")
     private String fullName;
+    @Schema(description = "Email")
     private String email;
+    @Schema(description = "目前持有總點數")
     private Long totalPoints;
+    @Schema(description = "備註")
     private String notes;
 
     public static MemberDto fromEntity(User user) {
-        if (user == null || user.getMemberProfile() == null) {
-            return null;
-        }
+        if (user == null || user.getMemberProfile() == null) return null;
         MemberProfile profile = user.getMemberProfile();
         MemberDto dto = new MemberDto();
         dto.setUserId(profile.getUserId());
@@ -23,57 +31,6 @@ public class MemberDto {
         dto.setEmail(profile.getEmail());
         dto.setTotalPoints(profile.getTotalPoints());
         dto.setNotes(profile.getNotes());
-
         return dto;
     }
-
-    // getter and setter
-    public Long getUserId() {
-        return userId;
-    }
-
-    public void setUserId(Long userId) {
-        this.userId = userId;
-    }
-
-    public String getPrimaryPhone() {
-        return primaryPhone;
-    }
-
-    public void setPrimaryPhone(String primaryPhone) {
-        this.primaryPhone = primaryPhone;
-    }
-
-    public String getFullName() {
-        return fullName;
-    }
-
-    public void setFullName(String fullName) {
-        this.fullName = fullName;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
-    public Long getTotalPoints() {
-        return totalPoints;
-    }
-
-    public void setTotalPoints(Long totalPoints) {
-        this.totalPoints = totalPoints;
-    }
-
-    public String getNotes() {
-        return notes;
-    }
-
-    public void setNotes(String notes) {
-        this.notes = notes;
-    }
-
 }

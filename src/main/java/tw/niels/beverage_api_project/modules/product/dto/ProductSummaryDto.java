@@ -1,72 +1,36 @@
 package tw.niels.beverage_api_project.modules.product.dto;
 
-import java.math.BigDecimal;
-
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import tw.niels.beverage_api_project.modules.product.entity.Product;
 
+import java.math.BigDecimal;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Schema(description = "商品列表摘要 (簡易版)")
 public class ProductSummaryDto {
+
+    @Schema(description = "商品 ID", example = "101")
     private Long id;
 
+    @Schema(description = "商品名稱", example = "珍珠奶茶")
     private String name;
 
+    @Schema(description = "基本價格", example = "50.00")
     private BigDecimal basePrice;
+
+    @Schema(description = "圖片 URL")
     private String imgUrl;
+
+    @Schema(description = "商品描述")
     private String description;
 
-    public ProductSummaryDto() {
-    }
-
-    public ProductSummaryDto(Long id, String name, BigDecimal basePrice, String imgUrl, String description) {
-        this.basePrice = basePrice;
-        this.description = description;
-        this.id = id;
-        this.imgUrl = imgUrl;
-        this.name = name;
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public BigDecimal getBasePrice() {
-        return basePrice;
-    }
-
-    public void setBasePrice(BigDecimal basePrice) {
-        this.basePrice = basePrice;
-    }
-
-    public String getImgUrl() {
-        return imgUrl;
-    }
-
-    public void setImgUrl(String imgUrl) {
-        this.imgUrl = imgUrl;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
     public static ProductSummaryDto fromEntity(Product product) {
-        if (product == null)
-            return null;
+        if (product == null) return null;
         return new ProductSummaryDto(
                 product.getProductId(),
                 product.getName(),
@@ -74,5 +38,4 @@ public class ProductSummaryDto {
                 product.getImageUrl(),
                 product.getDescription());
     }
-
 }
