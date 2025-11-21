@@ -2,10 +2,12 @@ package tw.niels.beverage_api_project.modules.report.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 
 @Data
+@NoArgsConstructor
 @Schema(description = "分店營收排行資料")
 public class StoreRankingDto {
 
@@ -17,4 +19,9 @@ public class StoreRankingDto {
 
     @Schema(description = "總實收金額", example = "120000.00")
     private BigDecimal totalRevenue;
+
+    public StoreRankingDto(Long storeId, BigDecimal totalRevenue) {
+        this.storeId = storeId;
+        this.totalRevenue = totalRevenue != null ? totalRevenue : BigDecimal.ZERO;
+    }
 }

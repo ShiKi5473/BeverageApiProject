@@ -1,15 +1,15 @@
 package tw.niels.beverage_api_project.modules.order.dto;
 
-import java.math.BigDecimal;
-import java.util.Date;
-import java.util.List;
-import java.util.stream.Collectors;
-
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import tw.niels.beverage_api_project.modules.order.entity.Order;
 import tw.niels.beverage_api_project.modules.order.entity.PaymentMethodEntity;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
+
+import java.math.BigDecimal;
+import java.util.Date;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Data
 @Schema(description = "訂單詳細資訊回應")
@@ -66,20 +66,27 @@ public class OrderResponseDto {
     @Data
     @Schema(description = "訂單內單一品項資訊")
     public static class OrderItemResponseDto {
-        @Schema(description = "訂單品項 ID")
+        @Schema(description = "訂單品項 ID", example = "501")
         private Long orderItemId;
-        @Schema(description = "商品 ID")
+
+        @Schema(description = "商品 ID", example = "101")
         private Long productId;
-        @Schema(description = "商品名稱")
+
+        @Schema(description = "商品名稱", example = "珍珠奶茶")
         private String productName;
-        @Schema(description = "數量")
+
+        @Schema(description = "數量", example = "2")
         private Integer quantity;
-        @Schema(description = "單價 (含選項加價)")
+
+        @Schema(description = "單價 (含選項加價)", example = "55.00")
         private BigDecimal unitPrice;
-        @Schema(description = "小計 (單價 x 數量)")
+
+        @Schema(description = "小計 (單價 x 數量)", example = "110.00")
         private BigDecimal subtotal;
-        @Schema(description = "單品備註")
+
+        @Schema(description = "單品備註", example = "少冰")
         private String notes;
+
         @Schema(description = "已選選項列表")
         private List<OptionResponseDto> options;
     }
@@ -87,21 +94,25 @@ public class OrderResponseDto {
     @Data
     @Schema(description = "已選選項資訊")
     public static class OptionResponseDto {
-        @Schema(description = "選項 ID")
+        @Schema(description = "選項 ID", example = "20")
         private Long optionId;
-        @Schema(description = "選項名稱 (如: 半糖)")
+
+        @Schema(description = "選項名稱", example = "半糖")
         private String optionName;
-        @Schema(description = "價格調整")
+
+        @Schema(description = "價格調整", example = "0.00")
         private BigDecimal priceAdjustment;
     }
 
     @Data
     @Schema(description = "付款方式資訊")
     public static class PaymentMethodDto {
-        @Schema(description = "付款方式 ID")
+        @Schema(description = "付款方式 ID", example = "1")
         private Integer id;
+
         @Schema(description = "代碼", example = "CASH")
         private String code;
+
         @Schema(description = "名稱", example = "現金")
         private String name;
 
@@ -120,8 +131,12 @@ public class OrderResponseDto {
         dto.setOrderId(order.getOrderId());
         dto.setOrderNumber(order.getOrderNumber());
         dto.setStoreId(order.getStore().getStoreId());
-        if (order.getMember() != null) dto.setMemberId(order.getMember().getUserId());
-        if (order.getStaff() != null) dto.setStaffId(order.getStaff().getUserId());
+        if (order.getMember() != null) {
+            dto.setMemberId(order.getMember().getUserId());
+        }
+        if (order.getStaff() != null) {
+            dto.setStaffId(order.getStaff().getUserId());
+        }
         dto.setStatus(order.getStatus());
         dto.setTotalAmount(order.getTotalAmount());
         dto.setDiscountAmount(order.getDiscountAmount());
