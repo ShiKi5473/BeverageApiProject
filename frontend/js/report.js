@@ -2,166 +2,219 @@
 import * as echarts from 'echarts';
 import '@material/web/button/filled-button.js';
 import { createNavbar } from "./components/Navbar.js";
+import {
+    getStores,
+    getStoreDailyStats,
+    getProductSalesRanking,
+    getBrandSummary,
+    getStoreRanking
+} from "./api.js";
 
 // 狀態變數
 let revenueChartInstance = null;
-let productChartInstance = null;
+let rankingChartInstance = null; // 改名：因為可能是商品排行，也可能是分店排行
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
     // 1. 初始化 Navbar
-    const layout = document.querySelector(".report-layout");
     const navbar = createNavbar("營收報表中心", () => {
         localStorage.removeItem("accessToken");
         localStorage.removeItem("brandId");
+        localStorage.removeItem("storeId");
         window.location.href = "login.html";
     });
-    // 插入到 layout 的第一列位置 (取代原本的 placeholder，或直接 prepend)
-    const placeholder = document.getElementById("navbar-placeholder");
-    if(placeholder) placeholder.replaceWith(navbar);
+    document.getElementById("navbar-placeholder").replaceWith(navbar);
 
-    // 2. 初始化日期選擇器 (預設為過去 7 天)
+    // 2. 初始化日期 (過去 7 天)
     const endDateInput = document.getElementById("end-date");
     const startDateInput = document.getElementById("start-date");
-
     const today = new Date();
     const lastWeek = new Date();
     lastWeek.setDate(today.getDate() - 6);
-
     endDateInput.valueAsDate = today;
     startDateInput.valueAsDate = lastWeek;
 
-    // 3. 初始化 ECharts 實例 (但先不放入資料)
+    // 3. 初始化圖表
     initCharts();
 
-    // 4. 綁定查詢按鈕
+    // 4. 初始化分店選單 & 權限判斷
+    const storeSelect = document.getElementById("store-select");
+    const storeSelectGroup = document.getElementById("store-selector-group");
+    const myStoreId = localStorage.getItem("storeId");
+
+    if (myStoreId) {
+        // 情境 A: 店長/店員 (鎖定分店)
+        storeSelectGroup.style.display = "none"; // 隱藏選單
+        // 直接載入該店資料
+        loadReportData(myStoreId);
+    } else {
+        // 情境 B: 品牌管理員 (顯示選單)
+        storeSelectGroup.style.display = "block";
+        try {
+            const stores = await getStores();
+            // 填充選單
+            stores.forEach(store => {
+                const option = document.createElement("option");
+                option.value = store.storeId;
+                option.textContent = store.name;
+                storeSelect.appendChild(option);
+            });
+            // 預設載入 "全品牌" (storeId = "")
+            loadReportData("");
+        } catch (e) {
+            console.error("無法載入分店列表", e);
+            alert("無法載入分店列表");
+        }
+    }
+
+    // 5. 綁定查詢按鈕
     document.getElementById("search-btn").addEventListener("click", () => {
-        loadReportData();
+        const selectedStoreId = myStoreId || storeSelect.value;
+        loadReportData(selectedStoreId);
     });
 
-    // 5. 處理 RWD：視窗縮放時重繪圖表
+    // 6. RWD
     window.addEventListener("resize", () => {
         revenueChartInstance?.resize();
-        productChartInstance?.resize();
+        rankingChartInstance?.resize();
     });
-
-    // 6. 初次載入
-    loadReportData();
 });
 
 function initCharts() {
-    const revenueDom = document.getElementById('revenue-chart');
-    const productDom = document.getElementById('product-chart');
-
-    if (revenueDom) {
-        revenueChartInstance = echarts.init(revenueDom);
-    }
-    if (productDom) {
-        productChartInstance = echarts.init(productDom);
-    }
+    revenueChartInstance = echarts.init(document.getElementById('revenue-chart'));
+    rankingChartInstance = echarts.init(document.getElementById('product-chart'));
 }
 
 /**
- * 主邏輯：載入並渲染所有報表資料
- * (下一階段我們將在此處呼叫 API)
+ * 核心資料載入函式
+ * @param {string} storeId - 若為空字串，代表查詢「全品牌」
  */
-async function loadReportData() {
+async function loadReportData(storeId) {
     const startDate = document.getElementById("start-date").value;
     const endDate = document.getElementById("end-date").value;
-    const storeId = localStorage.getItem("storeId"); // 若為 null 則代表品牌管理員
 
-    console.log(`正在查詢報表: ${startDate} ~ ${endDate}, StoreId: ${storeId}`);
-
-    // 顯示 Loading 狀態
-    revenueChartInstance?.showLoading();
-    productChartInstance?.showLoading();
+    revenueChartInstance.showLoading();
+    rankingChartInstance.showLoading();
 
     try {
-        // TODO: 下一步驟在此呼叫 api.js
-        // const dailyStats = await getStoreDailyStats(...);
-        // const productStats = await getProductSalesRanking(...);
+        if (storeId) {
+            // === 單一分店模式 ===
+            // 1. 平行撈取資料
+            const [dailyStats, productStats] = await Promise.all([
+                getStoreDailyStats(storeId, startDate, endDate),
+                getProductSalesRanking(storeId, startDate, endDate)
+            ]);
 
-        // 模擬延遲與假資料 (測試畫面用)
-        setTimeout(() => {
-            renderRevenueChart([], []); // 傳入空陣列暫時測試
-            renderProductChart([], []);
+            // 2. 更新 KPI 卡片 (前端自行加總)
+            updateKpiCardsFromDailyStats(dailyStats);
 
-            revenueChartInstance?.hideLoading();
-            productChartInstance?.hideLoading();
-        }, 500);
+            // 3. 渲染 折線圖 (營收趨勢)
+            const dates = dailyStats.map(s => s.date);
+            const revenues = dailyStats.map(s => s.finalRevenue);
+            renderRevenueChart(dates, revenues, "分店營收趨勢");
+
+            // 4. 渲染 長條圖 (商品排行)
+            // 取前 10 名
+            const top10 = productStats.slice(0, 10);
+            const productNames = top10.map(p => p.productName);
+            const sales = top10.map(p => p.totalSalesAmount); // 或 p.totalQuantity 看你想顯示哪個
+            renderBarChart(productNames, sales, "熱銷商品排行 (銷售額)", "#28a745");
+
+        } else {
+            // === 全品牌模式 (管理員) ===
+            // 1. 撈取品牌總覽 & 分店排行
+            const [brandSummary, storeRanking] = await Promise.all([
+                getBrandSummary(startDate, endDate),
+                getStoreRanking(startDate, endDate)
+            ]);
+
+            // 2. 更新 KPI 卡片 (直接用後端算好的 Summary)
+            updateKpiCardsFromSummary(brandSummary);
+
+            // 3. 渲染 長條圖 (分店排行) -> 顯示在原本的「商品排行」位置
+            // 因為沒有每日品牌總營收的 API (只有區間加總)，折線圖暫時清空或顯示提示
+            revenueChartInstance.clear();
+            revenueChartInstance.setOption({
+                title: {
+                    text: '全品牌模式下暫不顯示每日趨勢 (請選擇單一分店)',
+                    left: 'center', top: 'center',
+                    textStyle: { color: '#999', fontSize: 14 }
+                }
+            });
+
+            // 4. 渲染 分店排行
+            const storeNames = storeRanking.map(s => `店號 ${s.storeId}`); // 若後端 DTO 沒補 StoreName，暫用 ID
+            const revenues = storeRanking.map(s => s.totalRevenue);
+            renderBarChart(storeNames, revenues, "分店營收排行", "#17a2b8");
+        }
 
     } catch (error) {
         console.error("載入報表失敗", error);
-        alert("載入失敗：" + error.message);
-        revenueChartInstance?.hideLoading();
-        productChartInstance?.hideLoading();
+        alert(error.message);
+    } finally {
+        revenueChartInstance.hideLoading();
+        rankingChartInstance.hideLoading();
     }
 }
 
-function renderRevenueChart(dates, revenues) {
-    if (!revenueChartInstance) return;
+// --- 輔助函式：更新 KPI ---
 
-    // ECharts 設定檔
-    const option = {
-        tooltip: {
-            trigger: 'axis'
-        },
-        xAxis: {
-            type: 'category',
-            data: dates // ['2023-10-01', '2023-10-02', ...]
-        },
-        yAxis: {
-            type: 'value',
-            name: '金額 (NT$)'
-        },
-        series: [
-            {
-                data: revenues, // [5000, 6200, ...]
-                type: 'line',
-                smooth: true,
-                itemStyle: { color: '#007bff' },
-                areaStyle: {
-                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                        { offset: 0, color: 'rgba(0, 123, 255, 0.5)' },
-                        { offset: 1, color: 'rgba(0, 123, 255, 0.0)' }
-                    ])
-                }
-            }
-        ]
-    };
-    revenueChartInstance.setOption(option);
+function updateKpiCardsFromDailyStats(stats) {
+    let totalRev = 0, totalOrd = 0, cancelled = 0;
+    stats.forEach(s => {
+        totalRev += s.finalRevenue;
+        totalOrd += s.totalOrders;
+        cancelled += s.cancelledOrders;
+    });
+    updateKpiDom(totalRev, totalOrd, cancelled);
 }
 
-function renderProductChart(productNames, quantities) {
-    if (!productChartInstance) return;
+function updateKpiCardsFromSummary(summary) {
+    updateKpiDom(summary.finalRevenue, summary.totalOrders, summary.cancelledOrders);
+}
 
-    const option = {
-        tooltip: {
-            trigger: 'axis',
-            axisPointer: { type: 'shadow' }
-        },
-        grid: {
-            left: '3%',
-            right: '4%',
-            bottom: '3%',
-            containLabel: true
-        },
-        xAxis: {
-            type: 'value',
-            boundaryGap: [0, 0.01]
-        },
-        yAxis: {
-            type: 'category',
-            data: productNames, // ['珍珠奶茶', '四季春', ...]
-            inverse: true // 讓第一名排在最上面
-        },
-        series: [
-            {
-                name: '銷售杯數',
-                type: 'bar',
-                data: quantities, // [120, 85, ...]
-                itemStyle: { color: '#28a745' }
-            }
-        ]
-    };
-    productChartInstance.setOption(option);
+function updateKpiDom(revenue, orders, cancelled) {
+    document.getElementById("metric-revenue").textContent = `NT$ ${formatNumber(revenue)}`;
+    document.getElementById("metric-orders").textContent = orders;
+    document.getElementById("metric-cancelled").textContent = cancelled;
+
+    const aov = orders > 0 ? Math.round(revenue / orders) : 0;
+    document.getElementById("metric-aov").textContent = `NT$ ${aov}`;
+}
+
+function formatNumber(num) {
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+// --- 圖表渲染 ---
+
+function renderRevenueChart(dates, values, title) {
+    revenueChartInstance.setOption({
+        title: { text: title, left: 'center' },
+        tooltip: { trigger: 'axis' },
+        grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+        xAxis: { type: 'category', data: dates },
+        yAxis: { type: 'value' },
+        series: [{
+            data: values,
+            type: 'line',
+            smooth: true,
+            areaStyle: { opacity: 0.3 },
+            itemStyle: { color: '#007bff' }
+        }]
+    }, true); // true = 不合併舊配置 (徹底重繪)
+}
+
+function renderBarChart(labels, values, title, color) {
+    rankingChartInstance.setOption({
+        title: { text: title, left: 'center' },
+        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+        grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+        xAxis: { type: 'value' },
+        yAxis: { type: 'category', data: labels, inverse: true },
+        series: [{
+            type: 'bar',
+            data: values,
+            itemStyle: { color: color }
+        }]
+    }, true);
 }

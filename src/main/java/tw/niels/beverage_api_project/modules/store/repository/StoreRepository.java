@@ -22,6 +22,10 @@ public interface StoreRepository extends JpaRepository<Store, Long> {
      */
     @Query("SELECT s FROM Store s")
     Page<Store> findAllStoresForSystem(Pageable pageable);
+
+    List<Store> findByBrand_BrandId(Long brandId);
+
+
     /**
      * 禁用預設的 findById，強迫使用 findByBrand_BrandIdAndStoreId()。
      */

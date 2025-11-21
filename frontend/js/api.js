@@ -216,3 +216,73 @@ export async function updateOrderStatus(orderId, newStatus) {
     }
     return response.json();
 }
+
+/**
+ * 取得品牌下所有分店
+ * (對應 StoreController GET /api/v1/stores)
+ */
+export async function getStores() {
+    const response = await fetchWithAuth("/api/v1/stores", {
+        method: "GET",
+    });
+    if (!response.ok) {
+        throw new Error("取得分店列表失敗");
+    }
+    return response.json();
+}
+
+/**
+ * 取得分店日結統計 (折線圖資料)
+ */
+export async function getStoreDailyStats(storeId, startDate, endDate) {
+    const params = new URLSearchParams({
+        storeId,
+        startDate,
+        endDate
+    });
+    const response = await fetchWithAuth(`/api/v1/reports/store-daily?${params}`, {
+        method: "GET"
+    });
+    if (!response.ok) throw new Error("取得營收統計失敗");
+    return response.json();
+}
+
+/**
+ * 取得熱銷商品排行 (長條圖資料)
+ */
+export async function getProductSalesRanking(storeId, startDate, endDate) {
+    const params = new URLSearchParams({
+        storeId,
+        startDate,
+        endDate
+    });
+    const response = await fetchWithAuth(`/api/v1/reports/product-sales?${params}`, {
+        method: "GET"
+    });
+    if (!response.ok) throw new Error("取得商品排行失敗");
+    return response.json();
+}
+
+/**
+ * 取得品牌總覽 (KPI 卡片資料) - 僅品牌管理員
+ */
+export async function getBrandSummary(startDate, endDate) {
+    const params = new URLSearchParams({ startDate, endDate });
+    const response = await fetchWithAuth(`/api/v1/reports/brand-summary?${params}`, {
+        method: "GET"
+    });
+    if (!response.ok) throw new Error("取得品牌總覽失敗");
+    return response.json();
+}
+
+/**
+ * 取得分店排行 (長條圖資料) - 僅品牌管理員
+ */
+export async function getStoreRanking(startDate, endDate) {
+    const params = new URLSearchParams({ startDate, endDate });
+    const response = await fetchWithAuth(`/api/v1/reports/store-ranking?${params}`, {
+        method: "GET"
+    });
+    if (!response.ok) throw new Error("取得分店排行失敗");
+    return response.json();
+}
