@@ -13,5 +13,6 @@ public final class ApiPaths {
     public static final String AUTH = "/auth";
     public static final String ORDERS = "/orders";
     public static final String KDS = "/kds";
+    public static final String REPORTS = "/reports";
 
 }

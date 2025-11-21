@@ -1,15 +1,20 @@
 package tw.niels.beverage_api_project.modules.order.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Repository;
 
 import tw.niels.beverage_api_project.modules.order.entity.Order;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
+import tw.niels.beverage_api_project.modules.report.dto.OrderStatusStatsDto;
+import tw.niels.beverage_api_project.modules.report.dto.PaymentStatsDto;
+import tw.niels.beverage_api_project.modules.report.dto.ProductSalesStatsDto;
 
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
@@ -35,6 +40,48 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             "WHERE o.brand.brandId = :brandId AND o.orderId = :orderId")
     Optional<Order> findByBrand_BrandIdAndOrderId(Long brandId, Long orderId);
 
+    /**
+     * 統計 1: 訂單狀態統計 (改用 DTO)
+     */
+    @Query("SELECT new tw.niels.beverage_api_project.modules.report.dto.OrderStatusStatsDto(" +
+            "o.status, COUNT(o), SUM(o.totalAmount), SUM(o.discountAmount), SUM(o.finalAmount)) " +
+            "FROM Order o " +
+            "WHERE o.store.storeId = :storeId " +
+            "AND o.completedTime BETWEEN :start AND :end " +
+            "GROUP BY o.status")
+    List<OrderStatusStatsDto> findOrderStatusStatsByStoreAndDateRange(@Param("storeId") Long storeId,
+                                                                      @Param("start") LocalDateTime start, // 改用 java.util.Date 也可以，視您 Entity 設定而定，但建議統一用 Date 或 LocalDateTime
+                                                                      @Param("end") LocalDateTime end);
+
+    /**
+     * 統計 2: 付款方式統計 (改用 DTO)
+     */
+    @Query("SELECT new tw.niels.beverage_api_project.modules.report.dto.PaymentStatsDto(" +
+            "pm.code, SUM(o.finalAmount)) " +
+            "FROM Order o " +
+            "LEFT JOIN o.paymentMethod pm " +
+            "WHERE o.store.storeId = :storeId " +
+            "AND o.status = 'CLOSED' " + // 使用 Enum 字串或傳入參數
+            "AND o.completedTime BETWEEN :start AND :end " +
+            "GROUP BY pm.code")
+    List<PaymentStatsDto> findPaymentStatsByStoreAndDateRange(@Param("storeId") Long storeId,
+                                                              @Param("start") LocalDateTime start,
+                                                              @Param("end") LocalDateTime end);
+
+    /**
+     * 統計 3: 商品銷售統計 (改用 DTO)
+     */
+    @Query("SELECT new tw.niels.beverage_api_project.modules.report.dto.ProductSalesStatsDto(" +
+            "i.product.productId, i.product.name, SUM(i.quantity), SUM(i.subtotal)) " +
+            "FROM OrderItem i " +
+            "JOIN i.order o " +
+            "WHERE o.store.storeId = :storeId " +
+            "AND o.status = 'CLOSED' " +
+            "AND o.completedTime BETWEEN :start AND :end " +
+            "GROUP BY i.product.productId, i.product.name")
+    List<ProductSalesStatsDto> findProductStatsByStoreAndDateRange(@Param("storeId") Long storeId,
+                                                                   @Param("start") LocalDateTime start,
+                                                                   @Param("end") LocalDateTime end);
     /**
      * 禁用預設的 findById，強迫使用 findByBrand_BrandIdAndOrderId()。
      */
@@ -72,4 +119,6 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     default boolean existsById(@NonNull Long id) {
         throw new UnsupportedOperationException("禁止呼叫預設的 existsById()，請改用包含 brandId 的自訂查詢");
     }
+
+
 }
