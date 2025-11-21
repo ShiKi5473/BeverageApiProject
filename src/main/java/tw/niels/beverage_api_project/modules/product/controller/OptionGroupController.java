@@ -3,7 +3,10 @@ package tw.niels.beverage_api_project.modules.product.controller;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,8 +28,9 @@ import tw.niels.beverage_api_project.modules.product.entity.ProductOption;
 import tw.niels.beverage_api_project.modules.product.service.OptionGroupService;
 
 @RestController
-@RequestMapping(ApiPaths.API_V1 + ApiPaths.BRANDS)
+@RequestMapping(value = ApiPaths.API_V1 + ApiPaths.BRANDS, produces = MediaType.APPLICATION_JSON_VALUE)
 @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER')") // 僅管理員可設定
+@Tag(name = "Product Options", description = "商品客製化選項管理 (甜度、冰塊、加料)")
 public class OptionGroupController {
 
     private final OptionGroupService optionGroupService;
@@ -40,6 +44,7 @@ public class OptionGroupController {
 
     // 建立選項群組 (例如: 甜度)
     @PostMapping("/option-groups")
+    @Operation(summary = "建立選項群組", description = "例如建立「甜度」、「冰塊」或「加料」群組") // 【新增】
     public ResponseEntity<OptionGroupResponseDto> createOptionGroup(
             @Valid @RequestBody CreateOptionGroupRequestDto requestDto) {
         Long brandId = this.helperService.getCurrentBrandId();
@@ -49,6 +54,7 @@ public class OptionGroupController {
 
     // 取得品牌的所有選項群組
     @GetMapping("/option-groups")
+    @Operation(summary = "取得品牌所有選項群組", description = "列出該品牌下定義的所有客製化選項群組及其內容") // 【新增】
     public ResponseEntity<List<OptionGroupResponseDto>> getOptionGroupsByBrand() {
         Long brandId = this.helperService.getCurrentBrandId();
         List<OptionGroup> groups = optionGroupService.getOptionGroupsByBrand(brandId);
@@ -60,6 +66,7 @@ public class OptionGroupController {
 
     // 在群組下建立選項 (例如: "半糖")
     @PostMapping("/option-groups/{groupId}/options")
+    @Operation(summary = "新增選項項目", description = "在特定群組下新增選項，例如在「甜度」下新增「半糖」") // 【新增】
     public ResponseEntity<ProductOptionResponseDto> createProductOption(
             @PathVariable Long groupId,
             @Valid @RequestBody CreateProductOptionRequestDto requestDto) {
