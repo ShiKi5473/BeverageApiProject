@@ -9,8 +9,10 @@ import org.springframework.web.bind.annotation.*;
 import tw.niels.beverage_api_project.common.constants.ApiPaths;
 import tw.niels.beverage_api_project.common.service.ControllerHelperService;
 import tw.niels.beverage_api_project.modules.report.dto.BrandSalesSummaryDto;
+import tw.niels.beverage_api_project.modules.report.dto.ProductSalesStatsDto;
 import tw.niels.beverage_api_project.modules.report.dto.StoreRankingDto;
 import tw.niels.beverage_api_project.modules.report.entity.DailyStoreStats;
+import tw.niels.beverage_api_project.modules.report.repository.DailyProductStatsRepository;
 import tw.niels.beverage_api_project.modules.report.repository.DailyStoreStatsRepository;
 import tw.niels.beverage_api_project.modules.report.service.ReportAggregationService;
 
@@ -23,13 +25,16 @@ import java.util.List;
 public class ReportController {
 
     private final DailyStoreStatsRepository dailyStoreStatsRepository;
+    private final DailyProductStatsRepository dailyProductStatsRepository; //
     private final ReportAggregationService reportAggregationService;
     private final ControllerHelperService helperService;
 
     public ReportController(DailyStoreStatsRepository dailyStoreStatsRepository,
+                            DailyProductStatsRepository dailyProductStatsRepository,
                             ReportAggregationService reportAggregationService,
                             ControllerHelperService helperService) {
         this.dailyStoreStatsRepository = dailyStoreStatsRepository;
+        this.dailyProductStatsRepository = dailyProductStatsRepository;
         this.reportAggregationService = reportAggregationService;
         this.helperService = helperService;
     }
@@ -58,6 +63,32 @@ public class ReportController {
 
         return ResponseEntity.ok(stats);
     }
+
+        /**
+         * 【分店端】查詢熱銷商品排行 (指定區間)
+         * 用途：查詢某段時間內，賣得最好的商品 (依照金額排序)
+         * URL: GET /api/v1/reports/product-sales?storeId=1&startDate=...&endDate=...
+         */
+        @GetMapping("/product-sales")
+        @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
+        @Operation(
+                summary = "查詢熱銷商品排行",
+                description = "取得指定分店在區間內的商品銷售統計，依銷售總額排序 (用於繪製熱銷排行榜)"
+        )
+        public ResponseEntity<List<ProductSalesStatsDto>> getProductSalesRanking(
+                @RequestParam Long storeId,
+                @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+                @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+            // 1. 驗證權限
+            helperService.validateStoreAccess(storeId);
+
+            // 2. 查詢資料庫
+            List<ProductSalesStatsDto> stats = dailyProductStatsRepository
+                    .findProductSalesRanking(storeId, startDate, endDate);
+
+            return ResponseEntity.ok(stats);
+        }
 
     /**
      * 【品牌端】查詢全品牌總覽 (指定區間)
