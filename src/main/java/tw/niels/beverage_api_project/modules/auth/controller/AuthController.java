@@ -1,5 +1,7 @@
 package tw.niels.beverage_api_project.modules.auth.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.AuthenticationException;
@@ -16,6 +18,7 @@ import tw.niels.beverage_api_project.modules.auth.service.AuthService;
 
 @RestController
 @RequestMapping(ApiPaths.API_V1 + ApiPaths.AUTH) // 使用定義好的常數
+@Tag(name = "Authentication", description = "使用者認證與登入 API") // Swagger 分類
 public class AuthController {
 
     private final AuthService authService;
@@ -32,6 +35,7 @@ public class AuthController {
      * @return 成功時回傳包含 JWT Token 的 ResponseEntity，失敗時回傳 401 Unauthorized。
      */
     @PostMapping("/login")
+    @Operation(summary = "使用者登入", description = "員工或會員使用手機號碼與密碼登入，成功後回傳 JWT Token") // API 描述
     public ResponseEntity<?> authenticateUser(@RequestBody @Valid LoginRequestDto loginRequestDto) {
         try {
             System.out.println("收到登入請求");

@@ -23,7 +23,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import tw.niels.beverage_api_project.security.BrandContextHolder;
 
 @Component
-public class JwtAuthenticationFilter extends OncePerRequestFilter {
+public class  JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final Logger filterLogger = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 

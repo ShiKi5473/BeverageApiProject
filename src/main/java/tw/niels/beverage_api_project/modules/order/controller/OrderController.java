@@ -1,5 +1,7 @@
 package tw.niels.beverage_api_project.modules.order.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +21,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping(ApiPaths.API_V1 + ApiPaths.ORDERS)
+@Tag(name = "Order Management", description = "訂單處理 API (點餐、結帳、狀態更新)")
 public class OrderController {
     private final OrderService orderService;
     private final ControllerHelperService helperService;
@@ -34,6 +37,7 @@ public class OrderController {
      */
     @PostMapping
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
+    @Operation(summary = "建立新訂單 (暫存或待付款)", description = "通常用於將訂單存入 PENDING 或 HELD 狀態")
     public ResponseEntity<OrderResponseDto> createOrder(
             @Valid @RequestBody CreateOrderRequestDto createOrderRequestDto) {
         Order newOrder = orderService.createOrder(createOrderRequestDto);
@@ -47,6 +51,7 @@ public class OrderController {
      */
     @PostMapping("/pos-checkout") // 【新增端點】
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
+    @Operation(summary = "POS 直接結帳", description = "一步完成建立訂單、扣點數、付款，並將狀態設為 PREPARING (製作中)")
     public ResponseEntity<OrderResponseDto> performPosCheckout(
             @Valid @RequestBody PosCheckoutRequestDto requestDto) {
 
@@ -59,6 +64,7 @@ public class OrderController {
      */
     @PostMapping("/calculate")
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
+    @Operation(summary = "試算訂單金額", description = "僅計算總金額，不建立訂單")
     public ResponseEntity<OrderTotalDto> calculateOrderTotal(
             @Valid @RequestBody CreateOrderRequestDto createOrderRequestDto) {
         OrderTotalDto total = orderService.calculateOrderTotal(createOrderRequestDto);
@@ -72,6 +78,7 @@ public class OrderController {
      */
     @GetMapping
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
+    @Operation(summary = "查詢訂單列表", description = "根據分店 ID 與狀態 (可選) 查詢訂單")
     public ResponseEntity<List<OrderResponseDto>> getOrders(
             @RequestParam Long storeId,
             @RequestParam(required = false) OrderStatus status) {
@@ -98,6 +105,7 @@ public class OrderController {
      */
     @GetMapping("/{orderId}")
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
+    @Operation(summary = "查詢單一訂單詳情")
     public ResponseEntity<OrderResponseDto> getOrderDetails(@PathVariable Long orderId) {
 
         Long brandId = this.helperService.getCurrentBrandId();
@@ -115,6 +123,7 @@ public class OrderController {
      */
     @PatchMapping("/{orderId}/status") // 使用 PATCH 通常更適合部分更新
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
+    @Operation(summary = "更新訂單狀態", description = "例如：製作完成 (PREPARING -> READY_FOR_PICKUP)，或取餐 (CLOSED)")
     public ResponseEntity<OrderResponseDto> updateOrderStatus(
             @PathVariable Long orderId,
             @Valid @RequestBody UpdateOrderStatusDto requestDto) {
@@ -128,12 +137,12 @@ public class OrderController {
     }
 
     /**
-     * 【新 API】
      * 更新一筆 HELD 狀態的訂單
      * PUT /api/v1/orders/{orderId}
      */
     @PutMapping("/{orderId}")
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
+    @Operation(summary = "更新一筆 HELD 狀態的訂單")
     public ResponseEntity<OrderResponseDto> updateHeldOrder(
             @PathVariable Long orderId,
             @Valid @RequestBody CreateOrderRequestDto createOrderRequestDto) {
@@ -156,6 +165,7 @@ public class OrderController {
      */
     @PatchMapping("/{orderId}/checkout")
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
+    @Operation(summary = "處理一筆現有訂單的付款 (結帳)")
     public ResponseEntity<OrderResponseDto> processOrderPayment(
             @PathVariable Long orderId,
             @Valid @RequestBody ProcessPaymentRequestDto requestDto) {
@@ -171,6 +181,7 @@ public class OrderController {
      */
     @PatchMapping("/{orderId}/accept")
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
+    @Operation(summary = "店家確認接收一筆等待中的線上訂單")
     public ResponseEntity<OrderResponseDto> acceptOrder(@PathVariable Long orderId) {
 
         Long brandId = this.helperService.getCurrentBrandId();

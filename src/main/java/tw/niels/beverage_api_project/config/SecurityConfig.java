@@ -74,6 +74,7 @@ public class SecurityConfig {
                         .requestMatchers(ApiPaths.API_V1 + "/platform/auth/login").permitAll() // 【新增】允許 "平台" 登入
                         .requestMatchers("/error").permitAll()
                         .requestMatchers("/ws-kds/**").permitAll()
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .anyRequest().authenticated()
                 );
 

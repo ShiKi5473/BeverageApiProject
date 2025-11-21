@@ -1,5 +1,7 @@
 package tw.niels.beverage_api_project.modules.user.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -18,8 +20,11 @@ import tw.niels.beverage_api_project.modules.user.dto.CreateUserRequestDto;
 import tw.niels.beverage_api_project.modules.user.entity.User;
 import tw.niels.beverage_api_project.modules.user.service.UserService;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping(ApiPaths.API_V1 + ApiPaths.USERS)
+@Tag(name = "User Management", description = "使用者與會員管理 API")
 public class UserController {
 
     private final UserService userService;
@@ -35,13 +40,14 @@ public class UserController {
     // 只有品牌管理員或店長有權限建立新員工
     @PostMapping
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER')")
-    public ResponseEntity<String> createUser(
+    @Operation(summary = "建立新使用者", description = "建立員工或會員帳號 (需管理員權限)")
+    public ResponseEntity<Object> createUser(
             @Valid @RequestBody CreateUserRequestDto createUserRequestDto) {
         try {
             System.out.println("try to create new user");
             User newUser = userService.createUser(createUserRequestDto);
             return ResponseEntity.status(HttpStatus.CREATED)
-                    .body("User created successfully with ID: " + newUser.getUserId());
+                    .body(Map.of("message", "User created successfully", "userId", newUser.getUserId()));
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }
@@ -56,6 +62,7 @@ public class UserController {
      */
     @GetMapping("/member/by-phone/{phone}")
     @PreAuthorize("hasAnyRole('STAFF', 'MANAGER', 'BRAND_ADMIN')")
+    @Operation(summary = "查詢會員資料", description = "根據手機號碼搜尋會員 (用於 POS 結帳時綁定會員)")
     public ResponseEntity<MemberDto> getMemberByPhone(@PathVariable String phone) {
         Long brandId = this.helperService.getCurrentBrandId();
         return userService.findMemberByPhone(phone, brandId)

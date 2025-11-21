@@ -1,5 +1,7 @@
 package tw.niels.beverage_api_project.modules.report.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -17,6 +19,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping(ApiPaths.API_V1 + ApiPaths.REPORTS)
+@Tag(name = "Report APIs", description = "報表與統計數據查詢介面")
 public class ReportController {
 
     private final DailyStoreStatsRepository dailyStoreStatsRepository;
@@ -38,6 +41,10 @@ public class ReportController {
      */
     @GetMapping("/store-daily")
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
+    @Operation(
+            summary = "查詢分店日結明細",
+            description = "取得指定分店在特定日期區間內的每日營收統計 (權限: 該分店員工或品牌管理員)"
+    )
     public ResponseEntity<List<DailyStoreStats>> getStoreDailyStats(
             @RequestParam Long storeId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
@@ -59,6 +66,10 @@ public class ReportController {
      */
     @GetMapping("/brand-summary")
     @PreAuthorize("hasAnyRole('BRAND_ADMIN')") // 僅品牌管理員可看
+    @Operation(
+            summary = "查詢全品牌銷售總覽",
+            description = "取得全品牌在指定區間內的加總數據，包含總營收、總訂單數等 (權限: 品牌管理員)"
+    )
     public ResponseEntity<BrandSalesSummaryDto> getBrandSummary(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
@@ -78,6 +89,10 @@ public class ReportController {
      */
     @GetMapping("/store-ranking")
     @PreAuthorize("hasAnyRole('BRAND_ADMIN')")
+    @Operation(
+            summary = "查詢分店營收排行",
+            description = "取得各分店在指定區間內的實收金額排名 (權限: 品牌管理員)"
+    )
     public ResponseEntity<List<StoreRankingDto>> getStoreRanking(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
@@ -100,6 +115,10 @@ public class ReportController {
      */
     @PostMapping("/trigger-aggregation")
     @PreAuthorize("hasRole('BRAND_ADMIN')") // 暫時開放給品牌管理員測試，正式環境建議只給 PLATFORM_ADMIN
+    @Operation(
+            summary = "手動觸發日結計算",
+            description = "手動執行指定日期的報表結算，用於補漏或測試 (權限: 品牌管理員)"
+    )
     public ResponseEntity<String> triggerAggregation(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
 
