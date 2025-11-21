@@ -10,6 +10,7 @@ import tw.niels.beverage_api_project.modules.report.entity.DailyStoreStats;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface DailyStoreStatsRepository extends JpaRepository<DailyStoreStats, Long> {
@@ -44,6 +45,12 @@ public interface DailyStoreStatsRepository extends JpaRepository<DailyStoreStats
     List<StoreRankingDto> findTopStoresByRevenue(@Param("brandId") Long brandId,
                                                  @Param("startDate") LocalDate startDate,
                                                  @Param("endDate") LocalDate endDate);
+
+    /**
+     * 系統用：取得資料庫中「日期最新」的一筆紀錄
+     * 用途：判斷最後一次成功結算是哪一天
+     */
+    Optional<DailyStoreStats> findTopByOrderByDateDesc();
 
     /**
      * 系統用：檢查是否已存在該日報表 (避免重複執行)
