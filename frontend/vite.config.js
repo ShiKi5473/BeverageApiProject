@@ -61,6 +61,7 @@ export default defineConfig({
                 pos: 'pages/pos.html',
                 checkout: 'pages/checkout.html',
                 kds: 'pages/kds.html',
+                report: 'pages/report.html',
             }
         }
     }
