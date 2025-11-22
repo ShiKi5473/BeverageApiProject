@@ -36,7 +36,12 @@ public class AuthService {
             JwtAuthResponseDto responseDto = new JwtAuthResponseDto(token);
             Object principal = authentication.getPrincipal();
             if(principal instanceof AppUserDetails userDetails) {
-                responseDto.setStoreId(userDetails.getStoreId()); //
+                responseDto.setStoreId(userDetails.getStoreId());
+
+                if (!userDetails.getAuthorities().isEmpty()) {
+                    String role = userDetails.getAuthorities().iterator().next().getAuthority();
+                    responseDto.setRole(role);
+                }
             }
             return responseDto;
         } finally {

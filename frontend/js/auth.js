@@ -48,25 +48,34 @@ document.addEventListener("DOMContentLoaded", () => {
         localStorage.setItem("accessToken", data.accessToken);
         localStorage.setItem("brandId", brandId);
 
-          if (data.storeId) {
-              // 登入者是「店員」或「店長」
-              localStorage.setItem("storeId", data.storeId);
-              // 11. 轉跳到點餐頁面 (pos.html)
-              window.location.href = "pos.html";
-          } else {
-              // 登入者是「品牌管理員」
-              localStorage.removeItem("storeId");
-              console.warn("此帳號為品牌管理員，應導向管理頁面 (目前尚未建立)");
-              // TODO 未來您可以建立一個 admin.html
-              // window.location.href = "admin.html";
+          const userRole = data.role;
 
-              // 目前暫時顯示提醒，並允許他進入 POS (雖然 POS 會擋住他)
-              alert("品牌管理員登入成功。\n（目前沒有專屬後台，將嘗試進入 POS 頁）");
-              window.location.href = "pos.html"; // 保留原狀，但已告知使用者
+          if (userRole === "ROLE_BRAND_ADMIN") {
+              // --- 1. 品牌管理員 ---
+              localStorage.removeItem("storeId");
+              alert("品牌管理員登入成功。\n即將進入報表頁面。");
+              // 建議管理員導向剛做好的報表頁
+              window.location.href = "report.html";
+
+          } else if (userRole === "ROLE_MEMBER") {
+              // --- 2. 會員 (修正原本誤判為管理員的問題) ---
+              localStorage.removeItem("storeId");
+              // 視您的需求決定會員要去哪，例如會員中心或首頁
+              alert("會員登入成功。");
+              // window.location.href = "member.html"; // 範例
+
+          } else {
+              // --- 3. 店長或店員 (ROLE_MANAGER, ROLE_STAFF) ---
+              if (data.storeId) {
+                  localStorage.setItem("storeId", data.storeId);
+                  window.location.href = "pos.html";
+              } else {
+                  // 異常狀況：是員工但沒有 storeId
+                  console.error("員工帳號異常：無分店綁定");
+                  errorMessage.textContent = "帳號設定異常，請聯繫管理員";
+              }
           }
 
-        // 11. 登入成功，轉跳到點餐頁面 (pos.html)
-          window.location.href = "pos.html";
       } else {
         // 12. 登入失敗 (例如 401 帳密錯誤)
         const errorText = await response.text();

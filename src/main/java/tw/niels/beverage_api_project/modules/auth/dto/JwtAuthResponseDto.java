@@ -15,6 +15,9 @@ public class JwtAuthResponseDto {
     @Schema(description = "分店 ID (若為店員則回傳，管理員則為 null)", example = "1")
     private Long storeId;
 
+    @Schema(description = "使用者角色", example = "ROLE_STAFF")
+    private String role;
+
     public JwtAuthResponseDto(String accessToken) {
         this.accessToken = accessToken;
         this.storeId = null;
