@@ -2,6 +2,8 @@ package tw.niels.beverage_api_project.modules.user.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -30,6 +32,8 @@ public class UserController {
     private final UserService userService;
     private final ControllerHelperService helperService;
 
+    private static final Logger logger = LoggerFactory.getLogger(UserController.class);
+
     public UserController(UserService userService,
             ControllerHelperService helperService) {
         this.userService = userService;
@@ -43,14 +47,11 @@ public class UserController {
     @Operation(summary = "建立新使用者", description = "建立員工或會員帳號 (需管理員權限)")
     public ResponseEntity<Object> createUser(
             @Valid @RequestBody CreateUserRequestDto createUserRequestDto) {
-        try {
-            System.out.println("try to create new user");
-            User newUser = userService.createUser(createUserRequestDto);
-            return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(Map.of("message", "User created successfully", "userId", newUser.getUserId()));
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
-        }
+        logger.info("收到建立使用者請求，Phone: {}", createUserRequestDto.getPrimaryPhone());
+        User newUser = userService.createUser(createUserRequestDto);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(Map.of("message", "User created successfully", "userId", newUser.getUserId()));
+
     }
 
     /**

@@ -15,6 +15,8 @@ import tw.niels.beverage_api_project.common.constants.ApiPaths;
 import tw.niels.beverage_api_project.modules.auth.dto.JwtAuthResponseDto;
 import tw.niels.beverage_api_project.modules.auth.dto.LoginRequestDto;
 import tw.niels.beverage_api_project.modules.auth.service.AuthService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @RestController
 @RequestMapping(ApiPaths.API_V1 + ApiPaths.AUTH) // 使用定義好的常數
@@ -28,6 +30,8 @@ public class AuthController {
         this.authService = authService;
     }
 
+    private static final Logger logger = LoggerFactory.getLogger(AuthController.class); // 新增
+
     /**
      * 處理使用者登入請求 (員工與會員共用)。
      * 
@@ -38,13 +42,12 @@ public class AuthController {
     @Operation(summary = "使用者登入", description = "員工或會員使用手機號碼與密碼登入，成功後回傳 JWT Token") // API 描述
     public ResponseEntity<?> authenticateUser(@RequestBody @Valid LoginRequestDto loginRequestDto) {
         try {
-            System.out.println("收到登入請求");
+            logger.info("收到使用者登入請求: {}", loginRequestDto.getUsername());
             // 直接呼叫 AuthService，它會回傳完整的 DTO
             JwtAuthResponseDto jwtAuthResponseDto = authService.login(loginRequestDto);
             return ResponseEntity.ok(jwtAuthResponseDto);
         } catch (AuthenticationException e) {
-            // 如果 Spring Security 在認證過程中拋出異常（例如密碼錯誤），則捕捉它
-            System.out.println("failed");
+            logger.warn("登入失敗 (帳號: {}): {}", loginRequestDto.getUsername(), e.getMessage());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("登入失敗：帳號、密碼或品牌不正確。");
         }
     }

@@ -6,6 +6,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
 import tw.niels.beverage_api_project.modules.brand.entity.Brand;
 import tw.niels.beverage_api_project.modules.brand.repository.BrandRepository;
 import tw.niels.beverage_api_project.modules.order.dto.MemberDto;
@@ -40,12 +41,12 @@ public class UserService {
     public User createUser(CreateUserRequestDto requestDto) {
         // 1. 檢查品牌是否存在
         Brand brand = brandRepository.findById(requestDto.getBrandId())
-                .orElseThrow(() -> new RuntimeException("Error: Brand is not found."));
+                .orElseThrow(() -> new ResourceNotFoundException("Error: Brand not found with ID: " + requestDto.getBrandId()));
 
         // 2. 檢查手機號碼是否已在該品牌下註冊
         userRepository.findByPrimaryPhoneAndBrandId(requestDto.getPrimaryPhone(), requestDto.getBrandId())
                 .ifPresent(existingUser -> {
-                    throw new RuntimeException("Error: Phone number is already taken for this brand!");
+                    throw new IllegalStateException("Error: Phone number '" + requestDto.getPrimaryPhone() + "' is already taken for this brand!");
                 });
 
         // 3. 建立核心 User 物件
@@ -66,8 +67,9 @@ public class UserService {
             staffProfile.setHireDate(staffDto.getHireDate());
 
             if (staffDto.getStoreId() != null) {
-                Store store = storeRepository.findById(staffDto.getStoreId())
-                        .orElseThrow(() -> new RuntimeException("Error: Store is not found."));
+                // 修改：改拋出 ResourceNotFoundException
+                Store store = storeRepository.findByBrand_BrandIdAndStoreId(brand.getBrandId(), staffDto.getStoreId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Error: Store not found with ID: " + staffDto.getStoreId()));
                 staffProfile.setStore(store);
             }
             // 建立雙向關聯

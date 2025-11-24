@@ -1,6 +1,5 @@
 package tw.niels.beverage_api_project.modules.auth.service;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -15,10 +14,14 @@ import tw.niels.beverage_api_project.security.jwt.JwtTokenProvider;
 
 @Service
 public class AuthService {
-    @Autowired
-    private AuthenticationManager authenticationManager;
-    @Autowired
-    private JwtTokenProvider tokenProvider;
+    private final AuthenticationManager authenticationManager;
+    private final JwtTokenProvider tokenProvider;
+
+    public AuthService(AuthenticationManager authenticationManager,
+                       JwtTokenProvider tokenProvider) {
+        this.authenticationManager = authenticationManager;
+        this.tokenProvider = tokenProvider;
+    }
 
     public JwtAuthResponseDto login(LoginRequestDto loginRequestDto) {
         try {
