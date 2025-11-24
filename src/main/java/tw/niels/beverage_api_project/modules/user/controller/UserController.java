@@ -48,6 +48,13 @@ public class UserController {
     public ResponseEntity<Object> createUser(
             @Valid @RequestBody CreateUserRequestDto createUserRequestDto) {
         logger.info("收到建立使用者請求，Phone: {}", createUserRequestDto.getPrimaryPhone());
+
+        Long currentBrandId = this.helperService.getCurrentBrandId();
+        if (!currentBrandId.equals(createUserRequestDto.getBrandId())) {
+            // 嚴格檢查：禁止跨品牌建立使用者
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("無權限為其他品牌建立使用者");
+        }
+
         User newUser = userService.createUser(createUserRequestDto);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(Map.of("message", "User created successfully", "userId", newUser.getUserId()));

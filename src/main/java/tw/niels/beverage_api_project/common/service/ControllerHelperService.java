@@ -5,10 +5,17 @@ import org.springframework.stereotype.Service;
 
 import tw.niels.beverage_api_project.common.exception.BadRequestException;
 import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
+import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
 import tw.niels.beverage_api_project.security.AppUserDetails;
 
 @Service // 標註為 Spring Bean，使其可以被注入
 public class ControllerHelperService {
+
+    private final StoreRepository storeRepository; // 新增欄位
+
+    public ControllerHelperService(StoreRepository storeRepository) {
+        this.storeRepository = storeRepository;
+    }
 
     /**
      * 獲取當前已認證的使用者詳細資訊 (AppUserDetails)
@@ -37,7 +44,7 @@ public class ControllerHelperService {
 
     /**
      * 獲取當前使用者本身的 User ID
-     * 
+     *
      * @return 使用者 ID (Long)
      */
     public Long getCurrentUserId() {
@@ -55,6 +62,7 @@ public class ControllerHelperService {
     public void validateStoreAccess(Long targetStoreId) {
         AppUserDetails userDetails = getCurrentUserDetails();
         Long currentUserStoreId = userDetails.getStoreId();
+        Long currentBrandId = userDetails.getBrandId();
 
         // 情況 1: 如果是「已綁定店家」的員工 (STAFF, MANAGER)
         if (currentUserStoreId != null) {
@@ -74,6 +82,12 @@ public class ControllerHelperService {
         if (!isAdmin) {
             // 如果 storeId 是 null，但他又不是管理員 -> 視為異常或權限不足
             throw new BadRequestException("帳號權限異常：非管理員帳號必須綁定店家。");
+        }
+
+        boolean isStoreBelongsToBrand = storeRepository.findByBrand_BrandIdAndStoreId(currentBrandId, targetStoreId).isPresent();
+
+        if (!isStoreBelongsToBrand) {
+            throw new ResourceNotFoundException("找不到該分店，或您無權限存取 (ID: " + targetStoreId + ")");
         }
 
         // 品牌管理員 -> 允許通過 (後續交由 BrandId 進行資料隔離)

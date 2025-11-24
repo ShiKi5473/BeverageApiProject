@@ -44,6 +44,9 @@ public class StoreController {
     @PreAuthorize("hasRole('BRAND_ADMIN')")
     @Operation(summary = "建立新分店", description = "為品牌新增一家分店 (僅品牌管理員)")
     public ResponseEntity<Store> createStore(@Valid @RequestBody CreateStoreRequestDto createStoreRequestDto) {
+        Long currentBrandId = helperService.getCurrentBrandId();
+        createStoreRequestDto.setBrandId(currentBrandId);
+
         Store newStore = storeService.createStore(createStoreRequestDto);
         return new ResponseEntity<>(newStore, HttpStatus.CREATED);
     }
@@ -60,7 +63,6 @@ public class StoreController {
 
         List<Store> stores = storeRepository.findByBrand_BrandId(brandId);
 
-        // 將 Entity 轉換為 DTO
         List<StoreResponseDto> dtos = stores.stream()
                 .map(StoreResponseDto::fromEntity)
                 .collect(Collectors.toList());
