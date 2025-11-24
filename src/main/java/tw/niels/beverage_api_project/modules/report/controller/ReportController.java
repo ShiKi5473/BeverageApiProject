@@ -15,9 +15,14 @@ import tw.niels.beverage_api_project.modules.report.entity.DailyStoreStats;
 import tw.niels.beverage_api_project.modules.report.repository.DailyProductStatsRepository;
 import tw.niels.beverage_api_project.modules.report.repository.DailyStoreStatsRepository;
 import tw.niels.beverage_api_project.modules.report.service.ReportAggregationService;
+import tw.niels.beverage_api_project.modules.store.entity.Store;
+import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping(ApiPaths.API_V1 + ApiPaths.REPORTS)
@@ -28,15 +33,18 @@ public class ReportController {
     private final DailyProductStatsRepository dailyProductStatsRepository; //
     private final ReportAggregationService reportAggregationService;
     private final ControllerHelperService helperService;
+    private final StoreRepository storeRepository;
 
     public ReportController(DailyStoreStatsRepository dailyStoreStatsRepository,
                             DailyProductStatsRepository dailyProductStatsRepository,
                             ReportAggregationService reportAggregationService,
-                            ControllerHelperService helperService) {
+                            ControllerHelperService helperService,
+                            StoreRepository storeRepository) {
         this.dailyStoreStatsRepository = dailyStoreStatsRepository;
         this.dailyProductStatsRepository = dailyProductStatsRepository;
         this.reportAggregationService = reportAggregationService;
         this.helperService = helperService;
+        this.storeRepository = storeRepository;
     }
 
     /**
@@ -133,8 +141,19 @@ public class ReportController {
         List<StoreRankingDto> ranking = dailyStoreStatsRepository
                 .findTopStoresByRevenue(brandId, startDate, endDate);
 
-        // 這裡可以考慮補充 Store Name (因為 DTO 預設只有 ID)
-        // 如果前端有 Store Cache，可以只回傳 ID；否則這裡可以呼叫 StoreRepository 補上名稱
+        Set<Long> storeIds = ranking.stream()
+                .map(StoreRankingDto::getStoreId)
+                .collect(Collectors.toSet());
+
+        if (!storeIds.isEmpty()) {
+            Map<Long, String> storeNameMap = storeRepository.findAllById(storeIds).stream()
+                    .collect(Collectors.toMap(Store::getStoreId, Store::getName));
+
+            ranking.forEach(dto -> {
+                String name = storeNameMap.getOrDefault(dto.getStoreId(), "未知分店 (ID: " + dto.getStoreId() + ")");
+                dto.setStoreName(name);
+            });
+        }
 
         return ResponseEntity.ok(ranking);
     }
