@@ -1,5 +1,6 @@
 package tw.niels.beverage_api_project.modules.store.repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,6 +26,8 @@ public interface StoreRepository extends JpaRepository<Store, Long> {
 
     List<Store> findByBrand_BrandId(Long brandId);
 
+    List<Store> findByBrand_BrandIdAndStoreIdIn(Long brandId, Collection<Long> storeIds);
+
 
     /**
      * 禁用預設的 findById，強迫使用 findByBrand_BrandIdAndStoreId()。
@@ -34,6 +37,13 @@ public interface StoreRepository extends JpaRepository<Store, Long> {
     @NonNull
     default Optional<Store> findById(@NonNull Long id) {
         throw new UnsupportedOperationException("禁止呼叫預設的 findById()，請改用 findByBrand_BrandIdAndStoreId() 以確保資料隔離");
+    }
+
+    @Deprecated
+    @Override
+    @NonNull
+    default List<Store> findAllById(@NonNull Iterable<Long> ids) {
+        throw new UnsupportedOperationException("禁止呼叫預設的 findAllById()，請改用 findByBrand_BrandIdAndStoreIdIn() 以確保資料隔離");
     }
 
     /**
