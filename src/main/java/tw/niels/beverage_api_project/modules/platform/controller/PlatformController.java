@@ -78,17 +78,10 @@ public class PlatformController {
             throw new BadRequestException("Only BRAND_ADMIN can be created via this endpoint.");
         }
 
-        try {
-            User newUser = userService.createUser(createUserRequestDto);
-            String msg = "Brand Admin created successfully for brand " + brandId + " with User ID: " + newUser.getUserId();
+        User newUser = userService.createUser(createUserRequestDto);
+        String msg = "Brand Admin created successfully for brand " + brandId + " with User ID: " + newUser.getUserId();
 
-            return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(new CreateUserResponseDto(msg, newUser.getUserId()));
-
-        } catch (RuntimeException e) {
-            // 將原本的 RuntimeException 包裝成明確的 BadRequestException 拋出
-            // 這樣 GlobalExceptionHandler 就會回傳 400 Bad Request
-            throw new BadRequestException(e.getMessage());
-        }
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new CreateUserResponseDto(msg, newUser.getUserId()));
     }
 }
