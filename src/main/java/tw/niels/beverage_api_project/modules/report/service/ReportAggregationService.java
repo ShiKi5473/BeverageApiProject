@@ -30,6 +30,9 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
+import java.time.ZoneId;
+import java.util.Arrays;
+import java.util.Date;
 
 /**
  * 報表聚合核心服務。
@@ -199,6 +202,22 @@ public class ReportAggregationService {
                 prodStat.setCategoryName(categoryName);
             } else {
                 prodStat.setCategoryName("未分類");
+            }
+
+            Date startDate = Date.from(start.atZone(ZoneId.systemDefault()).toInstant());
+            Date endDate = Date.from(end.atZone(ZoneId.systemDefault()).toInstant());
+
+            long unclosedCount = orderRepository.countOrdersByStoreIdAndOrderTimeBetweenAndStatusIn(
+                    storeId,
+                    startDate,
+                    endDate,
+                    Arrays.asList(OrderStatus.PREPARING, OrderStatus.READY_FOR_PICKUP, OrderStatus.PENDING, OrderStatus.HELD, OrderStatus.AWAITING_ACCEPTANCE)
+            );
+
+            if (unclosedCount > 0) {
+                logger.warn("【日結警告】分店 ID: {} 在日期 {} 尚有 {} 筆訂單未結案 (非 CLOSED/CANCELLED)。" +
+                                "這些訂單未計入本日營收報表，請確認是否為店員漏按完成。",
+                        storeId, date, unclosedCount);
             }
 
             dailyProductStatsRepository.save(prodStat);

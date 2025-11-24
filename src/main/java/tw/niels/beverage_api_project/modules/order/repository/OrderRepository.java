@@ -1,8 +1,10 @@
 package tw.niels.beverage_api_project.modules.order.repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Date;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -82,6 +84,18 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     List<ProductSalesStatsDto> findProductStatsByStoreAndDateRange(@Param("storeId") Long storeId,
                                                                    @Param("start") LocalDateTime start,
                                                                    @Param("end") LocalDateTime end);
+
+    /**
+     * 計算指定分店在指定時間內，處於特定狀態的訂單數量
+     */
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.store.storeId = :storeId AND o.orderTime BETWEEN :start AND :end AND o.status IN :statuses")
+    long countOrdersByStoreIdAndOrderTimeBetweenAndStatusIn(
+            @Param("storeId") Long storeId,
+            @Param("start") Date start,
+            @Param("end") Date end,
+            @Param("statuses") Collection<OrderStatus> statuses
+    );
+
     /**
      * 禁用預設的 findById，強迫使用 findByBrand_BrandIdAndOrderId()。
      */
