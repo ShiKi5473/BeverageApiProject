@@ -3,7 +3,6 @@ package tw.niels.beverage_api_project.modules.promotion.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import tw.niels.beverage_api_project.modules.product.dto.ProductSummaryDto;
-import tw.niels.beverage_api_project.modules.product.entity.Product; // 【修正 1】新增 Import
 import tw.niels.beverage_api_project.modules.promotion.entity.Promotion;
 import tw.niels.beverage_api_project.modules.promotion.enums.PromotionType;
 
