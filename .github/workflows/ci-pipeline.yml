@@ -1,0 +1,36 @@
+name: Java CI with Maven & Qodana
+
+on:
+  push:
+    branches: [ "develop", "main", "feature/*" ]
+  pull_request:
+    branches: [ "develop", "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Qodana 分析需要完整的 git history
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build and Test with Maven
+        # 這裡執行 mvn verify 會自動觸發我們剛寫好的 TestContainers 測試
+        run: mvn verify
+
+      - name: Qodana Scan
+        uses: JetBrains/qodana-action@v2023.3
+        # Qodana 會產出程式碼品質報告，如果有設定 QODANA_TOKEN 可上傳雲端，否則僅本地檢查
+        continue-on-error: true # 暫時允許掃描失敗不中斷流程，初期調整用
+
+      - name: Build Docker Image (Dry Run)
+        # 驗證 Dockerfile 是否能成功建置 Image
+        run: docker build . --file Dockerfile --tag beverage-api:latest
