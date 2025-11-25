@@ -13,7 +13,7 @@ public interface PromotionCalculator {
     boolean supports(PromotionType type);
 
     /**
-     * 計算折扣金額 (不修改訂單，只回傳計算結果)
+     * 計算折扣金額 (只回傳計算結果，不修改訂單)
      * @return 折扣金額 (必須 >= 0)
      */
     BigDecimal calculateDiscount(Order order, Promotion promotion);

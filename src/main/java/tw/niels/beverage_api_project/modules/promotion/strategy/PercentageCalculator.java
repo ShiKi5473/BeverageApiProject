@@ -25,9 +25,9 @@ public class PercentageCalculator implements PromotionCalculator {
             return BigDecimal.ZERO;
         }
 
-        // promotion.getValue() 是折數 (例如 0.9 代表 9 折)
+        // promotion.getValue() 是折數 (例如 0.85 代表 85 折)
         // 折扣金額 = 總金額 * (1 - 折數)
-        // 例如：100 * (1 - 0.9) = 10 元折扣
+        // 例如：100 * (1 - 0.85) = 15 元折扣
         BigDecimal discountRate = BigDecimal.ONE.subtract(promotion.getValue());
 
         // 防呆：折數不能負數

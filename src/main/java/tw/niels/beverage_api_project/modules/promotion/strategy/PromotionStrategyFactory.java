@@ -4,9 +4,6 @@ import org.springframework.stereotype.Component;
 import tw.niels.beverage_api_project.modules.promotion.enums.PromotionType;
 
 import java.util.List;
-import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 @Component
 public class PromotionStrategyFactory {
@@ -21,6 +18,6 @@ public class PromotionStrategyFactory {
         return calculators.stream()
                 .filter(c -> c.supports(type))
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("不支援的促銷類型: " + type));
+                .orElseThrow(() -> new IllegalArgumentException("尚未實作此促銷類型的計算邏輯: " + type));
     }
 }
