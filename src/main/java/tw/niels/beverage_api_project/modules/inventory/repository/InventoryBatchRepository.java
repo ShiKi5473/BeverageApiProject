@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Repository;
 import tw.niels.beverage_api_project.modules.inventory.entity.InventoryBatch;
 
@@ -14,6 +15,9 @@ import java.util.Optional;
 
 @Repository
 public interface InventoryBatchRepository extends JpaRepository<InventoryBatch, Long> {
+
+
+    Optional<InventoryBatch> findByShipment_Store_Brand_IdAndId(Long brandId, Long id);
 
     /**
      * FIFO 核心查詢：
@@ -40,4 +44,23 @@ public interface InventoryBatchRepository extends JpaRepository<InventoryBatch, 
             "AND b.inventoryItem.id = :itemId")
     Optional<BigDecimal> sumQuantityByStoreAndItem(@Param("storeId") Long storeId,
                                                    @Param("itemId") Long itemId);
+    @Deprecated
+    @Override
+    @NonNull
+    default Optional<InventoryBatch> findById(@NonNull Long id) {
+        throw new UnsupportedOperationException("禁止使用 findById()，請改用 findByShipment_Store_Brand_IdAndId()");
+    }
+
+    @Deprecated
+    @Override
+    @NonNull
+    default List<InventoryBatch> findAll() {
+        throw new UnsupportedOperationException("禁止使用 findAll()");
+    }
+
+    @Deprecated
+    @Override
+    default void deleteById(@NonNull Long id) {
+        throw new UnsupportedOperationException("禁止使用 deleteById()，請先驗證 BrandId");
+    }
 }
