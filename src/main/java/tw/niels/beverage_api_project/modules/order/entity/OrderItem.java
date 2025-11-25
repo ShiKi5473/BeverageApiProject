@@ -4,32 +4,19 @@ import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.Set;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.JoinTable;
-import jakarta.persistence.ManyToMany;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
+import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
 import tw.niels.beverage_api_project.modules.product.entity.Product;
 import tw.niels.beverage_api_project.modules.product.entity.ProductOption;
 
 @Entity
 @Table(name = "order_items")
-public class OrderItem {
+@AttributeOverride(name = "id", column = @Column(name = "order_item_id"))
+public class OrderItem extends BaseTsidEntity {
 
     public OrderItem() {
-
     }
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "order_item_id")
-    private Long orderItemId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", nullable = false)
@@ -57,13 +44,9 @@ public class OrderItem {
     private Set<ProductOption> options = new HashSet<>();
 
     // getter setter
-    public Long getOrderItemId() {
-        return orderItemId;
-    }
+    public Long getOrderItemId() { return getId(); }
 
-    public void setOrderItemId(Long orderItemId) {
-        this.orderItemId = orderItemId;
-    }
+    public void setOrderItemId(Long orderItemId) { setId(orderItemId); }
 
     public Order getOrder() {
         return order;

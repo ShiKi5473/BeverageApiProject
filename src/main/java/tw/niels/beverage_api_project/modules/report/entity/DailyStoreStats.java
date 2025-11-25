@@ -2,20 +2,20 @@ package tw.niels.beverage_api_project.modules.report.entity;
 
 import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
+import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
+
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.Instant;
+import java.time.LocalDate;
 
 @Entity
 @Table(name = "daily_store_stats", indexes = {
-        @Index(name = "idx_daily_store_date", columnList = "store_id, date", unique = true), // 確保同一天同一分店只有一筆
+        @Index(name = "idx_daily_store_date", columnList = "store_id, date", unique = true),
         @Index(name = "idx_daily_brand_date", columnList = "brand_id, date")
 })
-public class DailyStoreStats {
+@AttributeOverride(name = "id", column = @Column(name = "daily_store_stats_id"))
+public class DailyStoreStats extends BaseTsidEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
 
     @Column(name = "store_id", nullable = false)
     private Long storeId;
@@ -32,18 +32,18 @@ public class DailyStoreStats {
     private Integer totalOrders = 0;
 
     @Column(name = "total_revenue", nullable = false, precision = 12, scale = 2)
-    private BigDecimal totalRevenue = BigDecimal.ZERO; // 總金額 (Gross Sales)
+    private BigDecimal totalRevenue = BigDecimal.ZERO;
 
     @Column(name = "total_discount", nullable = false, precision = 12, scale = 2)
-    private BigDecimal totalDiscount = BigDecimal.ZERO; // 折扣金額
+    private BigDecimal totalDiscount = BigDecimal.ZERO;
 
     @Column(name = "final_revenue", nullable = false, precision = 12, scale = 2)
-    private BigDecimal finalRevenue = BigDecimal.ZERO; // 實收金額 (Net Sales)
+    private BigDecimal finalRevenue = BigDecimal.ZERO;
 
     @Column(name = "cancelled_orders", nullable = false)
     private Integer cancelledOrders = 0;
 
-    // --- 支付方式細分 (可根據需求擴充) ---
+    // --- 支付方式細分 ---
 
     @Column(name = "cash_total", precision = 12, scale = 2)
     private BigDecimal cashTotal = BigDecimal.ZERO;
@@ -59,8 +59,16 @@ public class DailyStoreStats {
 
     // --- Getters and Setters ---
 
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
+    // 語義化的 ID Getter/Setter
+    public Long getDailyStoreStatsId() {
+        return getId();
+    }
+
+    public void setDailyStoreStatsId(Long id) {
+        setId(id);
+    }
+
+    // 為了相容性，可以選擇保留 getId/setId，或直接使用父類別的方法 (BaseTsidEntity 已經有 getId)
 
     public Long getStoreId() { return storeId; }
     public void setStoreId(Long storeId) { this.storeId = storeId; }

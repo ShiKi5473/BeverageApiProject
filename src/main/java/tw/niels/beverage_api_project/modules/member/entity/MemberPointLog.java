@@ -2,28 +2,18 @@ package tw.niels.beverage_api_project.modules.member.entity; // 建議新路徑
 
 import java.time.Instant;
 
+import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType; // 使用 Instant
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
 import tw.niels.beverage_api_project.modules.order.entity.Order;
 import tw.niels.beverage_api_project.modules.user.entity.User;
 
 @Entity
 @Table(name = "member_points_log")
-public class MemberPointLog {
+@AttributeOverride(name = "id", column = @Column(name = "log_id"))
+public class MemberPointLog extends BaseTsidEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "log_id")
-    private Long logId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "member_user_id", nullable = false)
@@ -60,9 +50,7 @@ public class MemberPointLog {
     }
 
     // --- Getters ---
-    public Long getLogId() {
-        return logId;
-    }
+    public Long getLogId() { return getId(); }
 
     public User getMember() {
         return member;

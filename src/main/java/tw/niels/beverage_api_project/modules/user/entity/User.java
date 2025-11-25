@@ -2,35 +2,23 @@ package tw.niels.beverage_api_project.modules.user.entity;
 
 import java.util.Date;
 
+import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import jakarta.persistence.CascadeType;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToOne;
-import jakarta.persistence.Table;
+import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
 import tw.niels.beverage_api_project.modules.brand.entity.Brand;
 import tw.niels.beverage_api_project.modules.user.entity.profile.MemberProfile;
 import tw.niels.beverage_api_project.modules.user.entity.profile.StaffProfile;
 
 @Entity
 @Table(name = "users")
-public class User {
+@AttributeOverride(name = "id", column = @Column(name = "brand_id"))
+public class User extends BaseTsidEntity {
 
     public User() {
     }
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "user_id")
-    private Long userId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "brand_id", nullable = false)
@@ -63,11 +51,11 @@ public class User {
 
     // Getters and Setters
     public Long getUserId() {
-        return userId;
+        return getId();
     }
 
     public void setUserId(Long userId) {
-        this.userId = userId;
+        setId(userId);
     }
 
     public Brand getBrand() {

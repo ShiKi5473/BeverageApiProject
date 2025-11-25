@@ -2,27 +2,16 @@ package tw.niels.beverage_api_project.modules.product.entity;
 
 import java.math.BigDecimal;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
+import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
 
 @Entity
 @Table(name = "product_options")
-public class ProductOption {
+@AttributeOverride(name = "id", column = @Column(name = "option_id"))
+public class ProductOption extends BaseTsidEntity {
 
     public ProductOption() {
     };
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "option_id")
-    private Long optionId;
 
     @Column(name = "name", nullable = false, length = 50)
     private String optionName;
@@ -39,11 +28,11 @@ public class ProductOption {
 
     // getter and setter
     public Long getOptionId() {
-        return optionId;
+        return getId();
     }
 
     public void setOptionId(Long optionId) {
-        this.optionId = optionId;
+        setId(optionId);
     }
 
     public String getOptionName() {

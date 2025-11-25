@@ -5,15 +5,12 @@ import java.util.Date;
 import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
 
 @Entity
 @Table(name = "brands")
-public class Brand {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "brand_id")
-    private Long brandId;
+@AttributeOverride(name = "id", column = @Column(name = "brand_id"))
+public class Brand extends BaseTsidEntity {
 
     @Column(nullable = false, unique = true)
     private String name;
@@ -37,11 +34,11 @@ public class Brand {
 
 
     public Long getBrandId() {
-        return brandId;
+        return getId();
     }
 
     public void setBrandId(Long brandId) {
-        this.brandId = brandId;
+        setId(brandId);
     }
 
     public String getName() {

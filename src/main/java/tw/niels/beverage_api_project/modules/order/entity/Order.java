@@ -5,21 +5,10 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.Set;
 
+import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
 
-import jakarta.persistence.CascadeType;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.Table;
+import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
 import tw.niels.beverage_api_project.modules.brand.entity.Brand;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
 import tw.niels.beverage_api_project.modules.store.entity.Store;
@@ -27,12 +16,8 @@ import tw.niels.beverage_api_project.modules.user.entity.User;
 
 @Entity
 @Table(name = "orders")
-public class Order {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "order_id")
-    private Long orderId;
+@AttributeOverride(name = "id", column = @Column(name = "order_id"))
+public class Order extends BaseTsidEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "brand_id", nullable = false)
@@ -94,13 +79,9 @@ public class Order {
 
     // getter setter
 
-    public Long getOrderId() {
-        return orderId;
-    }
+    public Long getOrderId() { return getId(); }
 
-    public void setOrderId(Long orderId) {
-        this.orderId = orderId;
-    }
+    public void setOrderId(Long orderId) { setId(orderId); }
 
     public Brand getBrand() {
         return brand;

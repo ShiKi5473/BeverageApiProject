@@ -3,20 +3,8 @@ package tw.niels.beverage_api_project.modules.product.entity;
 import java.util.HashSet;
 import java.util.Set;
 
-import jakarta.persistence.CascadeType;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.*;
+import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
 import tw.niels.beverage_api_project.modules.brand.entity.Brand;
 import tw.niels.beverage_api_project.modules.product.enums.SelectionType;
 
@@ -24,15 +12,11 @@ import tw.niels.beverage_api_project.modules.product.enums.SelectionType;
 @Table(name = "option_groups", uniqueConstraints = {
         @UniqueConstraint(columnNames = { "brand_id", "name" })
 })
-public class OptionGroup {
+@AttributeOverride(name = "id", column = @Column(name = "group_id"))
+public class OptionGroup extends BaseTsidEntity {
 
     public OptionGroup() {
     };
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "group_id")
-    private Long groupId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "brand_id", nullable = false)
@@ -53,13 +37,9 @@ public class OptionGroup {
 
     // getter and setter
 
-    public Long getGroupId() {
-        return groupId;
-    }
+    public Long getGroupId() { return getId(); }
 
-    public void setGroup_id(Long groupId) {
-        this.groupId = groupId;
-    }
+    public void setGroupId(Long groupId) { setId(groupId); }
 
     public Brand getBrand() {
         return brand;

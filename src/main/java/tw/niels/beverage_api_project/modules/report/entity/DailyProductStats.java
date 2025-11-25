@@ -2,6 +2,8 @@ package tw.niels.beverage_api_project.modules.report.entity;
 
 import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
+import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -11,11 +13,9 @@ import java.time.LocalDate;
         @Index(name = "idx_prod_store_date", columnList = "store_id, date"),
         @Index(name = "idx_prod_brand_date", columnList = "brand_id, date")
 })
-public class DailyProductStats {
+@AttributeOverride(name = "id", column = @Column(name = "daily_product_stats_id"))
+public class DailyProductStats extends BaseTsidEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
 
     @Column(name = "store_id", nullable = false)
     private Long storeId;
@@ -26,7 +26,6 @@ public class DailyProductStats {
     @Column(name = "product_id", nullable = false)
     private Long productId;
 
-    // 快照欄位：記錄當下的商品名稱與分類
     @Column(name = "product_name", nullable = false)
     private String productName;
 
@@ -35,8 +34,6 @@ public class DailyProductStats {
 
     @Column(name = "date", nullable = false)
     private LocalDate date;
-
-    // --- 銷售指標 ---
 
     @Column(name = "quantity_sold", nullable = false)
     private Integer quantitySold = 0;
@@ -52,8 +49,14 @@ public class DailyProductStats {
 
     // --- Getters and Setters ---
 
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
+    // 語義化的 ID Getter/Setter
+    public Long getDailyProductStatsId() {
+        return getId();
+    }
+
+    public void setDailyProductStatsId(Long id) {
+        setId(id);
+    }
 
     public Long getStoreId() { return storeId; }
     public void setStoreId(Long storeId) { this.storeId = storeId; }

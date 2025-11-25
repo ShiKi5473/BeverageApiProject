@@ -2,33 +2,22 @@ package tw.niels.beverage_api_project.modules.store.entity;
 
 import java.time.Instant;
 
+import jakarta.persistence.*;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EntityListeners;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
 import tw.niels.beverage_api_project.modules.brand.entity.Brand;
 
 @EntityListeners(AuditingEntityListener.class)
 @Entity
 @Table(name = "stores")
-public class Store {
+@AttributeOverride(name = "id", column = @Column(name = "store_id"))
+public class Store extends BaseTsidEntity {
 
     public Store() {
     };
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "store_id")
-    private Long storeId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "brand_id", nullable = false)
@@ -49,11 +38,11 @@ public class Store {
     // getter and setter
 
     public Long getStoreId() {
-        return storeId;
+        return getId();
     }
 
     public void setStoreId(Long storeId) {
-        this.storeId = storeId;
+        setId(storeId);
     }
 
     public Brand getBrand() {
