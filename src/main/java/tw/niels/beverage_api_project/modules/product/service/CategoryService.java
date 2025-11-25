@@ -31,7 +31,7 @@ public class CategoryService {
                 .orElseThrow(() -> new ResourceNotFoundException("找不到品牌，ID：" + brandId));
 
         // 2. 檢查同一品牌下是否已有相同名稱的分類 (忽略大小寫)
-        categoryRepository.findByBrand_BrandIdAndNameIgnoreCase(brandId, requestDto.getName())
+        categoryRepository.findByBrand_IdAndNameIgnoreCase(brandId, requestDto.getName())
                 .ifPresent(existingCategory -> {
                     throw new BadRequestException(
                             "品牌 '" + brand.getName() + "' 下已存在名為 '" + requestDto.getName() + "' 的分類。");
@@ -49,7 +49,7 @@ public class CategoryService {
 
     @Transactional
     public List<Category> getCategoriesByBrand(Long brandId) {
-        return categoryRepository.findByBrand_BrandId(brandId);
+        return categoryRepository.findByBrand_Id(brandId);
         // TODO 未來可加入排序
     }
 

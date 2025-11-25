@@ -56,7 +56,7 @@ public class OrderItemProcessorService {
         BigDecimal totalAmount = BigDecimal.ZERO;
 
         for (OrderItemDto itemDto : itemDtos) {
-            Product product = productRepository.findByBrand_BrandIdAndProductId(brandId, itemDto.getProductId())
+            Product product = productRepository.findByBrand_IdAndId(brandId, itemDto.getProductId())
                     .orElseThrow(() -> new ResourceNotFoundException("找不到商品，ID：" + itemDto.getProductId()));
 
             OrderItem orderItem = new OrderItem();
@@ -72,7 +72,7 @@ public class OrderItemProcessorService {
             orderItem.setNotes(notes);
             BigDecimal optionsPrice = BigDecimal.ZERO;
             if (itemDto.getOptionIds() != null && !itemDto.getOptionIds().isEmpty()) {
-                Set<ProductOption> options = productOptionRepository.findByOptionIdIn(itemDto.getOptionIds());
+                Set<ProductOption> options = productOptionRepository.findByIdIn(itemDto.getOptionIds());
                 if (options.size() != itemDto.getOptionIds().size()) {
                     throw new BadRequestException("部分選項 ID 無效");
                 }

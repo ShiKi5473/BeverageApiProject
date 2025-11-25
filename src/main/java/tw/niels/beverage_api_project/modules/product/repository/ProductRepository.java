@@ -12,10 +12,9 @@ import tw.niels.beverage_api_project.modules.product.enums.ProductStatus;
 
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long> {
-    List<Product> findByBrand_BrandIdAndStatus(Long brandId, ProductStatus Status);
+    List<Product> findByBrand_IdAndStatus(Long brandId, ProductStatus Status);
 
-    Optional<Product> findByBrand_BrandIdAndProductId(Long brandId, Long productId);
-
+    Optional<Product> findByBrand_IdAndId(Long brandId, Long productId);
     /**
      * 禁用預設的 findById，強迫使用 findByBrand_BrandIdAndProductId()。
      */

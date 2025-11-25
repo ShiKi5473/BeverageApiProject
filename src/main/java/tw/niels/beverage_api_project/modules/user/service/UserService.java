@@ -68,7 +68,7 @@ public class UserService {
 
             if (staffDto.getStoreId() != null) {
                 // 修改：改拋出 ResourceNotFoundException
-                Store store = storeRepository.findByBrand_BrandIdAndStoreId(brand.getBrandId(), staffDto.getStoreId())
+                Store store = storeRepository.findByBrand_IdAndId(brand.getBrandId(), staffDto.getStoreId())
                         .orElseThrow(() -> new ResourceNotFoundException("Error: Store not found with ID: " + staffDto.getStoreId()));
                 staffProfile.setStore(store);
             }

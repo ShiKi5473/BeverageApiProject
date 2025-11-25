@@ -10,5 +10,5 @@ import tw.niels.beverage_api_project.modules.product.entity.ProductOption;
 
 @Repository
 public interface ProductOptionRepository extends JpaRepository<ProductOption, Long> {
-    Set<ProductOption> findByOptionIdIn(List<Long> optionIds);
+    Set<ProductOption> findByIdIn(List<Long> optionIds);
 }

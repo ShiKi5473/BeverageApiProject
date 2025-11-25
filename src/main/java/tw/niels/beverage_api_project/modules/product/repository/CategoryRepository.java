@@ -12,15 +12,13 @@ import tw.niels.beverage_api_project.modules.product.entity.Category;
 
 @Repository
 public interface CategoryRepository extends JpaRepository<Category, Long> {
-    Optional<Category> findByBrand_BrandIdAndNameIgnoreCase(Long brandId, String name);
+    Optional<Category> findByBrand_IdAndNameIgnoreCase(Long brandId, String name);
 
-    List<Category> findByBrand_BrandId(Long brandId);
-
+    List<Category> findByBrand_Id(Long brandId);
     /**
      * 提供一個安全的 "findAllById" 替代方案
      */
-    Set<Category> findByBrand_BrandIdAndCategoryIdIn(Long brandId, Set<Long> categoryIds);
-
+    Set<Category> findByBrand_IdAndIdIn(Long brandId, Set<Long> categoryIds);
     /**
      * 禁用預設的 findById，強迫使用 findByBrand_BrandIdAndCategoryId()。
      */

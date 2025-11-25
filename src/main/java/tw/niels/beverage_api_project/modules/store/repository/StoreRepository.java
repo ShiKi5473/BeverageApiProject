@@ -15,8 +15,8 @@ import tw.niels.beverage_api_project.modules.store.entity.Store;
 
 @Repository
 public interface StoreRepository extends JpaRepository<Store, Long> {
-    Optional<Store> findByBrand_BrandIdAndStoreId(Long brandId, Long storeId);
 
+    Optional<Store> findByBrand_IdAndId(Long brandId, Long storeId);
     /**
      * 【系統排程專用】查詢系統內所有分店。
      * <p>此方法專供報表排程使用，繞過 findAll() 的安全限制。</p>
@@ -24,10 +24,9 @@ public interface StoreRepository extends JpaRepository<Store, Long> {
     @Query("SELECT s FROM Store s")
     Page<Store> findAllStoresForSystem(Pageable pageable);
 
-    List<Store> findByBrand_BrandId(Long brandId);
+    List<Store> findByBrand_Id(Long brandId);
 
-    List<Store> findByBrand_BrandIdAndStoreIdIn(Long brandId, Collection<Long> storeIds);
-
+    List<Store> findByBrand_IdAndIdIn(Long brandId, Collection<Long> storeIds);
 
     /**
      * 禁用預設的 findById，強迫使用 findByBrand_BrandIdAndStoreId()。

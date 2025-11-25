@@ -46,7 +46,7 @@ public class OptionGroupService {
 
     @Transactional
     public ProductOption createProductOption(Long groupId, Long brandId, CreateProductOptionRequestDto requestDto) {
-        OptionGroup optionGroup = optionGroupRepository.findByBrand_BrandIdAndGroupId(brandId, groupId)
+        OptionGroup optionGroup = optionGroupRepository.findByBrand_IdAndId(brandId, groupId)
                 .orElseThrow(() -> new ResourceNotFoundException("找不到選項群組，ID：" + groupId));
 
         ProductOption productOption = new ProductOption();
@@ -60,12 +60,12 @@ public class OptionGroupService {
 
     @Transactional(readOnly = true)
     public List<OptionGroup> getOptionGroupsByBrand(Long brandId) {
-        return optionGroupRepository.findByBrand_BrandId(brandId);
+        return optionGroupRepository.findByBrand_Id(brandId);
     }
 
     @Transactional(readOnly = true)
     public OptionGroup getOptionGroupById(Long groupId, Long brandId) {
-        return optionGroupRepository.findByBrand_BrandIdAndGroupId(brandId, groupId)
+        return optionGroupRepository.findByBrand_IdAndId(brandId, groupId)
                 .orElseThrow(() -> new ResourceNotFoundException("找不到選項群組，ID：" + groupId));
     }
 }

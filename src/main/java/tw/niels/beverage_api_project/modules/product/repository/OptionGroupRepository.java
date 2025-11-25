@@ -11,10 +11,9 @@ import tw.niels.beverage_api_project.modules.product.entity.OptionGroup;
 
 @Repository
 public interface OptionGroupRepository extends JpaRepository<OptionGroup, Long> {
-    List<OptionGroup> findByBrand_BrandId(Long brandId);
+    List<OptionGroup> findByBrand_Id(Long brandId);
 
-    Optional<OptionGroup> findByBrand_BrandIdAndGroupId(Long brandId, Long groupId);
-
+    Optional<OptionGroup> findByBrand_IdAndId(Long brandId, Long groupId);
     /**
      * 禁用預設的 findById，強迫使用 findByBrand_BrandIdAndGroupId()。
      */

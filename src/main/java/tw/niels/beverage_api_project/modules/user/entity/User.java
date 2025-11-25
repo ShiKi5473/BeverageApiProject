@@ -13,7 +13,7 @@ import tw.niels.beverage_api_project.modules.user.entity.profile.StaffProfile;
 
 @Entity
 @Table(name = "users")
-@AttributeOverride(name = "id", column = @Column(name = "brand_id"))
+@AttributeOverride(name = "id", column = @Column(name = "user_id"))
 public class User extends BaseTsidEntity {
 
     public User() {

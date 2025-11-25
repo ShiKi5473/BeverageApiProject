@@ -25,22 +25,22 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             "LEFT JOIN FETCH o.items item " +
             "LEFT JOIN FETCH item.product " +
             "LEFT JOIN FETCH item.options " +
-            "WHERE o.brand.brandId = :brandId AND o.store.storeId = :storeId AND o.status = :status")
-    List<Order> findAllByBrand_BrandIdAndStore_StoreIdAndStatus(Long brandId, Long storeId, OrderStatus status);
+            "WHERE o.brand.id = :brandId AND o.store.id = :storeId AND o.status = :status")
+    List<Order> findAllByBrand_IdAndStore_IdAndStatus(Long brandId, Long storeId, OrderStatus status);
 
     @Query("SELECT DISTINCT o FROM Order o " +
             "LEFT JOIN FETCH o.items item " +
             "LEFT JOIN FETCH item.product " +
             "LEFT JOIN FETCH item.options " +
-            "WHERE o.brand.brandId = :brandId AND o.store.storeId = :storeId")
-    List<Order> findAllByBrand_BrandIdAndStore_StoreId(Long brandId, Long storeId);
+            "WHERE o.brand.id = :brandId AND o.store.id = :storeId")
+    List<Order> findAllByBrand_IdAndStore_Id(Long brandId, Long storeId);
 
     @Query("SELECT o FROM Order o " +
             "LEFT JOIN FETCH o.items item " +
             "LEFT JOIN FETCH item.product " +
             "LEFT JOIN FETCH item.options " +
-            "WHERE o.brand.brandId = :brandId AND o.orderId = :orderId")
-    Optional<Order> findByBrand_BrandIdAndOrderId(Long brandId, Long orderId);
+            "WHERE o.brand.id = :brandId AND o.id = :orderId")
+    Optional<Order> findByBrand_IdAndId(Long brandId, Long orderId);
 
     /**
      * 統計 1: 訂單狀態統計 (改用 DTO)
@@ -48,11 +48,11 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Query("SELECT new tw.niels.beverage_api_project.modules.report.dto.OrderStatusStatsDto(" +
             "o.status, COUNT(o), SUM(o.totalAmount), SUM(o.discountAmount), SUM(o.finalAmount)) " +
             "FROM Order o " +
-            "WHERE o.store.storeId = :storeId " +
+            "WHERE o.store.id = :storeId " +
             "AND o.completedTime BETWEEN :start AND :end " +
             "GROUP BY o.status")
     List<OrderStatusStatsDto> findOrderStatusStatsByStoreAndDateRange(@Param("storeId") Long storeId,
-                                                                      @Param("start") LocalDateTime start, // 改用 java.util.Date 也可以，視您 Entity 設定而定，但建議統一用 Date 或 LocalDateTime
+                                                                      @Param("start") LocalDateTime start,
                                                                       @Param("end") LocalDateTime end);
 
     /**
@@ -62,8 +62,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             "pm.code, SUM(o.finalAmount)) " +
             "FROM Order o " +
             "LEFT JOIN o.paymentMethod pm " +
-            "WHERE o.store.storeId = :storeId " +
-            "AND o.status = 'CLOSED' " + // 使用 Enum 字串或傳入參數
+            "WHERE o.store.id = :storeId " +
+            "AND o.status = 'CLOSED' " +
             "AND o.completedTime BETWEEN :start AND :end " +
             "GROUP BY pm.code")
     List<PaymentStatsDto> findPaymentStatsByStoreAndDateRange(@Param("storeId") Long storeId,
@@ -74,21 +74,20 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
      * 統計 3: 商品銷售統計 (改用 DTO)
      */
     @Query("SELECT new tw.niels.beverage_api_project.modules.report.dto.ProductSalesStatsDto(" +
-            "i.product.productId, i.product.name, SUM(i.quantity), SUM(i.subtotal)) " +
+            "i.product.id, i.product.name, SUM(i.quantity), SUM(i.subtotal)) " +
             "FROM OrderItem i " +
             "JOIN i.order o " +
-            "WHERE o.store.storeId = :storeId " +
+            "WHERE o.store.id = :storeId " +
             "AND o.status = 'CLOSED' " +
             "AND o.completedTime BETWEEN :start AND :end " +
-            "GROUP BY i.product.productId, i.product.name")
+            "GROUP BY i.product.id, i.product.name")
     List<ProductSalesStatsDto> findProductStatsByStoreAndDateRange(@Param("storeId") Long storeId,
                                                                    @Param("start") LocalDateTime start,
                                                                    @Param("end") LocalDateTime end);
-
     /**
      * 計算指定分店在指定時間內，處於特定狀態的訂單數量
      */
-    @Query("SELECT COUNT(o) FROM Order o WHERE o.store.storeId = :storeId AND o.orderTime BETWEEN :start AND :end AND o.status IN :statuses")
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.store.id = :storeId AND o.orderTime BETWEEN :start AND :end AND o.status IN :statuses")
     long countOrdersByStoreIdAndOrderTimeBetweenAndStatusIn(
             @Param("storeId") Long storeId,
             @Param("start") Date start,

@@ -81,7 +81,7 @@ public class OrderService {
             throw new BadRequestException("此帳號未綁定店家，無法建立訂單。");
         }
 
-        Store store = storeRepository.findByBrand_BrandIdAndStoreId(brandId, storeId)
+        Store store = storeRepository.findByBrand_IdAndId(brandId, storeId)
                 .orElseThrow(() -> new ResourceNotFoundException("找不到店家 (JWT storeId: " + storeId + ")"));
 
         // 建立 Order Entity
@@ -126,7 +126,7 @@ public class OrderService {
         if (storeId == null) {
             throw new BadRequestException("此帳號未綁定店家，無法建立訂單。");
         }
-        Store store = storeRepository.findByBrand_BrandIdAndStoreId(brandId, storeId)
+        Store store = storeRepository.findByBrand_IdAndId(brandId, storeId)
                 .orElseThrow(() -> new ResourceNotFoundException("找不到店家 (JWT storeId: " + storeId + ")"));
 
         // 1. 建立 Order Entity
@@ -152,7 +152,7 @@ public class OrderService {
         Long pointsToUse = 0L;
 
         if (requestDto.getMemberId() != null) {
-            member = userRepository.findByBrand_BrandIdAndUserId(brandId, requestDto.getMemberId())
+            member = userRepository.findByBrand_IdAndId(brandId, requestDto.getMemberId())
                     .filter(user -> user.getMemberProfile() != null)
                     .orElseThrow(() -> new ResourceNotFoundException("找不到會員，ID：" + requestDto.getMemberId()));
             order.setMember(member);
@@ -202,7 +202,7 @@ public class OrderService {
         Long currentUserId = helperService.getCurrentUserId();
         Long currentBrandId = helperService.getCurrentBrandId();
 
-        return userRepository.findByBrand_BrandIdAndUserId(currentBrandId, currentUserId)
+        return userRepository.findByBrand_IdAndId(currentBrandId, currentUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("找不到當前登入的員工資訊"));
 
     }
@@ -235,9 +235,9 @@ public class OrderService {
         // 在這裡可以加入權限檢查，例如檢查目前登入的使用者是否有權限查看 storeId 的訂單
 
         if (status.isPresent()) {
-            return orderRepository.findAllByBrand_BrandIdAndStore_StoreIdAndStatus(brandId, storeId, status.get());
+            return orderRepository.findAllByBrand_IdAndStore_IdAndStatus(brandId, storeId, status.get());
         } else {
-            return orderRepository.findAllByBrand_BrandIdAndStore_StoreId(brandId, storeId);
+            return orderRepository.findAllByBrand_IdAndStore_Id(brandId, storeId);
         }
     }
 
@@ -251,7 +251,7 @@ public class OrderService {
      */
     @Transactional(readOnly = true)
     public Order getOrderDetails(Long brandId, Long orderId) {
-        Order order = orderRepository.findByBrand_BrandIdAndOrderId(brandId, orderId)
+        Order order = orderRepository.findByBrand_IdAndId(brandId, orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("找不到訂單，ID：" + orderId));
         // TODO 在這裡可以加入權限檢查，例如檢查目前使用者是否能查看此訂單 (可能基於店家 ID)
         return order;

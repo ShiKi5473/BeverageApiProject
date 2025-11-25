@@ -84,7 +84,7 @@ public class ControllerHelperService {
             throw new BadRequestException("帳號權限異常：非管理員帳號必須綁定店家。");
         }
 
-        boolean isStoreBelongsToBrand = storeRepository.findByBrand_BrandIdAndStoreId(currentBrandId, targetStoreId).isPresent();
+        boolean isStoreBelongsToBrand = storeRepository.findByBrand_IdAndId(currentBrandId, targetStoreId).isPresent();
 
         if (!isStoreBelongsToBrand) {
             throw new ResourceNotFoundException("找不到該分店，或您無權限存取 (ID: " + targetStoreId + ")");

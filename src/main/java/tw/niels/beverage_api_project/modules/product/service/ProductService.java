@@ -43,7 +43,7 @@ public class ProductService {
                 Brand brand = brandRepository.findById(brandId)
                                 .orElseThrow(() -> new RuntimeException("找不到品牌，ID：" + brandId));
 
-            Set<Category> categories = categoryRepository.findByBrand_BrandIdAndCategoryIdIn(brandId, request.getCategoryIds());
+            Set<Category> categories = categoryRepository.findByBrand_IdAndIdIn(brandId, request.getCategoryIds());
 
                 if (categories.size() != request.getCategoryIds().size()) {
                         throw new RuntimeException("部分分類 ID 無效");
@@ -53,9 +53,9 @@ public class ProductService {
                 if (request.getOptionGroupIds() != null && !request.getOptionGroupIds().isEmpty()) {
                         optionGroups = request.getOptionGroupIds().stream()
                                         .map(groupId -> optionGroupRepository
-                                                        .findByBrand_BrandIdAndGroupId(brandId, groupId)
-                                                        .orElseThrow(() -> new BadRequestException(
-                                                                        "無效的選項群組 ID：" + groupId + " 或不屬於此品牌")))
+                                                .findByBrand_IdAndId(brandId, groupId)
+                                                .orElseThrow(() -> new BadRequestException(
+                                                        "無效的選項群組 ID：" + groupId + " 或不屬於此品牌")))
                                         .collect(Collectors.toSet());
                 }
                 Product newProduct = new Product();
@@ -73,11 +73,11 @@ public class ProductService {
 
         @Transactional
         public Product linkOptionGroupsToProduct(Long brandId, Long productId, Set<Long> groupIds) {
-                Product product = productRepository.findByBrand_BrandIdAndProductId(brandId, productId)
+                Product product = productRepository.findByBrand_IdAndId(brandId, productId)
                                 .orElseThrow(() -> new ResourceNotFoundException("找不到商品，ID：" + productId));
 
                 Set<OptionGroup> groupsToLink = groupIds.stream()
-                                .map(groupId -> optionGroupRepository.findByBrand_BrandIdAndGroupId(brandId, groupId)
+                                .map(groupId -> optionGroupRepository.findByBrand_IdAndId(brandId, groupId)
                                                 .orElseThrow(() -> new ResourceNotFoundException(
                                                                 "找不到選項群組，ID：" + groupId)))
                                 .collect(Collectors.toSet());
@@ -88,7 +88,7 @@ public class ProductService {
 
         @Transactional(readOnly = true)
         public List<ProductSummaryDto> getAvailableSummaries(Long brandId) {
-                List<Product> products = productRepository.findByBrand_BrandIdAndStatus(brandId, ProductStatus.ACTIVE);
+                List<Product> products = productRepository.findByBrand_IdAndStatus(brandId, ProductStatus.ACTIVE);
                 return products.stream()
                                 .map(product -> ProductSummaryDto.fromEntity(product))
                                 .collect(Collectors.toList());
@@ -96,7 +96,7 @@ public class ProductService {
 
         @Transactional(readOnly = true)
         public List<ProductPosDto> getAvailableProductsForPos(Long brandId) {
-                List<Product> products = productRepository.findByBrand_BrandIdAndStatus(brandId, ProductStatus.ACTIVE);
+                List<Product> products = productRepository.findByBrand_IdAndStatus(brandId, ProductStatus.ACTIVE);
                 return products.stream()
                                 .map(product -> ProductPosDto.fromEntity(product))
                                 .collect(Collectors.toList());

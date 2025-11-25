@@ -14,16 +14,15 @@ import tw.niels.beverage_api_project.modules.user.entity.User;
 public interface UserRepository extends JpaRepository<User, Long> {
 
     // 使用手機號碼和品牌ID來尋找使用者，確保多租戶下的帳號唯一性
-    @Query("SELECT u FROM User u WHERE u.primaryPhone = :phone AND u.brand.brandId = :brandId")
+    @Query("SELECT u FROM User u WHERE u.primaryPhone = :phone AND u.brand.id = :brandId")
     Optional<User> findByPrimaryPhoneAndBrandId(String phone, Long brandId);
-
 
 
     /**
      * 根據品牌ID和使用者ID查找
      */
-    @Query("SELECT u FROM User u WHERE u.brand.brandId = :brandId AND u.userId = :userId")
-    Optional<User> findByBrand_BrandIdAndUserId(Long brandId, Long userId);
+    @Query("SELECT u FROM User u WHERE u.brand.id = :brandId AND u.id = :userId")
+    Optional<User> findByBrand_IdAndId(Long brandId, Long userId);
 
     /**
      * 禁用預設的 findById，強迫使用 findByBrand_BrandIdAndUserId()。
