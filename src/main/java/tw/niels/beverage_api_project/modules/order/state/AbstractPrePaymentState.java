@@ -1,7 +1,5 @@
-// 新檔案：AbstractPrePaymentState.java
 package tw.niels.beverage_api_project.modules.order.state;
 
-// ... 匯入 ...
 import org.springframework.context.ApplicationEventPublisher;
 import tw.niels.beverage_api_project.common.exception.BadRequestException;
 import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
@@ -15,36 +13,37 @@ import tw.niels.beverage_api_project.modules.order.event.OrderStateChangedEvent;
 import tw.niels.beverage_api_project.modules.order.repository.PaymentMethodRepository;
 import tw.niels.beverage_api_project.modules.order.service.OrderItemProcessorService;
 import tw.niels.beverage_api_project.modules.order.vo.MemberSnapshot;
+import tw.niels.beverage_api_project.modules.promotion.service.PromotionService; // 新增匯入
 import tw.niels.beverage_api_project.modules.user.entity.User;
 import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
 
 import java.math.BigDecimal;
 
-// 注意：這個類別「不」需要 @Component，因為它不會被 Spring 直接實例化
 public abstract class AbstractPrePaymentState extends AbstractOrderState {
 
     protected final MemberPointService memberPointService;
     protected final PaymentMethodRepository paymentMethodRepository;
     protected final UserRepository userRepository;
     protected final OrderItemProcessorService orderItemProcessorService;
+    protected final PromotionService promotionService;
     private final ApplicationEventPublisher eventPublisher;
 
     public AbstractPrePaymentState(MemberPointService memberPointService,
                                    PaymentMethodRepository paymentMethodRepository,
                                    UserRepository userRepository,
                                    OrderItemProcessorService orderItemProcessorService,
+                                   PromotionService promotionService,
                                    ApplicationEventPublisher eventPublisher) {
         this.memberPointService = memberPointService;
         this.paymentMethodRepository = paymentMethodRepository;
         this.userRepository = userRepository;
         this.orderItemProcessorService = orderItemProcessorService;
+        this.promotionService = promotionService;
         this.eventPublisher = eventPublisher;
     }
 
-    // 移入 update 實作
     @Override
     public void update(Order order, CreateOrderRequestDto dto) {
-        // ... (從 PendingState 搬過來的完整邏輯) ...
         Long brandId = order.getBrand().getBrandId();
         OrderItemProcessorService.ProcessedItemsResult result =
                 orderItemProcessorService.processOrderItems(order, dto.getItems(), brandId);
@@ -57,7 +56,6 @@ public abstract class AbstractPrePaymentState extends AbstractOrderState {
         order.setStatus(dto.getStatus());
     }
 
-    // 移入 processPayment 實作
     @Override
     public void processPayment(Order order, ProcessPaymentRequestDto requestDto) {
         OrderStatus oldStatus = order.getStatus();
@@ -66,7 +64,9 @@ public abstract class AbstractPrePaymentState extends AbstractOrderState {
                 .orElseThrow(() -> new BadRequestException("無效的支付方式代碼：" + requestDto.getPaymentMethod()));
         order.setPaymentMethod(paymentMethodEntity);
         User member = null;
-        BigDecimal discountAmount = BigDecimal.ZERO;
+
+        // 1. 計算會員點數折抵
+        BigDecimal pointsDiscount = BigDecimal.ZERO;
         Long pointsToUse = 0L;
 
         if (requestDto.getMemberId() != null) {
@@ -75,8 +75,6 @@ public abstract class AbstractPrePaymentState extends AbstractOrderState {
                     .orElseThrow(() -> new ResourceNotFoundException("找不到會員，ID：" + requestDto.getMemberId()));
             order.setMember(member);
 
-            // 建立並儲存 MemberSnapshot
-            // 注意：這裡假設 User 有 MemberProfile，前面的程式碼已有 filter 檢查
             if (member.getMemberProfile() != null) {
                 MemberSnapshot snapshot = new MemberSnapshot(
                         member.getUserId(),
@@ -87,20 +85,28 @@ public abstract class AbstractPrePaymentState extends AbstractOrderState {
                 order.setMemberSnapshot(snapshot);
             }
 
-
             if (requestDto.getPointsToUse() > 0) {
                 pointsToUse = requestDto.getPointsToUse();
-                discountAmount = memberPointService.calculateDiscountAmount(pointsToUse, order);
+                pointsDiscount = memberPointService.calculateDiscountAmount(pointsToUse, order);
                 memberPointService.usePoints(member, order, pointsToUse);
             }
         }
         order.setPointsUsed(pointsToUse);
-        order.setDiscountAmount(discountAmount);
-        BigDecimal finalAmount = order.getTotalAmount().subtract(discountAmount);
+
+        // 2. 【新增】計算促銷活動折扣
+        BigDecimal promoDiscount = promotionService.calculateBestDiscount(order);
+
+        // 3. 計算總折扣與最終金額
+        BigDecimal totalDiscount = pointsDiscount.add(promoDiscount);
+        order.setDiscountAmount(totalDiscount);
+
+        BigDecimal finalAmount = order.getTotalAmount().subtract(totalDiscount);
         if (finalAmount.compareTo(BigDecimal.ZERO) < 0) {
             finalAmount = BigDecimal.ZERO;
         }
         order.setFinalAmount(finalAmount);
+
+        // 狀態更新
         order.setStatus(OrderStatus.PREPARING);
         eventPublisher.publishEvent(new OrderStateChangedEvent(order, oldStatus, OrderStatus.PREPARING));
     }
@@ -111,6 +117,7 @@ public abstract class AbstractPrePaymentState extends AbstractOrderState {
         order.setStatus(OrderStatus.CANCELLED);
         eventPublisher.publishEvent(new OrderStateChangedEvent(order, oldStatus, OrderStatus.CANCELLED));
     }
+
     @Override
     public void accept(Order order) {
         throw new BadRequestException("訂單狀態為 " + getStatus() + "，無法執行接單動作。");

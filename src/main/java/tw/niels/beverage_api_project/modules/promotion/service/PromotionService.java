@@ -25,10 +25,13 @@ public class PromotionService {
 
     /**
      * 計算訂單的最佳促銷折扣
-     * 目前策略：擇優使用 (挑選折扣金額最高的一個活動)
+     * 策略：擇優使用 (挑選折扣金額最高的一個活動)
      */
     @Transactional(readOnly = true)
     public BigDecimal calculateBestDiscount(Order order) {
+        // 確保有 Brand Id
+        if (order.getBrand() == null) return BigDecimal.ZERO;
+
         Long brandId = order.getBrand().getBrandId();
         List<Promotion> activePromotions = promotionRepository.findActivePromotionsByBrand(brandId, LocalDateTime.now());
 
@@ -41,11 +44,11 @@ public class PromotionService {
 
                 if (discount.compareTo(maxDiscount) > 0) {
                     maxDiscount = discount;
-                    // TODO: 未來可以在這裡記錄 order 使用了哪個 promotion (order 需要新增 promotion_id 欄位)
+                    // TODO: 未來可在此記錄使用哪個 Promotion ID
                 }
             } catch (Exception e) {
-                // 忽略計算錯誤的促銷，繼續下一個
-                System.err.println("促銷計算失敗 ID: " + promotion.getPromotionId() + " Error: " + e.getMessage());
+                // 遇到不支援的類型或計算錯誤，跳過該活動，不影響結帳
+                System.err.println("促銷計算跳過 (ID: " + promotion.getPromotionId() + "): " + e.getMessage());
             }
         }
 

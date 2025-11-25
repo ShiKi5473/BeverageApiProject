@@ -7,6 +7,7 @@ import tw.niels.beverage_api_project.modules.member.service.MemberPointService;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
 import tw.niels.beverage_api_project.modules.order.repository.PaymentMethodRepository;
 import tw.niels.beverage_api_project.modules.order.service.OrderItemProcessorService;
+import tw.niels.beverage_api_project.modules.promotion.service.PromotionService;
 import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
 
 @Component("HELD") // 【注意】Bean Name
@@ -17,8 +18,9 @@ public class HeldState extends AbstractPrePaymentState { // 【注意】繼承�
                      PaymentMethodRepository paymentMethodRepository,
                      UserRepository userRepository,
                      OrderItemProcessorService orderItemProcessorService,
+                     PromotionService promotionService,
                      ApplicationEventPublisher  eventPublisher) {
-        super(memberPointService, paymentMethodRepository, userRepository, orderItemProcessorService, eventPublisher);
+        super(memberPointService, paymentMethodRepository, userRepository, orderItemProcessorService, promotionService, eventPublisher);
     }
 
     @Override
