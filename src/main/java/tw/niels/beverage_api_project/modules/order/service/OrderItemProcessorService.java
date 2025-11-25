@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * 新服務：
  * 專門負責處理 OrderItem DTOs 轉換為 Entities 並計算總金額。
  * 可被 OrderService (建立) 和 PendingState (更新) 共用。
  */
@@ -88,10 +87,14 @@ public class OrderItemProcessorService {
 
             BigDecimal optionsPrice = BigDecimal.ZERO;
             if (itemDto.getOptionIds() != null && !itemDto.getOptionIds().isEmpty()) {
-                Set<ProductOption> options = productOptionRepository.findByIdIn(itemDto.getOptionIds());
-                if (options.size() != itemDto.getOptionIds().size()) {
-                    throw new BadRequestException("部分選項 ID 無效");
+                Set<Long> requestOptionIds = new HashSet<>(itemDto.getOptionIds());
+
+                Set<ProductOption> options = productOptionRepository.findByOptionGroup_Brand_IdAndIdIn(brandId, itemDto.getOptionIds());
+
+                if (options.size() != requestOptionIds.size()) {
+                    throw new BadRequestException("部分選項 ID 無效或不屬於此品牌");
                 }
+
                 orderItem.setOptions(options);
                 optionsPrice = options.stream()
                         .map(ProductOption::getPriceAdjustment)

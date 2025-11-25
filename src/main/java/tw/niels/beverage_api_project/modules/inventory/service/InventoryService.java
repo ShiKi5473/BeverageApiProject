@@ -68,7 +68,7 @@ public class InventoryService {
 
         // 2. 建立庫存批次 (Batches)
         for (AddShipmentRequestDto.BatchItemDto itemDto : request.getItems()) {
-            InventoryItem item = itemRepository.findById(itemDto.getInventoryItemId())
+            InventoryItem item = itemRepository.findByBrand_IdAndId(brandId, itemDto.getInventoryItemId())
                     .orElseThrow(() -> new ResourceNotFoundException("找不到原物料 ID: " + itemDto.getInventoryItemId()));
 
             // 簡單檢查品牌是否正確
