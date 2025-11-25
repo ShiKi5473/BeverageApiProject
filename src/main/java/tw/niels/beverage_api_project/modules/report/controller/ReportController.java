@@ -146,7 +146,7 @@ public class ReportController {
                 .collect(Collectors.toSet());
 
         if (!storeIds.isEmpty()) {
-            Map<Long, String> storeNameMap = storeRepository.findByBrand_BrandIdAndStoreIdIn(brandId, storeIds).stream()
+            Map<Long, String> storeNameMap = storeRepository.findByBrand_IdAndIdIn(brandId, storeIds).stream()
                     .collect(Collectors.toMap(Store::getStoreId, Store::getName));
 
             ranking.forEach(dto -> {

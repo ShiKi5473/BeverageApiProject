@@ -61,7 +61,7 @@ public class StoreController {
     public ResponseEntity<List<StoreResponseDto>> getStoresByBrand() {
         Long brandId = helperService.getCurrentBrandId();
 
-        List<Store> stores = storeRepository.findByBrand_BrandId(brandId);
+        List<Store> stores = storeRepository.findByBrand_Id(brandId);
 
         List<StoreResponseDto> dtos = stores.stream()
                 .map(StoreResponseDto::fromEntity)

@@ -195,7 +195,7 @@ public class ReportAggregationService {
             prodStat.setQuantitySold(dto.getTotalQuantity().intValue());
             prodStat.setTotalSalesAmount(dto.getTotalSalesAmount());
 
-            Optional<Product> productOpt = productRepository.findByBrand_BrandIdAndProductId(brandId, dto.getProductId());
+            Optional<Product> productOpt = productRepository.findByBrand_IdAndId(brandId, dto.getProductId());
 
             if (productOpt.isPresent() && !productOpt.get().getCategories().isEmpty()) {
                 String categoryName = productOpt.get().getCategories().iterator().next().getName();

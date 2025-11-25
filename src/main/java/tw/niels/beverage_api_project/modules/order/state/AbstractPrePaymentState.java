@@ -69,7 +69,7 @@ public abstract class AbstractPrePaymentState extends AbstractOrderState {
         Long pointsToUse = 0L;
 
         if (requestDto.getMemberId() != null) {
-            member = userRepository.findByBrand_BrandIdAndUserId(order.getBrand().getBrandId(), requestDto.getMemberId())
+            member = userRepository.findByBrand_IdAndId(order.getBrand().getBrandId(), requestDto.getMemberId())
                     .filter(user -> user.getMemberProfile() != null)
                     .orElseThrow(() -> new ResourceNotFoundException("找不到會員，ID：" + requestDto.getMemberId()));
             order.setMember(member);
