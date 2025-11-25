@@ -14,6 +14,7 @@ import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
 import tw.niels.beverage_api_project.modules.order.event.OrderStateChangedEvent;
 import tw.niels.beverage_api_project.modules.order.repository.PaymentMethodRepository;
 import tw.niels.beverage_api_project.modules.order.service.OrderItemProcessorService;
+import tw.niels.beverage_api_project.modules.order.vo.MemberSnapshot;
 import tw.niels.beverage_api_project.modules.user.entity.User;
 import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
 
@@ -73,6 +74,19 @@ public abstract class AbstractPrePaymentState extends AbstractOrderState {
                     .filter(user -> user.getMemberProfile() != null)
                     .orElseThrow(() -> new ResourceNotFoundException("找不到會員，ID：" + requestDto.getMemberId()));
             order.setMember(member);
+
+            // 建立並儲存 MemberSnapshot
+            // 注意：這裡假設 User 有 MemberProfile，前面的程式碼已有 filter 檢查
+            if (member.getMemberProfile() != null) {
+                MemberSnapshot snapshot = new MemberSnapshot(
+                        member.getUserId(),
+                        member.getMemberProfile().getFullName(),
+                        member.getPrimaryPhone(),
+                        member.getMemberProfile().getEmail()
+                );
+                order.setMemberSnapshot(snapshot);
+            }
+
 
             if (requestDto.getPointsToUse() > 0) {
                 pointsToUse = requestDto.getPointsToUse();

@@ -8,9 +8,12 @@ import java.util.Set;
 import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
 import tw.niels.beverage_api_project.modules.brand.entity.Brand;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
+import tw.niels.beverage_api_project.modules.order.vo.MemberSnapshot;
 import tw.niels.beverage_api_project.modules.store.entity.Store;
 import tw.niels.beverage_api_project.modules.user.entity.User;
 
@@ -73,6 +76,11 @@ public class Order extends BaseTsidEntity {
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<OrderItem> items = new HashSet<>();
+
+    // 會員快照
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "member_snapshot")
+    private MemberSnapshot memberSnapshot;
 
     public Order() {
     }
@@ -209,6 +217,14 @@ public class Order extends BaseTsidEntity {
 
     public void setPaymentMethod(PaymentMethodEntity paymentMethod) {
         this.paymentMethod = paymentMethod;
+    }
+
+    public MemberSnapshot getMemberSnapshot() {
+        return memberSnapshot;
+    }
+
+    public void setMemberSnapshot(MemberSnapshot memberSnapshot) {
+        this.memberSnapshot = memberSnapshot;
     }
 
 }

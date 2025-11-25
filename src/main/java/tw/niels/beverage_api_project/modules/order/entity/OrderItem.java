@@ -5,7 +5,10 @@ import java.util.HashSet;
 import java.util.Set;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
+import tw.niels.beverage_api_project.modules.order.vo.ProductSnapshot;
 import tw.niels.beverage_api_project.modules.product.entity.Product;
 import tw.niels.beverage_api_project.modules.product.entity.ProductOption;
 
@@ -42,6 +45,11 @@ public class OrderItem extends BaseTsidEntity {
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(name = "order_item_options", joinColumns = @JoinColumn(name = "order_item_id"), inverseJoinColumns = @JoinColumn(name = "option_id"))
     private Set<ProductOption> options = new HashSet<>();
+
+    // 商品快照
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "product_snapshot")
+    private ProductSnapshot productSnapshot;
 
     // getter setter
     public Long getOrderItemId() { return getId(); }
@@ -102,6 +110,14 @@ public class OrderItem extends BaseTsidEntity {
 
     public void setOptions(Set<ProductOption> options) {
         this.options = options;
+    }
+
+    public ProductSnapshot getProductSnapshot() {
+        return productSnapshot;
+    }
+
+    public void setProductSnapshot(ProductSnapshot productSnapshot) {
+        this.productSnapshot = productSnapshot;
     }
 
 }

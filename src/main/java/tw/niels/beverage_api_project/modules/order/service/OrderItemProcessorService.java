@@ -7,6 +7,8 @@ import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
 import tw.niels.beverage_api_project.modules.order.dto.OrderItemDto;
 import tw.niels.beverage_api_project.modules.order.entity.Order;
 import tw.niels.beverage_api_project.modules.order.entity.OrderItem;
+import tw.niels.beverage_api_project.modules.order.vo.ProductSnapshot;
+import tw.niels.beverage_api_project.modules.product.entity.Category;
 import tw.niels.beverage_api_project.modules.product.entity.Product;
 import tw.niels.beverage_api_project.modules.product.entity.ProductOption;
 import tw.niels.beverage_api_project.modules.product.repository.ProductOptionRepository;
@@ -70,6 +72,20 @@ public class OrderItemProcessorService {
                 notes = Jsoup.clean(notes, Safelist.none());
             }
             orderItem.setNotes(notes);
+
+            String categoryName = product.getCategories().stream()
+                    .findFirst()
+                    .map(Category::getName)
+                    .orElse("Uncategorized");
+
+            ProductSnapshot snapshot = new ProductSnapshot(
+                    product.getProductId(),
+                    product.getName(),
+                    product.getBasePrice(),
+                    categoryName
+            );
+            orderItem.setProductSnapshot(snapshot);
+
             BigDecimal optionsPrice = BigDecimal.ZERO;
             if (itemDto.getOptionIds() != null && !itemDto.getOptionIds().isEmpty()) {
                 Set<ProductOption> options = productOptionRepository.findByIdIn(itemDto.getOptionIds());
