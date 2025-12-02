@@ -16,6 +16,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Optional;
+import java.util.concurrent.Executors;
 
 @Component
 public class ReportRecoveryRunner implements ApplicationRunner {
@@ -86,19 +87,41 @@ public class ReportRecoveryRunner implements ApplicationRunner {
 
         logger.info("【報表補漏檢查】發現數據缺漏！區間: {} 到 {}", startDate, yesterday);
 
-        // 非同步執行建議：
-        // 如果補跑天數很多，這裡可以再開一個 new Thread 或是把 process 丟給 @Async
-        // 但因為我們已經搶到鎖了，在鎖的有效期間內跑完是最安全的。
-
         LocalDate processingDate = startDate;
-        while (!processingDate.isAfter(yesterday)) {
-            try {
-                logger.info(">> [Recovery] 正在補跑 {} 的報表...", processingDate);
-                reportAggregationService.generateDailyStats(processingDate);
-            }catch (RuntimeException e){
-                logger.error(">> [Recovery] 補跑 {} 失敗", processingDate, e);
+
+        // 使用 Java 21 虛擬線程 Executor
+        // try-with-resources 會自動等待所有任務完成 (await termination) 才繼續往下執行
+        // 這確保了在鎖釋放前，所有補跑作業都已完成。
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            // 限制同時只有 8 個任務在執行 (保護資料庫連線池)
+            java.util.concurrent.Semaphore semaphore = new java.util.concurrent.Semaphore(8);
+
+            // 【修正 2】 使用 !isAfter 確保「昨天」也會被執行
+            while (!processingDate.isAfter(yesterday)) {
+                final LocalDate dateToProcess = processingDate;
+
+                try {
+                    semaphore.acquire();
+
+                    executor.submit(() -> {
+                        try {
+                            reportAggregationService.generateDailyStats(dateToProcess);
+                        } finally {
+                            semaphore.release(); // 任務結束釋放許可
+                        }
+                    });
+                } catch (InterruptedException e) {
+                    logger.error("補跑作業被中斷", e);
+                    Thread.currentThread().interrupt(); // 恢復中斷狀態
+                    break; // 中斷迴圈
+                }
+
+                processingDate = processingDate.plusDays(1);
             }
-            processingDate = processingDate.plusDays(1);
-        }
+
+        } // 這裡會阻塞，直到所有提交給 executor 的任務都執行完畢
+
+        logger.info("【報表補漏檢查】區間補跑作業已全部完成。");
+
     }
 }

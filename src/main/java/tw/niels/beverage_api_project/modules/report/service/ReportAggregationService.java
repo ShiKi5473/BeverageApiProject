@@ -10,7 +10,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation; // 新增
 import org.springframework.transaction.annotation.Transactional;
-import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
 import tw.niels.beverage_api_project.modules.order.repository.OrderRepository;
 import tw.niels.beverage_api_project.modules.product.entity.Product;
@@ -22,7 +21,6 @@ import tw.niels.beverage_api_project.modules.report.entity.DailyProductStats;
 import tw.niels.beverage_api_project.modules.report.entity.DailyStoreStats;
 import tw.niels.beverage_api_project.modules.report.repository.DailyProductStatsRepository;
 import tw.niels.beverage_api_project.modules.report.repository.DailyStoreStatsRepository;
-import tw.niels.beverage_api_project.modules.store.entity.Store;
 import tw.niels.beverage_api_project.modules.store.repository.StoreIdentity;
 import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
 
