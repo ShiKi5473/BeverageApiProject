@@ -10,6 +10,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation; // 新增
 import org.springframework.transaction.annotation.Transactional;
+import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
 import tw.niels.beverage_api_project.modules.order.repository.OrderRepository;
 import tw.niels.beverage_api_project.modules.product.entity.Product;
@@ -98,15 +99,14 @@ public class ReportAggregationService {
         do {
             // 1. 查詢該頁分店
             storePage = storeRepository.findAllStoresForSystem(
-                    PageRequest.of(pageNumber, pageSize, Sort.by("storeId"))
+                    PageRequest.of(pageNumber, pageSize, Sort.by("id"))
             );
 
             // 2. 處理該頁的分店
             for (Store store : storePage.getContent()) {
                 try {
-                    // 【修改】透過 self 代理物件呼叫，確保 @Transactional 生效
-                    self.processStoreStats(store, date, startOfDay, endOfDay);
-                    successCount++;
+                    // 透過 self 代理物件呼叫，確保 @Transactional 生效
+                    self.processStoreStats(store.getStoreId(), date, startOfDay, endOfDay);                    successCount++;
                 } catch (Exception e) {
                     logger.error("分店 ID: {} 日結失敗", store.getStoreId(), e);
                     failCount++;
@@ -134,8 +134,10 @@ public class ReportAggregationService {
      * </p>
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW) // 新增交易註解與傳播屬性
-    public void processStoreStats(Store store, LocalDate date, LocalDateTime start, LocalDateTime end) { // 【修改】改為 public
-        Long storeId = store.getStoreId();
+    public void processStoreStats(Long storeId, LocalDate date, LocalDateTime start, LocalDateTime end) { // 【修改】改為 public
+        Store store = storeRepository.findById(storeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Store not found: " + storeId));
+
         Long brandId = store.getBrand().getBrandId();
 
         // --- 步驟 0: 冪等性檢查 ---
