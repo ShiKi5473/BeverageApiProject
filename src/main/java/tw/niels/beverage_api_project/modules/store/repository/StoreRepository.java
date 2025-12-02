@@ -8,6 +8,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Repository;
 
@@ -27,6 +28,19 @@ public interface StoreRepository extends JpaRepository<Store, Long> {
     List<Store> findByBrand_Id(Long brandId);
 
     List<Store> findByBrand_IdAndIdIn(Long brandId, Collection<Long> storeIds);
+
+    /**
+     * 只查詢 ID，避免載入整個 Entity，並解決 N+1 問題
+     */
+    @Query("SELECT s.id as storeId, s.brand.id as brandId FROM Store s")
+    Page<StoreIdentity> findAllStoreIdentities(Pageable pageable);
+
+    /**
+     * 【系統專用】根據 ID 查詢分店 (繞過 BrandId 檢查)
+     * 用於報表結算等背景服務。
+     */
+    @Query("SELECT s FROM Store s WHERE s.id = :id")
+    Optional<Store> findByIdSystem(@Param("id") Long id);
 
     /**
      * 禁用預設的 findById，強迫使用 findByBrand_BrandIdAndStoreId()。

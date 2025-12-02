@@ -23,6 +23,7 @@ import tw.niels.beverage_api_project.modules.report.entity.DailyStoreStats;
 import tw.niels.beverage_api_project.modules.report.repository.DailyProductStatsRepository;
 import tw.niels.beverage_api_project.modules.report.repository.DailyStoreStatsRepository;
 import tw.niels.beverage_api_project.modules.store.entity.Store;
+import tw.niels.beverage_api_project.modules.store.repository.StoreIdentity;
 import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
 
 import java.math.BigDecimal;
@@ -94,22 +95,25 @@ public class ReportAggregationService {
         // 分頁設定
         int pageNumber = 0;
         int pageSize = 50;
-        Page<Store> storePage;
+        Page<StoreIdentity> storePage;
 
         do {
             // 1. 查詢該頁分店
-            storePage = storeRepository.findAllStoresForSystem(
-                    PageRequest.of(pageNumber, pageSize, Sort.by("id"))
+            storePage = storeRepository.findAllStoreIdentities(
+                    PageRequest.of(pageNumber, pageSize, Sort.by("storeId"))
             );
 
             // 2. 處理該頁的分店
-            for (Store store : storePage.getContent()) {
+            for (StoreIdentity storeIdentity : storePage.getContent()) {
                 try {
                     // 透過 self 代理物件呼叫，確保 @Transactional 生效
-                    self.processStoreStats(store.getStoreId(), date, startOfDay, endOfDay);                    successCount++;
+                    self.processStoreStats(
+                            storeIdentity.getStoreId(),
+                            storeIdentity.getBrandId(), // 新增參數
+                            date,
+                            startOfDay, endOfDay);
                 } catch (Exception e) {
-                    logger.error("分店 ID: {} 日結失敗", store.getStoreId(), e);
-                    failCount++;
+                    logger.error("分店 ID: {} 日結失敗", storeIdentity.getStoreId(), e);                    failCount++;
                     // 單一分店失敗不影響其他分店 (因為是獨立交易)
                 }
             }
@@ -134,11 +138,7 @@ public class ReportAggregationService {
      * </p>
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW) // 新增交易註解與傳播屬性
-    public void processStoreStats(Long storeId, LocalDate date, LocalDateTime start, LocalDateTime end) { // 【修改】改為 public
-        Store store = storeRepository.findById(storeId)
-                .orElseThrow(() -> new ResourceNotFoundException("Store not found: " + storeId));
-
-        Long brandId = store.getBrand().getBrandId();
+    public void processStoreStats(Long storeId, Long brandId, LocalDate date, LocalDateTime start, LocalDateTime end) {
 
         // --- 步驟 0: 冪等性檢查 ---
         if (dailyStoreStatsRepository.existsByStoreIdAndDate(storeId, date)) {
