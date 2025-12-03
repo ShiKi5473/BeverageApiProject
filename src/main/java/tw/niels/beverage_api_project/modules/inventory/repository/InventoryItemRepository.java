@@ -1,6 +1,10 @@
 package tw.niels.beverage_api_project.modules.inventory.repository;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Repository;
 import tw.niels.beverage_api_project.modules.inventory.entity.InventoryItem;
@@ -10,7 +14,16 @@ import java.util.Optional;
 
 @Repository
 public interface InventoryItemRepository extends JpaRepository<InventoryItem, Long> {
+
     List<InventoryItem> findByBrand_Id(Long brandId);
+
+    /**
+     * 取得原物料並加寫入鎖 (SELECT FOR UPDATE)
+     * 用於扣減庫存時，鎖定該品項，防止死鎖與超賣。
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT i FROM InventoryItem i WHERE i.id = :id AND i.brand.id = :brandId")
+    Optional<InventoryItem> findByBrandIdAndIdForUpdate(@Param("brandId") Long brandId, @Param("id") Long id);
 
     // 安全的單筆查詢
     Optional<InventoryItem> findByBrand_IdAndId(Long brandId, Long id);
