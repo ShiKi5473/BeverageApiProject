@@ -1,9 +1,12 @@
 package tw.niels.beverage_api_project.modules.promotion.service;
 
-import jakarta.persistence.Cacheable;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import tw.niels.beverage_api_project.common.exception.BadRequestException;
 import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
 import tw.niels.beverage_api_project.modules.brand.entity.Brand;
@@ -26,6 +29,11 @@ import java.util.Set;
 @Service
 public class PromotionService {
 
+    // 自我注入 (Self-Injection) 以解決 AOP 失效問題
+    @Autowired
+    @Lazy
+    private PromotionService self;
+
     private final PromotionRepository promotionRepository;
     private final PromotionStrategyFactory strategyFactory;
     private final BrandRepository brandRepository;
@@ -44,6 +52,7 @@ public class PromotionService {
     /**
      * 查詢有效活動並快取
      * Key 為 brandId，當該品牌的活動有變更時清除。
+     * 注意：必須是 public 方法，且由外部或其他 Bean (如 self) 呼叫才能觸發快取。
      */
     @Cacheable(value = "promotions", key = "#brandId")
     @Transactional(readOnly = true)
@@ -59,8 +68,8 @@ public class PromotionService {
 
         Long brandId = order.getBrand().getBrandId();
 
-        // 【修改】改呼叫有快取的方法
-        List<Promotion> activePromotions = getActivePromotions(brandId);
+        // 透過 self 代理物件呼叫，觸發 @Cacheable 機制
+        List<Promotion> activePromotions = self.getActivePromotions(brandId);
 
         BigDecimal maxDiscount = BigDecimal.ZERO;
 
