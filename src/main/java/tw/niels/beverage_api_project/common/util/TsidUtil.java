@@ -5,48 +5,38 @@ import com.github.f4b6a3.tsid.TsidFactory;
 /**
  * TSID (Time-Sorted Unique Identifier) 生成工具類別。
  * <p>
- * 用於生成 64-bit 的 Long 型態唯一識別碼，具備時間排序特性。
- * 適合用於資料庫主鍵，能減少索引分裂 (Page Splitting) 並提升寫入效能。
+ * 1. 預設 Node ID 為 0 (避免未初始化時報錯)。
+ * 2. 支援透過 setNodeId() 動態切換 Node ID (由 NodeIdAllocator 在啟動時呼叫)。
  * </p>
  */
 public class TsidUtil {
 
-    private static final TsidFactory FACTORY;
+    // 使用 volatile 確保多執行緒下的可見性，雖然通常只在啟動時設定一次
+    private static volatile TsidFactory FACTORY = TsidFactory.builder()
+            .withNode(0) // 預設值，防止 Spring Context 初始化前的調用導致 NPE
+            .build();
 
-    static {
-        // 從環境變數讀取 Node ID (範圍 0~1023)，預設為 0
-        // 在分散式部署時，每個實例應配置不同的 APP_NODE_ID 以避免 ID 衝突
-        String nodeIdEnv = System.getenv("APP_NODE_ID");
-        int nodeId = 0;
-        if (nodeIdEnv != null && !nodeIdEnv.isBlank()) {
-            try {
-                nodeId = Integer.parseInt(nodeIdEnv);
-            } catch (NumberFormatException e) {
-                // 忽略錯誤，維持預設值 0，但在 Log 中應有提示
-                System.err.println("Invalid APP_NODE_ID: " + nodeIdEnv + ", using default 0.");
-            }
+    /**
+     * 設定當前應用實例的 Node ID (0 ~ 1023)
+     * 應在應用程式啟動時儘早呼叫
+     */
+    public static void setNodeId(int nodeId) {
+        if (nodeId < 0 || nodeId > 1023) {
+            throw new IllegalArgumentException("Node ID must be between 0 and 1023");
         }
-
-        // 建立 TSID Factory，配置 Node ID
+        // 重新建立 Factory
         FACTORY = TsidFactory.builder()
                 .withNode(nodeId)
                 .build();
+
+        System.out.println("[TsidUtil] TSID Factory initialized with Node ID: " + nodeId);
     }
 
-    /**
-     * 生成一個新的 TSID (Long 型態)
-     * @return 64-bit unique identifier
-     */
     public static long nextId() {
         return FACTORY.create().toLong();
     }
 
-    /**
-     * 生成一個新的 TSID (String 型態，Base62 編碼)
-     * 用於需要字串顯示的場景 (如訂單編號、公開的 URL 參數)
-     * @return Base62 encoded string
-     */
     public static String nextIdString() {
-        return FACTORY.create().toString(); // Base62 string
+        return FACTORY.create().toString();
     }
 }
