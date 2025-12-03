@@ -17,8 +17,12 @@ import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
 import tw.niels.beverage_api_project.modules.user.entity.User;
 import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
 
+import tw.niels.beverage_api_project.modules.inventory.dao.InventoryBatchDAO;
+import tw.niels.beverage_api_project.modules.inventory.dao.InventoryBatchDAO.BatchUpdateTuple;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -30,15 +34,18 @@ public class InventoryService {
     private final StoreRepository storeRepository;
     private final UserRepository userRepository;
     private final ControllerHelperService helperService;
+    private final InventoryBatchDAO inventoryBatchDAO;
 
     public InventoryService(InventoryItemRepository itemRepository,
                             InventoryBatchRepository batchRepository,
+                            InventoryBatchDAO inventoryBatchDAO,
                             PurchaseShipmentRepository shipmentRepository,
                             StoreRepository storeRepository,
                             UserRepository userRepository,
                             ControllerHelperService helperService) {
         this.itemRepository = itemRepository;
         this.batchRepository = batchRepository;
+        this.inventoryBatchDAO = inventoryBatchDAO;
         this.shipmentRepository = shipmentRepository;
         this.storeRepository = storeRepository;
         this.userRepository = userRepository;
@@ -90,25 +97,22 @@ public class InventoryService {
 
     /**
      * 核心 FIFO 庫存扣減邏輯 (Deduct Inventory)
-     * 採用「總量預扣」策略，先鎖定 Item 防止死鎖，再扣減批次。
-     * * @param brandId 品牌 ID (用於驗證)
-     * @param storeId 店家 ID
-     * @param itemId 原物料 ID
-     * @param quantityToDeduct 要扣減的數量
+     * 【混合架構優化】：
+     * 1. 使用 JPA Repository 查詢可用批次 (Read)。
+     * 2. 使用 JDBC DAO 進行批次更新 (Write)，提升效能。
      */
     @Transactional
     public void deductInventory(Long brandId, Long storeId, Long itemId, BigDecimal quantityToDeduct) {
         if (quantityToDeduct.compareTo(BigDecimal.ZERO) <= 0) {
-            // 使用通用錯誤代碼 (可自行定義 error.bad_request)
             throw new BadRequestException("扣減數量必須大於 0");
         }
 
+        // 1. 鎖定原物料 (Item Level Lock)
         InventoryItem item = itemRepository.findByBrandIdAndIdForUpdate(brandId, itemId)
                 .orElseThrow(() -> new ResourceNotFoundException("error.resource.not_found", "Item ID: " + itemId));
 
-        // 2. 【快速失敗】檢查總庫存
+        // 2. 檢查總庫存 (Fast Fail)
         if (item.getTotalQuantity().compareTo(quantityToDeduct) < 0) {
-            // 【修改】改用 I18n 代碼與參數
             throw new BadRequestException(
                     "error.inventory.insufficient",
                     item.getName(),
@@ -117,40 +121,44 @@ public class InventoryService {
             );
         }
 
-        // 3. 預扣總庫存
+        // 3. 預扣總庫存 (Item Table) - 單筆更新保留 JPA
         item.setTotalQuantity(item.getTotalQuantity().subtract(quantityToDeduct));
-
         itemRepository.save(item);
 
-        // 4. 執行 FIFO 批次扣減
-        // 因為我們已經鎖定了 Item (Parent)，此時去鎖定 Batches (Children) 是安全的
+        // 4. FIFO 批次扣減計算
         List<InventoryBatch> batches = batchRepository.findAvailableBatchesForUpdate(storeId, itemId);
 
+        // 準備批次更新列表 (DTO List)
+        List<InventoryBatchDAO.BatchUpdateTuple> batchUpdates = new ArrayList<>();
         BigDecimal remainingToDeduct = quantityToDeduct;
 
         for (InventoryBatch batch : batches) {
-            if (remainingToDeduct.compareTo(BigDecimal.ZERO) <= 0) {
-                break; // 已扣完
-            }
+            if (remainingToDeduct.compareTo(BigDecimal.ZERO) <= 0) break;
 
             BigDecimal currentQty = batch.getCurrentQuantity();
+            BigDecimal newQty;
 
             if (currentQty.compareTo(remainingToDeduct) >= 0) {
-                // 情況 A: 此批次庫存足夠
-                batch.setCurrentQuantity(currentQty.subtract(remainingToDeduct));
+                // 此批次足夠
+                newQty = currentQty.subtract(remainingToDeduct);
                 remainingToDeduct = BigDecimal.ZERO;
             } else {
-                // 情況 B: 此批次庫存不足，全部扣光，繼續扣下一批
+                // 此批次不足，扣光
+                newQty = BigDecimal.ZERO;
                 remainingToDeduct = remainingToDeduct.subtract(currentQty);
-                batch.setCurrentQuantity(BigDecimal.ZERO);
             }
-            batchRepository.save(batch);
+
+            // 將 ID 與 新數量 加入列表
+            batchUpdates.add(new tw.niels.beverage_api_project.modules.inventory.dao.InventoryBatchDAO.BatchUpdateTuple(batch.getBatchId(), newQty));
         }
 
-        // 5. 二次檢查 (理論上步驟 2 已經擋掉，但防禦性編程)
+        // 5. 呼叫 DAO 執行 JDBC 批次更新
+        if (!batchUpdates.isEmpty()) {
+            inventoryBatchDAO.batchUpdateQuantities(batchUpdates);
+        }
+
+        // 6. 二次檢查
         if (remainingToDeduct.compareTo(BigDecimal.ZERO) > 0) {
-            // 這代表資料庫有資料不一致 (TotalQuantity > Sum(Batches))
-            // 發生此情況應拋出系統錯誤，並可能觸發警報
             throw new IllegalStateException("庫存資料異常：總量檢查通過但批次不足。短缺: " + remainingToDeduct);
         }
     }
