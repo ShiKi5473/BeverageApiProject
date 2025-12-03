@@ -115,6 +115,17 @@
     - [ ] 實作雙 Token (Access Token 短效期 + Refresh Token 長效期) 驗證流程。
     - [ ] 提升安全性（Access Token 洩漏風險低）與使用者體驗（無感續約，不用頻繁登入）。
 
+### 5.4 未結帳訂單持久化策略 (Unfinished Order Persistence) 🌟 (新加入)
+* **目標**：確保線上點餐與揪團過程中，資料在「未正式結帳前」具備持久性，不因伺服器重啟或用戶斷線而遺失，同時避免無效訂單汙染主資料庫。
+  * **技術選型**：採用 **Redis** (In-Memory Data Store)。
+  * **執行計畫**：
+      - [ ] **分層儲存設計**：
+          - **個人/揪團暫存**：使用 Redis (`Hash` 或 `JSON` 結構) 儲存購物車內容。Key 範例：`cart:{userId}` 或 `group_order:{groupId}`。
+          - **正式訂單**：僅在「確認結帳」當下，將 Redis 資料轉換為 `Order` Entity 寫入 PostgreSQL。
+      - [ ] **生命週期管理**：
+          - 設定 Redis Key 的 **TTL (Time To Live)** (如 24 小時)，實現自動過期清理機制，無需額外編寫排程刪除垃圾資料。
+      - [ ] **狀態同步**：結合 WebSocket，當 Redis 中的暫存狀態變更時，即時廣播給前端，確保多裝置/多用戶看到的購物車狀態一致。
+
 ---
 
 ## 6. 🏗️ 階段五：微服務拆分與治理 (Microservices Transformation)
