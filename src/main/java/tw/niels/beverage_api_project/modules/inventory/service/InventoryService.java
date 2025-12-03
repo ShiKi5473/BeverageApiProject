@@ -18,7 +18,6 @@ import tw.niels.beverage_api_project.modules.user.entity.User;
 import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
 
 import tw.niels.beverage_api_project.modules.inventory.dao.InventoryBatchDAO;
-import tw.niels.beverage_api_project.modules.inventory.dao.InventoryBatchDAO.BatchUpdateTuple;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
