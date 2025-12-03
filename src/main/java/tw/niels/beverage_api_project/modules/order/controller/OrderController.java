@@ -13,6 +13,7 @@ import tw.niels.beverage_api_project.common.service.ControllerHelperService;
 import tw.niels.beverage_api_project.modules.order.dto.*;
 import tw.niels.beverage_api_project.modules.order.entity.Order;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
+import tw.niels.beverage_api_project.modules.order.facade.OrderProcessFacade;
 import tw.niels.beverage_api_project.modules.order.service.OrderService;
 
 import java.util.List;
@@ -24,13 +25,16 @@ import java.util.stream.Collectors;
 @Tag(name = "Order Management", description = "訂單處理 API (點餐、結帳、狀態更新)")
 public class OrderController {
     private final OrderService orderService;
+    private final OrderProcessFacade orderProcessFacade; // 注入 Facade
     private final ControllerHelperService helperService;
 
-    public OrderController(OrderService orderService, ControllerHelperService helperService) {
+    public OrderController(OrderService orderService,
+                           OrderProcessFacade orderProcessFacade,
+                           ControllerHelperService helperService) {
         this.orderService = orderService;
+        this.orderProcessFacade = orderProcessFacade;
         this.helperService = helperService;
     }
-
 
     /**
      * 建立一筆新訂單
@@ -40,22 +44,39 @@ public class OrderController {
     @Operation(summary = "建立新訂單 (暫存或待付款)", description = "通常用於將訂單存入 PENDING 或 HELD 狀態")
     public ResponseEntity<OrderResponseDto> createOrder(
             @Valid @RequestBody CreateOrderRequestDto createOrderRequestDto) {
-        Order newOrder = orderService.createOrder(createOrderRequestDto);
+
+        Long brandId = helperService.getCurrentBrandId();
+        Long storeId = helperService.getCurrentStoreId();
+        Long userId = helperService.getCurrentUserId();
+
+        if (storeId == null) {
+            throw new BadRequestException("此帳號未綁定店家，無法建立訂單。");
+        }
+
+        // 改用 Facade 呼叫
+        Order newOrder = orderProcessFacade.createOrder(brandId, storeId, userId, createOrderRequestDto);
         return new ResponseEntity<>(OrderResponseDto.fromEntity(newOrder), HttpStatus.CREATED);
     }
 
     /**
-     * 處理來自 POS 的「一步到位」結帳。
-     * 建立訂單並直接設為 PREPARING。
-     * (這個 API 取代了舊的 [createOrder(PENDING) -> getOrder -> processPayment] 流程)
+     * POS 直接結帳
      */
-    @PostMapping("/pos-checkout") // 【新增端點】
+    @PostMapping("/pos-checkout")
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
-    @Operation(summary = "POS 直接結帳", description = "一步完成建立訂單、扣點數、付款，並將狀態設為 PREPARING (製作中)")
+    @Operation(summary = "POS 直接結帳", description = "一步完成建立訂單、扣點數、付款，並將狀態設為 PREPARING")
     public ResponseEntity<OrderResponseDto> performPosCheckout(
             @Valid @RequestBody PosCheckoutRequestDto requestDto) {
 
-        Order newOrder = orderService.completePosCheckout(requestDto);
+        Long brandId = helperService.getCurrentBrandId();
+        Long storeId = helperService.getCurrentStoreId();
+        Long userId = helperService.getCurrentUserId();
+
+        if (storeId == null) {
+            throw new BadRequestException("此帳號未綁定店家，無法建立訂單。");
+        }
+
+        // 改用 Facade 呼叫
+        Order newOrder = orderProcessFacade.processPosCheckout(brandId, storeId, userId, requestDto);
         return new ResponseEntity<>(OrderResponseDto.fromEntity(newOrder), HttpStatus.CREATED);
     }
 
@@ -71,27 +92,14 @@ public class OrderController {
         return ResponseEntity.ok(total);
     }
 
-    /**
-     * 查詢訂單列表 (店家使用)
-     * GET /api/v1/orders?storeId={storeId}&status={status}
-     * status 參數是可選的 (PENDING, PREPARING, COMPLETED, CANCELLED)
-     */
     @GetMapping
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
-    @Operation(summary = "查詢訂單列表", description = "根據分店 ID 與狀態 (可選) 查詢訂單")
     public ResponseEntity<List<OrderResponseDto>> getOrders(
             @RequestParam Long storeId,
             @RequestParam(required = false) OrderStatus status) {
-
-        // 從 JWT 取得 brandId 進行驗證與查詢
-
         Long brandId = helperService.getCurrentBrandId();
-
-        // TODO: 在 Service 層或 Controller 層加入更嚴格的權限檢查：
         helperService.validateStoreAccess(storeId);
-
-        Optional<OrderStatus> statusOptional = Optional.ofNullable(status); // 將可能為 null 的 status 轉為 Optional
-
+        Optional<OrderStatus> statusOptional = Optional.ofNullable(status);
         List<Order> orders = orderService.getOrders(brandId, storeId, statusOptional);
         List<OrderResponseDto> dtos = orders.stream()
                 .map(OrderResponseDto::fromEntity)
@@ -99,97 +107,53 @@ public class OrderController {
         return ResponseEntity.ok(dtos);
     }
 
-    /**
-     * 取得單一訂單詳情
-     * GET /api/v1/orders/{orderId}
-     */
     @GetMapping("/{orderId}")
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
-    @Operation(summary = "查詢單一訂單詳情")
     public ResponseEntity<OrderResponseDto> getOrderDetails(@PathVariable Long orderId) {
-
         Long brandId = this.helperService.getCurrentBrandId();
-
         Order order = orderService.getOrderDetails(brandId, orderId);
-
-        // TODO: 可選的權限檢查：檢查目前使用者是否有權限查看此訂單 (可能基於 order.getStore().getStoreId())
-
         return ResponseEntity.ok(OrderResponseDto.fromEntity(order));
     }
 
-    /**
-     * 更新訂單狀態
-     * PATCH /api/v1/orders/{orderId}/status
-     */
-    @PatchMapping("/{orderId}/status") // 使用 PATCH 通常更適合部分更新
+    @PatchMapping("/{orderId}/status")
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
-    @Operation(summary = "更新訂單狀態", description = "例如：製作完成 (PREPARING -> READY_FOR_PICKUP)，或取餐 (CLOSED)")
     public ResponseEntity<OrderResponseDto> updateOrderStatus(
             @PathVariable Long orderId,
             @Valid @RequestBody UpdateOrderStatusDto requestDto) {
-
         Long brandId = this.helperService.getCurrentBrandId();
-
-        // TODO: 可選的權限檢查：檢查目前使用者是否有權限修改此訂單 (可能基於訂單的 storeId)
-
         Order updatedOrder = orderService.updateOrderStatus(brandId, orderId, requestDto.getStatus());
         return ResponseEntity.ok(OrderResponseDto.fromEntity(updatedOrder));
     }
 
-    /**
-     * 更新一筆 HELD 狀態的訂單
-     * PUT /api/v1/orders/{orderId}
-     */
     @PutMapping("/{orderId}")
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
-    @Operation(summary = "更新一筆 HELD 狀態的訂單")
     public ResponseEntity<OrderResponseDto> updateHeldOrder(
             @PathVariable Long orderId,
             @Valid @RequestBody CreateOrderRequestDto createOrderRequestDto) {
-
         Long brandId = helperService.getCurrentBrandId();
-
-        // 檢查 DTO 狀態，防止更新為 PREPARING
         OrderStatus newStatus = createOrderRequestDto.getStatus();
         if (newStatus != OrderStatus.HELD && newStatus != OrderStatus.PENDING) {
             throw new BadRequestException("更新訂單時，狀態只能設為 HELD 或 PENDING。");
         }
-
         Order updatedOrder = orderService.updateHeldOrder(brandId, orderId, createOrderRequestDto);
         return ResponseEntity.ok(OrderResponseDto.fromEntity(updatedOrder));
     }
 
-    /**
-     * 處理一筆現有訂單的付款 (結帳)
-     * PATCH /api/v1/orders/{orderId}/checkout
-     */
     @PatchMapping("/{orderId}/checkout")
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
-    @Operation(summary = "處理一筆現有訂單的付款 (結帳)")
     public ResponseEntity<OrderResponseDto> processOrderPayment(
             @PathVariable Long orderId,
             @Valid @RequestBody ProcessPaymentRequestDto requestDto) {
-
         Long brandId = this.helperService.getCurrentBrandId();
-
         Order updatedOrder = orderService.processPayment(brandId, orderId, requestDto);
         return ResponseEntity.ok(OrderResponseDto.fromEntity(updatedOrder));
     }
-    /**
-     * 店家確認接收一筆等待中的線上訂單
-     * PATCH /api/v1/orders/{orderId}/accept
-     */
+
     @PatchMapping("/{orderId}/accept")
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
-    @Operation(summary = "店家確認接收一筆等待中的線上訂單")
     public ResponseEntity<OrderResponseDto> acceptOrder(@PathVariable Long orderId) {
-
         Long brandId = this.helperService.getCurrentBrandId();
-
-        // 呼叫 Service 新增的方法 (您需要在 OrderService 中建立此方法)
         Order updatedOrder = orderService.acceptOrder(brandId, orderId);
-
         return ResponseEntity.ok(OrderResponseDto.fromEntity(updatedOrder));
     }
-
 }
