@@ -1,5 +1,7 @@
 package tw.niels.beverage_api_project.modules.promotion.service;
 
+import jakarta.persistence.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tw.niels.beverage_api_project.common.exception.BadRequestException;
@@ -40,16 +42,25 @@ public class PromotionService {
     }
 
     /**
-     * 計算訂單的最佳促銷折扣
-     * 策略：擇優使用 (挑選折扣金額最高的一個活動)
+     * 查詢有效活動並快取
+     * Key 為 brandId，當該品牌的活動有變更時清除。
      */
+    @Cacheable(value = "promotions", key = "#brandId")
     @Transactional(readOnly = true)
+    public List<Promotion> getActivePromotions(Long brandId) {
+        return promotionRepository.findActivePromotionsByBrand(brandId, LocalDateTime.now());
+    }
+
+    /**
+     * 計算訂單的最佳促銷折扣
+     */
     public BigDecimal calculateBestDiscount(Order order) {
-        // 確保有 Brand Id
         if (order.getBrand() == null) return BigDecimal.ZERO;
 
         Long brandId = order.getBrand().getBrandId();
-        List<Promotion> activePromotions = promotionRepository.findActivePromotionsByBrand(brandId, LocalDateTime.now());
+
+        // 【修改】改呼叫有快取的方法
+        List<Promotion> activePromotions = getActivePromotions(brandId);
 
         BigDecimal maxDiscount = BigDecimal.ZERO;
 
@@ -60,19 +71,19 @@ public class PromotionService {
 
                 if (discount.compareTo(maxDiscount) > 0) {
                     maxDiscount = discount;
-                    // TODO: 未來可在此記錄使用哪個 Promotion ID
                 }
             } catch (Exception e) {
-                // 遇到不支援的類型或計算錯誤，跳過該活動，不影響結帳
-                System.err.println("促銷計算跳過 (ID: " + promotion.getPromotionId() + "): " + e.getMessage());
+                // 忽略不支援或計算錯誤的活動
             }
         }
 
         return maxDiscount;
     }
+
     /**
      * 建立新促銷活動
      */
+    @CacheEvict(value = "promotions", key = "#brandId") // 【新增】清除快取
     @Transactional
     public Promotion createPromotion(Long brandId, CreatePromotionRequestDto request) {
         Brand brand = brandRepository.findById(brandId)
@@ -93,11 +104,9 @@ public class PromotionService {
         promotion.setEndDate(request.getEndDate());
         promotion.setActive(true);
 
-        // 處理適用商品 (若有指定)
         if (request.getApplicableProductIds() != null && !request.getApplicableProductIds().isEmpty()) {
             Set<Product> products = new HashSet<>();
             for (Long pid : request.getApplicableProductIds()) {
-                // 使用帶 brandId 的安全查詢
                 Product p = productRepository.findByBrand_IdAndId(brandId, pid)
                         .orElseThrow(() -> new BadRequestException("商品 ID " + pid + " 無效或不屬於此品牌"));
                 products.add(p);
@@ -116,9 +125,11 @@ public class PromotionService {
         return promotionRepository.findByBrand_Id(brandId);
     }
 
+
     /**
-     * 關閉/刪除活動 (軟刪除：設為 inactive)
+     * 關閉/刪除活動
      */
+    @CacheEvict(value = "promotions", key = "#brandId") // 【新增】清除快取
     @Transactional
     public void deactivatePromotion(Long brandId, Long promotionId) {
         Promotion promotion = promotionRepository.findByBrand_IdAndId(brandId, promotionId)
