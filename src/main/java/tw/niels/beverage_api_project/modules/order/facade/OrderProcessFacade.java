@@ -8,6 +8,7 @@ import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
 import tw.niels.beverage_api_project.modules.inventory.service.InventoryService;
 import tw.niels.beverage_api_project.modules.member.service.MemberPointService;
 import tw.niels.beverage_api_project.modules.order.dto.CreateOrderRequestDto;
+import tw.niels.beverage_api_project.modules.order.dto.OrderTotalDto;
 import tw.niels.beverage_api_project.modules.order.dto.PosCheckoutRequestDto;
 import tw.niels.beverage_api_project.modules.order.entity.Order;
 import tw.niels.beverage_api_project.modules.order.entity.PaymentMethodEntity;
@@ -151,5 +152,16 @@ public class OrderProcessFacade {
         order.setFinalAmount(result.totalAmount); // 暫無折扣
 
         return orderService.saveOrder(order);
+    }
+
+    /**
+     * 試算訂單金額 (不存檔)
+     * 從 OrderService 遷移過來的邏輯
+     */
+    @Transactional(readOnly = true)
+    public OrderTotalDto calculateOrderTotal(Long brandId, CreateOrderRequestDto requestDto) {
+        // 傳入 null 作為 order，因為只是試算，不需要實體
+        var result = orderItemProcessorService.processOrderItems(null, requestDto.getItems(), brandId);
+        return new OrderTotalDto(result.totalAmount);
     }
 }

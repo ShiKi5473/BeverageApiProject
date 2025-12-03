@@ -1,7 +1,8 @@
 // 路徑：src/main/java/tw/niels/beverage_api_project/modules/order/service/OrderService.java
 package tw.niels.beverage_api_project.modules.order.service;
 
-import org.springframework.context.ApplicationEventPublisher; // 保留給 processPayment 等狀態機用
+// 保留給 processPayment 等狀態機用
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tw.niels.beverage_api_project.common.exception.BadRequestException;

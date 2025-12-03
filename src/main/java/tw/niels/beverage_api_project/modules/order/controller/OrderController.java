@@ -88,7 +88,12 @@ public class OrderController {
     @Operation(summary = "試算訂單金額", description = "僅計算總金額，不建立訂單")
     public ResponseEntity<OrderTotalDto> calculateOrderTotal(
             @Valid @RequestBody CreateOrderRequestDto createOrderRequestDto) {
-        OrderTotalDto total = orderService.calculateOrderTotal(createOrderRequestDto);
+        // 1. 取得當前品牌 ID
+        Long brandId = helperService.getCurrentBrandId();
+
+        // 2. 改用 Facade 呼叫，並傳入 brandId
+        OrderTotalDto total = orderProcessFacade.calculateOrderTotal(brandId, createOrderRequestDto);
+
         return ResponseEntity.ok(total);
     }
 
