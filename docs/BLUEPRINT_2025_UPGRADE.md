@@ -94,6 +94,16 @@
     - [ ] 撰寫負載測試腳本，模擬高併發點餐場景。
     - [ ] 建立 RPS (Requests Per Second) 與 Latency (P95/P99) 的效能基準線 (Baseline)。
 
+### 4.6 多語言持久化與審計日誌 (Polyglot Persistence & Audit Logging) 
+* **目標**：引入 NoSQL 資料庫以處理高寫入量、結構鬆散的日誌資料，展現「多語言持久化」架構能力，並滿足企業級資安審計需求。
+* **技術選型**：採用 **MongoDB** (Document-Oriented Database)。
+* **執行計畫**：
+    - [ ] **架構整合**：引入 `spring-boot-starter-data-mongodb`，配置與 PostgreSQL 並存的多資料源環境。
+    - [ ] **AOP 切面設計**：實作 `@Audit` 自定義註解與 Aspect，攔截關鍵操作（如：調整員工權限、修改商品價格）。
+    - [ ] **日誌結構設計**：設計 `AuditLog` 文件結構，包含 `traceId` (關聯 Zipkin)、操作者資訊、執行時間與資料變更快照 (Diff)。
+    - [ ] **非同步寫入**：利用 `@Async` 或 RabbitMQ 將日誌寫入 MongoDB，確保不影響主業務回應速度。
+    - [ ] **自動歸檔**：設定 MongoDB **TTL Index** (如 90 天)，自動清理過期日誌，降低維運成本。
+
 ---
 
 ## 5. 🤝 階段四：即時互動功能 (Real-time Interaction)
