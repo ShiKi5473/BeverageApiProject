@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
+import tw.niels.beverage_api_project.common.service.ControllerHelperService;
 import tw.niels.beverage_api_project.modules.brand.entity.Brand;
 import tw.niels.beverage_api_project.modules.brand.repository.BrandRepository;
 import tw.niels.beverage_api_project.modules.order.dto.MemberDto;
@@ -20,8 +21,10 @@ import tw.niels.beverage_api_project.modules.user.dto.UpdateStaffRequestDto;
 import tw.niels.beverage_api_project.modules.user.entity.User;
 import tw.niels.beverage_api_project.modules.user.entity.profile.MemberProfile;
 import tw.niels.beverage_api_project.modules.user.entity.profile.StaffProfile;
+import tw.niels.beverage_api_project.modules.user.enums.StaffRole;
 import tw.niels.beverage_api_project.modules.user.repository.StaffProfileRepository;
 import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
+import tw.niels.beverage_api_project.security.AppUserDetails;
 
 @Service
 public class UserService {
@@ -36,14 +39,18 @@ public class UserService {
 
     private final StaffProfileRepository staffProfileRepository;
 
+    private final ControllerHelperService helperService;
+
     public UserService(UserRepository userRepository, BrandRepository brandRepository, StoreRepository storeRepository,
             PasswordEncoder passwordEncoder,
-                       StaffProfileRepository staffProfileRepository) {
+                       StaffProfileRepository staffProfileRepository,
+                       ControllerHelperService helperService) {
         this.userRepository = userRepository;
         this.brandRepository = brandRepository;
         this.storeRepository = storeRepository;
         this.passwordEncoder = passwordEncoder;
         this.staffProfileRepository = staffProfileRepository;
+        this.helperService = helperService;
     }
 
     @Transactional
@@ -136,46 +143,67 @@ public class UserService {
 
     /**
      * 更新員工資料 (調店、升職、停權)
+     * 【強化】加入權限檢查，防止越權
      */
     @Transactional
     public StaffDto updateStaff(Long brandId, Long targetUserId, UpdateStaffRequestDto dto) {
-        // 1. 查詢員工 (同時確保該員工屬於此品牌)
-        StaffProfile profile = staffProfileRepository.findByUser_Brand_IdAndUserId(brandId, targetUserId)
+        // 1. 查詢目標員工
+        StaffProfile targetProfile = staffProfileRepository.findByUser_Brand_IdAndUserId(brandId, targetUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("找不到員工 ID: " + targetUserId));
 
-        User user = profile.getUser();
+        User targetUser = targetProfile.getUser();
+
+        // 權限檢查邏輯
+        AppUserDetails currentUser = helperService.getCurrentUserDetails();
+        boolean isCurrentUserBrandAdmin = currentUser.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_BRAND_ADMIN"));
+
+        // 如果當前操作者「不是」品牌管理員 (即為店長 MANAGER)
+        if (!isCurrentUserBrandAdmin) {
+            // A. 禁止修改 BRAND_ADMIN 的資料
+            if (targetProfile.getRole() == StaffRole.BRAND_ADMIN) {
+                throw new IllegalStateException("權限不足：店長無法修改品牌管理員的資料");
+            }
+            // B. 禁止將任何人提升為 BRAND_ADMIN
+            if (dto.getRole() == StaffRole.BRAND_ADMIN) {
+                throw new IllegalStateException("權限不足：店長無法指派品牌管理員角色");
+            }
+            // C. 禁止跨店操作 (雖然 Controller 層有檢查，這裡做雙重保險)
+            Long targetStoreId = targetProfile.getStore() != null ? targetProfile.getStore().getStoreId() : null;
+            Long currentStoreId = currentUser.getStoreId();
+            if (targetStoreId != null && !targetStoreId.equals(currentStoreId)) {
+                throw new IllegalStateException("權限不足：無法修改非本店員工資料");
+            }
+        }
 
         // 2. 更新基本資料
         if (dto.getFullName() != null) {
-            profile.setFullName(dto.getFullName());
+            targetProfile.setFullName(dto.getFullName());
         }
 
         // 3. 更新角色
         if (dto.getRole() != null) {
-            // 這裡可以加入權限檢查，例如：不能將自己降級，或只有 BRAND_ADMIN 能設定其他 BRAND_ADMIN
-            profile.setRole(dto.getRole());
+            targetProfile.setRole(dto.getRole());
         }
 
         // 4. 更新所屬分店 (調店)
         if (dto.getStoreId() != null) {
             Store store = storeRepository.findByBrand_IdAndId(brandId, dto.getStoreId())
                     .orElseThrow(() -> new ResourceNotFoundException("找不到分店 ID: " + dto.getStoreId()));
-            profile.setStore(store);
-        } else if (dto.getRole() == tw.niels.beverage_api_project.modules.user.enums.StaffRole.BRAND_ADMIN) {
+            targetProfile.setStore(store);
+        } else if (dto.getRole() == StaffRole.BRAND_ADMIN) {
             // 只有品牌管理員允許沒有分店
-            profile.setStore(null);
+            targetProfile.setStore(null);
         }
 
         // 5. 更新帳號啟用狀態 (停權)
         if (dto.getIsActive() != null) {
-            user.setActive(dto.getIsActive());
+            targetUser.setActive(dto.getIsActive());
         }
 
-        // JPA Dirty Checking 會自動儲存變更 (因為有 @Transactional)
-        // 但為了保險或立即生效，手動 save 也可以
-        staffProfileRepository.save(profile);
-        userRepository.save(user);
+        staffProfileRepository.save(targetProfile);
+        userRepository.save(targetUser);
 
-        return tw.niels.beverage_api_project.modules.user.dto.StaffDto.fromEntity(user);
+        return StaffDto.fromEntity(targetUser);
     }
 }

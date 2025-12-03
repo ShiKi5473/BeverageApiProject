@@ -23,15 +23,17 @@ public class AppUserDetails implements UserDetails {
     private final String username; // 使用手機號碼作為 username
     private final String password;
     private final Long storeId;
+    private final boolean isActive;
     private final Collection<? extends GrantedAuthority> authorities;
 
-    public AppUserDetails(Long userId, Long brandId, Long storeId, String username, String password,
-            Collection<? extends GrantedAuthority> authorities) {
+    public AppUserDetails(Long userId, Long brandId, Long storeId, String username, String password, boolean isActive,
+                          Collection<? extends GrantedAuthority> authorities) {
         this.userId = userId;
         this.brandId = brandId;
         this.username = username;
         this.password = password;
         this.storeId = storeId;
+        this.isActive = isActive;
         this.authorities = authorities;
     }
 
@@ -58,6 +60,7 @@ public class AppUserDetails implements UserDetails {
                 storeId,
                 user.getPrimaryPhone(),
                 user.getPasswordHash(),
+                user.getActive(),
                 authorities);
     }
 
@@ -105,6 +108,7 @@ public class AppUserDetails implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return isActive;
     }
+
 }
