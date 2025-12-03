@@ -99,19 +99,22 @@ public class InventoryService {
     @Transactional
     public void deductInventory(Long brandId, Long storeId, Long itemId, BigDecimal quantityToDeduct) {
         if (quantityToDeduct.compareTo(BigDecimal.ZERO) <= 0) {
+            // 使用通用錯誤代碼 (可自行定義 error.bad_request)
             throw new BadRequestException("扣減數量必須大於 0");
         }
 
-        // 1. 先鎖定原物料 (Item Level Lock)
-        // 這會序列化同一品項的扣減請求，避免多個交易同時搶佔不同 Batch 造成的 Deadlock
         InventoryItem item = itemRepository.findByBrandIdAndIdForUpdate(brandId, itemId)
-                .orElseThrow(() -> new ResourceNotFoundException("找不到原物料 ID: " + itemId));
+                .orElseThrow(() -> new ResourceNotFoundException("error.resource.not_found", "Item ID: " + itemId));
 
-        // 2.檢查總庫存是否足夠
+        // 2. 【快速失敗】檢查總庫存
         if (item.getTotalQuantity().compareTo(quantityToDeduct) < 0) {
+            // 【修改】改用 I18n 代碼與參數
             throw new BadRequestException(
-                    String.format("庫存不足 (Item: %s)。目前: %s, 需求: %s",
-                            item.getName(), item.getTotalQuantity(), quantityToDeduct));
+                    "error.inventory.insufficient",
+                    item.getName(),
+                    item.getTotalQuantity(),
+                    quantityToDeduct
+            );
         }
 
         // 3. 預扣總庫存
@@ -174,13 +177,11 @@ public class InventoryService {
                 .orElse(BigDecimal.ZERO);
     }
 
-    // 為了讓 Controller 能正確呼叫，這裡重載一個方法 (補上 brandId 參數)
-    // 原本的 deductInventory 是給手動測試用的
+
     @Transactional
     public void deductInventory(Long storeId, Long itemId, BigDecimal quantity) {
-        // 為了相容舊 API，這裡先查出 brandId (需從 store 查)
         Store store = storeRepository.findByIdSystem(storeId)
-                .orElseThrow(() -> new ResourceNotFoundException("Store not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("error.resource.not_found", "Store ID: " + storeId));
         deductInventory(store.getBrand().getBrandId(), storeId, itemId, quantity);
     }
 }
