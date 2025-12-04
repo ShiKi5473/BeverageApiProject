@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import tw.niels.beverage_api_project.common.annotation.Idempotent;
 import tw.niels.beverage_api_project.common.constants.ApiPaths;
 import tw.niels.beverage_api_project.common.exception.BadRequestException;
 import tw.niels.beverage_api_project.common.service.ControllerHelperService;
@@ -41,6 +42,7 @@ public class OrderController {
      */
     @PostMapping
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
+    @Idempotent // 防止重複下單
     @Operation(summary = "建立新訂單 (暫存或待付款)", description = "通常用於將訂單存入 PENDING 或 HELD 狀態")
     public ResponseEntity<OrderResponseDto> createOrder(
             @Valid @RequestBody CreateOrderRequestDto createOrderRequestDto) {
@@ -62,6 +64,7 @@ public class OrderController {
      * POS 直接結帳
      */
     @PostMapping("/pos-checkout")
+    @Idempotent // 防止重複扣款
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
     @Operation(summary = "POS 直接結帳", description = "一步完成建立訂單、扣點數、付款，並將狀態設為 PREPARING")
     public ResponseEntity<OrderResponseDto> performPosCheckout(
