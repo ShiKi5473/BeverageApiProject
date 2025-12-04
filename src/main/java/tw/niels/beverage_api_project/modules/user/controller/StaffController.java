@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import tw.niels.beverage_api_project.common.annotation.Audit;
 import tw.niels.beverage_api_project.common.constants.ApiPaths;
 import tw.niels.beverage_api_project.common.service.ControllerHelperService;
 import tw.niels.beverage_api_project.modules.user.dto.StaffDto;
@@ -47,6 +48,7 @@ public class StaffController {
 
     @PutMapping("/{userId}")
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER')")
+    @Audit(action = "UPDATE_STAFF_PROFILE")
     @Operation(summary = "更新員工資料", description = "修改員工職位、所屬分店或停權狀態")
     public ResponseEntity<StaffDto> updateStaff(
             @PathVariable Long userId,
