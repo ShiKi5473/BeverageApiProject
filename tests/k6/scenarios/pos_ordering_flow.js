@@ -68,7 +68,7 @@ export default function (data) {
                 productId: 1, // 請確保資料庫有此商品 ID
                 quantity: 1,
                 notes: 'K6 Load Test',
-                optionIds: []
+                optionIds: [1, 3]
             }
         ]
     });

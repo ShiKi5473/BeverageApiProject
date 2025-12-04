@@ -1,95 +1,110 @@
-// package tw.niels.beverage_api_project.config;
+package tw.niels.beverage_api_project.config;
 
-// import org.slf4j.Logger;
-// import org.slf4j.LoggerFactory;
-// import org.springframework.boot.CommandLineRunner;
-// import org.springframework.security.crypto.password.PasswordEncoder;
-// import org.springframework.stereotype.Component;
-// import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
-// import tw.niels.beverage_api_project.modules.brand.entity.Brand;
-// import
-// tw.niels.beverage_api_project.modules.brand.repository.BrandRepository;
-// import tw.niels.beverage_api_project.modules.user.entity.User;
-// import
-// tw.niels.beverage_api_project.modules.user.entity.profile.StaffProfile;
-// import tw.niels.beverage_api_project.modules.user.enums.StaffRole;
-// import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
+import tw.niels.beverage_api_project.modules.brand.entity.Brand;
+import tw.niels.beverage_api_project.modules.brand.repository.BrandRepository;
+import tw.niels.beverage_api_project.modules.product.entity.Product;
+import tw.niels.beverage_api_project.modules.product.enums.ProductStatus;
+import tw.niels.beverage_api_project.modules.product.repository.ProductRepository;
+import tw.niels.beverage_api_project.modules.store.entity.Store;
+import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
+import tw.niels.beverage_api_project.modules.user.entity.User;
+import tw.niels.beverage_api_project.modules.user.entity.profile.StaffProfile;
+import tw.niels.beverage_api_project.modules.user.enums.StaffRole;
+import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
 
-// /**
-// * 此類別用於在應用程式啟動時，自動填充必要的初始資料。
-// * 主要用於解決「第一個品牌管理員」的建立問題。
-// */
-// @Component
-// public class DataSeeder implements CommandLineRunner {
+import java.math.BigDecimal;
 
-// private static final Logger logger =
-// LoggerFactory.getLogger(DataSeeder.class);
+@Component
+@Profile("dev") // 限制只在 dev 環境執行
+public class DataSeeder implements CommandLineRunner {
 
-// private final UserRepository userRepository;
-// private final BrandRepository brandRepository;
-// private final PasswordEncoder passwordEncoder;
+    private static final Logger logger = LoggerFactory.getLogger(DataSeeder.class);
 
-// // *** 在這裡設定您要為哪個品牌建立管理員 ***
-// private static final String TARGET_BRAND_NAME = "品茶軒";
-// private static final String ADMIN_PHONE = "0911111111";
-// private static final String ADMIN_PASSWORD = "password123";
+    private final UserRepository userRepository;
+    private final BrandRepository brandRepository;
+    private final StoreRepository storeRepository;
+    private final ProductRepository productRepository;
+    private final PasswordEncoder passwordEncoder;
 
-// public DataSeeder(UserRepository userRepository, BrandRepository
-// brandRepository,
-// PasswordEncoder passwordEncoder) {
-// this.userRepository = userRepository;
-// this.brandRepository = brandRepository;
-// this.passwordEncoder = passwordEncoder;
-// }
+    public DataSeeder(UserRepository userRepository,
+                      BrandRepository brandRepository,
+                      StoreRepository storeRepository,
+                      ProductRepository productRepository,
+                      PasswordEncoder passwordEncoder) {
+        this.userRepository = userRepository;
+        this.brandRepository = brandRepository;
+        this.storeRepository = storeRepository;
+        this.productRepository = productRepository;
+        this.passwordEncoder = passwordEncoder;
+    }
 
-// @Override
-// @Transactional
-// public void run(String... args) throws Exception {
-// seedFirstBrandAndAdmin();
-// }
+    @Override
+    @Transactional
+    public void run(String... args) throws Exception {
+        seedDataForK6Testing();
+    }
 
-// private void seedFirstBrandAndAdmin() {
-// // 1. 檢查品牌是否存在，如果不存在就建立它
-// Brand brand = brandRepository.findByName(TARGET_BRAND_NAME).orElseGet(() -> {
-// logger.info("品牌 '{}' 不存在，現在開始建立...", TARGET_BRAND_NAME);
-// Brand newBrand = new Brand();
-// newBrand.setName(TARGET_BRAND_NAME);
-// newBrand.setContactPerson("自動建立");
-// newBrand.setActive(true);
-// return brandRepository.save(newBrand);
-// });
+    private void seedDataForK6Testing() {
+        // 1. 建立品牌 (強制 ID = 1，配合 K6 腳本)
+        Brand brand = brandRepository.findById(1L).orElseGet(() -> {
+            Brand b = new Brand();
+            b.setId(1L); // 【關鍵】手動指定 ID
+            b.setName("品茶軒");
+            b.setContactPerson("測試員");
+            b.setActive(true);
+            return brandRepository.save(b);
+        });
 
-// // 2. 檢查該品牌下是否已經有任何使用者 (特別是管理員)
-// if (userRepository.findByPrimaryPhoneAndBrandId(ADMIN_PHONE,
-// brand.getBrandId()).isEmpty()) {
-// // 3. 如果沒有，就建立第一個 BRAND_ADMIN
-// logger.info("品牌 ID: {} 尚未建立管理員，現在開始建立預設管理員 (帳號: {})...", brand.getBrandId(),
-// ADMIN_PHONE);
+        // 2. 建立分店 (強制 ID = 1)
+        Store store = storeRepository.findById(1L).orElseGet(() -> {
+            Store s = new Store();
+            s.setId(1L); // 【關鍵】手動指定 ID
+            s.setBrand(brand);
+            s.setName("台北總店");
+            s.setAddress("台北市測試路1號");
+            s.setPhoneNumber("02-12345678");
+            return storeRepository.save(s);
+        });
 
-// // 建立核心 User 物件
-// User adminUser = new User();
-// adminUser.setBrand(brand);
-// adminUser.setPrimaryPhone(ADMIN_PHONE);
-// // 使用應用程式的 PasswordEncoder 來加密密碼
-// adminUser.setPasswordHash(passwordEncoder.encode(ADMIN_PASSWORD));
-// adminUser.setActive(true);
+        // 3. 建立店員帳號 (0911111111)
+        if (userRepository.findByPrimaryPhoneAndBrandId("0911111111", brand.getBrandId()).isEmpty()) {
+            User user = new User();
+            user.setBrand(brand);
+            user.setPrimaryPhone("0911111111");
+            user.setPasswordHash(passwordEncoder.encode("password123")); // 預設密碼
+            user.setActive(true);
 
-// // 建立對應的 StaffProfile
-// StaffProfile staffProfile = new StaffProfile();
-// staffProfile.setFullName("預設品牌管理員");
-// staffProfile.setEmployeeNumber("ADMIN001");
-// staffProfile.setRole(StaffRole.BRAND_ADMIN);
-// staffProfile.setStore(null); // 品牌管理員不隸屬於特定分店
+            StaffProfile profile = new StaffProfile();
+            profile.setFullName("K6 測試員");
+            profile.setEmployeeNumber("K6-001");
+            profile.setRole(StaffRole.MANAGER);
+            profile.setStore(store); // 綁定分店
+            user.setStaffProfile(profile);
 
-// // 建立雙向關聯
-// adminUser.setStaffProfile(staffProfile);
+            userRepository.save(user);
+            logger.info("已建立 K6 測試帳號: 0911111111 / password123 (Brand: 1, Store: 1)");
+        }
 
-// userRepository.save(adminUser);
-// logger.info("預設管理員 '{}' 已成功建立。請用此帳號登入。", ADMIN_PHONE);
-// } else {
-// logger.info("品牌 ID: {} 已存在管理員帳號 '{}'，跳過建立程序。", brand.getBrandId(),
-// ADMIN_PHONE);
-// }
-// }
-// }
+        // 4. 建立測試商品 (強制 ID = 1)
+        if (productRepository.findByBrand_IdAndId(brand.getBrandId(), 1L).isEmpty()) {
+            Product product = new Product();
+            product.setId(1L); // 【關鍵】手動指定 ID
+            product.setBrand(brand);
+            product.setName("招牌紅茶");
+            product.setDescription("K6 測試專用商品");
+            product.setBasePrice(new BigDecimal("30.00"));
+            product.setStatus(ProductStatus.ACTIVE);
+
+            productRepository.save(product);
+            logger.info("已建立 K6 測試商品: 招牌紅茶 (ID: 1)");
+        }
+    }
+}

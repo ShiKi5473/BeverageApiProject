@@ -6,7 +6,7 @@
 
 1. 安裝 [K6](https://k6.io/docs/get-started/installation/)。
 2. 確保後端 API (`localhost:8080`) 與 Redis 已啟動。
-3. 確保資料庫中有測試用的店員帳號 (預設腳本使用 `0911111111` / `password123`) 與商品 (ID: 1)。
+3. 確保資料庫中有測試用的店員帳號 (預設腳本使用 `0988888888` / `password123`) 與商品 (ID: 1)。
 
 ## 執行測試
 
