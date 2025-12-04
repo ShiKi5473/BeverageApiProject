@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import tw.niels.beverage_api_project.common.annotation.Audit;
 import tw.niels.beverage_api_project.common.annotation.Idempotent;
 import tw.niels.beverage_api_project.common.constants.ApiPaths;
 import tw.niels.beverage_api_project.common.exception.BadRequestException;
@@ -125,6 +126,7 @@ public class OrderController {
 
     @PatchMapping("/{orderId}/status")
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
+    @Audit(action = "UPDATE_ORDER_STATUS")
     public ResponseEntity<OrderResponseDto> updateOrderStatus(
             @PathVariable Long orderId,
             @Valid @RequestBody UpdateOrderStatusDto requestDto) {
@@ -135,6 +137,7 @@ public class OrderController {
 
     @PutMapping("/{orderId}")
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
+    @Audit(action = "UPDATE_HELD_ORDER")
     public ResponseEntity<OrderResponseDto> updateHeldOrder(
             @PathVariable Long orderId,
             @Valid @RequestBody CreateOrderRequestDto createOrderRequestDto) {
@@ -159,6 +162,7 @@ public class OrderController {
 
     @PatchMapping("/{orderId}/accept")
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
+    @Audit(action = "ACCEPT_ORDER")
     public ResponseEntity<OrderResponseDto> acceptOrder(@PathVariable Long orderId) {
         Long brandId = this.helperService.getCurrentBrandId();
         Order updatedOrder = orderService.acceptOrder(brandId, orderId);

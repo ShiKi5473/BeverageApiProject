@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
+import tw.niels.beverage_api_project.common.annotation.Audit;
 import tw.niels.beverage_api_project.common.constants.ApiPaths;
 import tw.niels.beverage_api_project.common.service.ControllerHelperService;
 import tw.niels.beverage_api_project.modules.order.dto.MemberDto;
@@ -45,6 +46,7 @@ public class UserController {
     @PostMapping
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER')")
     @Operation(summary = "建立新使用者", description = "建立員工或會員帳號 (需管理員權限)")
+    @Audit(action = "CREATE_USER")
     public ResponseEntity<Object> createUser(
             @Valid @RequestBody CreateUserRequestDto createUserRequestDto) {
         logger.info("收到建立使用者請求，Phone: {}", createUserRequestDto.getPrimaryPhone());

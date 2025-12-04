@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import tw.niels.beverage_api_project.common.annotation.Audit;
 import tw.niels.beverage_api_project.common.constants.ApiPaths;
 import tw.niels.beverage_api_project.common.service.ControllerHelperService;
 import tw.niels.beverage_api_project.modules.brand.dto.UpdatePointConfigDto;
@@ -56,6 +57,7 @@ public class BrandController {
     @PutMapping("/point-config")
     @PreAuthorize("hasRole('BRAND_ADMIN')")
     @Operation(summary = "更新會員點數規則", description = "設定累積匯率與折抵匯率 (僅品牌管理員)")
+    @Audit(action = "UPDATE_POINT_CONFIG")
     public ResponseEntity<BrandPointConfig> updatePointConfig(
             @Valid @RequestBody UpdatePointConfigDto requestDto) {
 

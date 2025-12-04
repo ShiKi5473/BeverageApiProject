@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import tw.niels.beverage_api_project.common.annotation.Audit;
 import tw.niels.beverage_api_project.common.constants.ApiPaths;
 import tw.niels.beverage_api_project.common.service.ControllerHelperService;
 import tw.niels.beverage_api_project.modules.promotion.dto.CreatePromotionRequestDto;
@@ -33,6 +34,7 @@ public class PromotionController {
     @PostMapping
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER')")
     @Operation(summary = "建立促銷活動", description = "設定折扣規則與適用商品")
+    @Audit(action = "CREATE_PROMOTION")
     public ResponseEntity<PromotionResponseDto> createPromotion(
             @Valid @RequestBody CreatePromotionRequestDto requestDto) {
 
@@ -58,6 +60,7 @@ public class PromotionController {
     @DeleteMapping("/{promotionId}")
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER')")
     @Operation(summary = "停用促銷活動", description = "將活動狀態設為無效 (軟刪除)")
+    @Audit(action = "DEACTIVATE_PROMOTION")
     public ResponseEntity<Void> deactivatePromotion(@PathVariable Long promotionId) {
         Long brandId = helperService.getCurrentBrandId();
         promotionService.deactivatePromotion(brandId, promotionId);
