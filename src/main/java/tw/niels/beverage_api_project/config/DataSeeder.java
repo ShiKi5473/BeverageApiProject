@@ -77,7 +77,7 @@ public class DataSeeder implements CommandLineRunner {
         });
 
         // 2. 建立分店 (ID = 1)
-        Store store = storeRepository.findById(1L).orElseGet(() -> {
+        Store store = storeRepository.findByBrand_IdAndId(brand.getBrandId(), 1L).orElseGet(() -> {
             Store s = new Store();
             s.setId(1L);
             s.setBrand(brand);
@@ -116,7 +116,7 @@ public class DataSeeder implements CommandLineRunner {
         }
 
         // 4. 建立選項群組與選項
-        OptionGroup sugarGroup = optionGroupRepository.findById(10L).orElseGet(() -> {
+        OptionGroup sugarGroup = optionGroupRepository.findByBrand_IdAndId(brand.getBrandId(), 10L).orElseGet(() -> {
             OptionGroup g = new OptionGroup();
             g.setId(10L);
             g.setBrand(brand);
@@ -126,7 +126,7 @@ public class DataSeeder implements CommandLineRunner {
             return optionGroupRepository.save(g);
         });
 
-        if (productOptionRepository.findById(11L).isEmpty()) {
+        if (productOptionRepository.findByOptionGroup_Brand_IdAndId(brand.getBrandId(), 11L).isEmpty()) {
             ProductOption opt = new ProductOption();
             opt.setId(11L);
             opt.setOptionGroup(sugarGroup);
@@ -136,7 +136,7 @@ public class DataSeeder implements CommandLineRunner {
             productOptionRepository.save(opt);
         }
 
-        OptionGroup iceGroup = optionGroupRepository.findById(20L).orElseGet(() -> {
+        OptionGroup iceGroup = optionGroupRepository.findByBrand_IdAndId(brand.getBrandId(), 20L).orElseGet(() -> {
             OptionGroup g = new OptionGroup();
             g.setId(20L);
             g.setBrand(brand);
@@ -146,7 +146,7 @@ public class DataSeeder implements CommandLineRunner {
             return optionGroupRepository.save(g);
         });
 
-        if (productOptionRepository.findById(21L).isEmpty()) {
+        if (productOptionRepository.findByOptionGroup_Brand_IdAndId(brand.getBrandId(), 21L).isEmpty()) {
             ProductOption opt = new ProductOption();
             opt.setId(21L);
             opt.setOptionGroup(iceGroup);
