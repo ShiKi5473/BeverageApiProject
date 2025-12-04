@@ -32,6 +32,10 @@ public class PurchaseShipment extends BaseTsidEntity {
     // Getters & Setters
     public Long getShipmentId() { return getId(); }
 
+    public void setShipmentId(Long shipmentId) {
+        this.setId(shipmentId);
+    }
+
     public Store getStore() { return store; }
     public void setStore(Store store) { this.store = store; }
 

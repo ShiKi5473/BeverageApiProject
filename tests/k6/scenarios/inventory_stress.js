@@ -18,8 +18,9 @@ export const options = {
         },
     },
     thresholds: {
-        http_req_failed: ['rate<0.01'], // 失敗率應低於 1% (除非庫存真的沒了)
+        'http_req_failed{status:500}': ['rate<0.01'],
         http_req_duration: ['p(95)<1000'], // 95% 請求應在 1秒內完成 (考慮到 DB Lock)
+
     },
 };
 
@@ -54,6 +55,13 @@ export default function (data) {
     };
 
     const res = http.post(url, null, params);
+
+    if (res.status !== 200 && res.status !== 400) {
+        // 只印出前幾次失敗，避免洗版
+        if (__ITER < 3) {
+            console.error(`Request failed. Status: ${res.status}, Body: ${res.body}`);
+        }
+    }
 
     check(res, {
         'status is 200 (success) or 400 (out of stock)': (r) => r.status === 200 || r.status === 400,

@@ -10,6 +10,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import tw.niels.beverage_api_project.modules.brand.entity.Brand;
 import tw.niels.beverage_api_project.modules.brand.repository.BrandRepository;
+import tw.niels.beverage_api_project.modules.inventory.entity.InventoryBatch;
+import tw.niels.beverage_api_project.modules.inventory.entity.InventoryItem;
+import tw.niels.beverage_api_project.modules.inventory.entity.PurchaseShipment;
+import tw.niels.beverage_api_project.modules.inventory.repository.InventoryBatchRepository;
+import tw.niels.beverage_api_project.modules.inventory.repository.InventoryItemRepository;
+import tw.niels.beverage_api_project.modules.inventory.repository.PurchaseShipmentRepository;
+import tw.niels.beverage_api_project.modules.inventory.service.InventoryService;
 import tw.niels.beverage_api_project.modules.product.entity.OptionGroup;
 import tw.niels.beverage_api_project.modules.product.entity.Product;
 import tw.niels.beverage_api_project.modules.product.entity.ProductOption;
@@ -26,6 +33,8 @@ import tw.niels.beverage_api_project.modules.user.enums.StaffRole;
 import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.Set;
 
@@ -42,6 +51,9 @@ public class DataSeeder implements CommandLineRunner {
     private final OptionGroupRepository optionGroupRepository;
     private final ProductOptionRepository productOptionRepository;
     private final PasswordEncoder passwordEncoder;
+    private final InventoryItemRepository inventoryItemRepository;;
+    private final InventoryBatchRepository inventoryBatchRepository;
+    private final PurchaseShipmentRepository purchaseShipmentRepository;
 
     public DataSeeder(UserRepository userRepository,
                       BrandRepository brandRepository,
@@ -49,7 +61,10 @@ public class DataSeeder implements CommandLineRunner {
                       ProductRepository productRepository,
                       OptionGroupRepository optionGroupRepository,
                       ProductOptionRepository productOptionRepository,
-                      PasswordEncoder passwordEncoder) {
+                      PasswordEncoder passwordEncoder,
+                      InventoryItemRepository inventoryItemRepository,
+                      InventoryBatchRepository inventoryBatchRepository,
+                      PurchaseShipmentRepository purchaseShipmentRepository) {
         this.userRepository = userRepository;
         this.brandRepository = brandRepository;
         this.storeRepository = storeRepository;
@@ -57,6 +72,9 @@ public class DataSeeder implements CommandLineRunner {
         this.optionGroupRepository = optionGroupRepository;
         this.productOptionRepository = productOptionRepository;
         this.passwordEncoder = passwordEncoder;
+        this.inventoryItemRepository = inventoryItemRepository;
+        this.inventoryBatchRepository = inventoryBatchRepository;
+        this.purchaseShipmentRepository = purchaseShipmentRepository;
     }
 
     @Override
@@ -88,31 +106,28 @@ public class DataSeeder implements CommandLineRunner {
         });
 
         // 3. 建立或更新店員帳號
-        Optional<User> existingUser = userRepository.findByPrimaryPhoneAndBrandId("0911111111", brand.getBrandId());
+        User staffUser = userRepository.findByPrimaryPhoneAndBrandId("0911111111", brand.getBrandId())
+                .orElseGet(() -> {
+                    User user = new User();
+                    user.setBrand(brand);
+                    user.setPrimaryPhone("0911111111");
+                    user.setPasswordHash(passwordEncoder.encode("password123"));
+                    user.setActive(true);
 
-        if (existingUser.isPresent()) {
-            // 強制重設密碼
-            User user = existingUser.get();
-            user.setPasswordHash(passwordEncoder.encode("password123"));
-            userRepository.save(user);
+                    StaffProfile profile = new StaffProfile();
+                    profile.setFullName("K6 測試員");
+                    profile.setEmployeeNumber("K6-001");
+                    profile.setRole(StaffRole.MANAGER);
+                    profile.setStore(store);
+                    user.setStaffProfile(profile);
+
+                    return userRepository.save(user);
+                });
+
+        if (!passwordEncoder.matches("password123", staffUser.getPasswordHash())) {
+            staffUser.setPasswordHash(passwordEncoder.encode("password123"));
+            userRepository.save(staffUser);
             logger.info("DataSeeder: 已更新測試帳號密碼: 0911111111");
-        } else {
-            // 建立新帳號
-            User user = new User();
-            user.setBrand(brand);
-            user.setPrimaryPhone("0911111111");
-            user.setPasswordHash(passwordEncoder.encode("password123"));
-            user.setActive(true);
-
-            StaffProfile profile = new StaffProfile();
-            profile.setFullName("K6 測試員");
-            profile.setEmployeeNumber("K6-001");
-            profile.setRole(StaffRole.MANAGER);
-            profile.setStore(store);
-            user.setStaffProfile(profile);
-
-            userRepository.save(user);
-            logger.info("DataSeeder: 已建立 K6 測試帳號: 0911111111");
         }
 
         // 4. 建立選項群組與選項
@@ -172,6 +187,44 @@ public class DataSeeder implements CommandLineRunner {
             product.setOptionGroups(Set.of(sugarGroup, iceGroup));
             productRepository.save(product);
         }
+
+        // 6. 【新增】建立庫存資料 (Inventory Item + Batch)
+
+        // 6-1. 建立原物料
+        InventoryItem item = inventoryItemRepository.findByBrand_IdAndId(brand.getBrandId(), 1L).orElseGet(() -> {
+            InventoryItem i = new InventoryItem();
+            i.setInventoryItemId(1L);
+            i.setBrand(brand);
+            i.setName("測試用茶葉");
+            i.setUnit("g");
+            i.setTotalQuantity(new BigDecimal("1000.00")); // 初始總量
+            return inventoryItemRepository.save(i);
+        });
+
+        // 6-2. 建立進貨單 (PurchaseShipment) - 批次的父層
+        PurchaseShipment shipment = purchaseShipmentRepository.findByStore_Brand_IdAndId(brand.getBrandId(), 1L).orElseGet(() -> {
+            PurchaseShipment s = new PurchaseShipment();
+            s.setShipmentId(1L);
+            s.setStore(store);
+            s.setStaff(staffUser);
+            s.setShipmentDate(LocalDateTime.now());
+            s.setSupplier("K6 供應商");
+            return purchaseShipmentRepository.save(s);
+        });
+
+        // 6-3. 建立庫存批次 (InventoryBatch)
+        // 注意：這裡我們建立一個 ID 為 1 的批次，數量與 Item 總量一致
+        inventoryBatchRepository.findByShipment_Store_Brand_IdAndId(brand.getBrandId(), 1L).orElseGet(() -> {
+            InventoryBatch b = new InventoryBatch();
+            b.setBatchId(1L); // 設定 ID (因為我們剛加了 setBatchId)
+            b.setShipment(shipment);
+            b.setInventoryItem(item);
+            b.setQuantityReceived(new BigDecimal("1000.00"));
+            b.setCurrentQuantity(new BigDecimal("1000.00")); // 足夠的庫存
+            b.setExpiryDate(LocalDate.now().plusYears(1)); // 明年過期
+            return inventoryBatchRepository.save(b);
+        });
+
 
         logger.info("DataSeeder: 初始化資料完成！");
     }
