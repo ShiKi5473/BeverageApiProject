@@ -36,6 +36,10 @@ public class InventoryBatch extends BaseTsidEntity {
     // Getters & Setters
     public Long getBatchId() { return getId(); }
 
+    public void setBatchId(Long batchId) {
+        setId(batchId);
+    }
+
     public PurchaseShipment getShipment() { return shipment; }
     public void setShipment(PurchaseShipment shipment) { this.shipment = shipment; }
 
