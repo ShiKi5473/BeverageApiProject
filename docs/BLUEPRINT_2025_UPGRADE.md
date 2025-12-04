@@ -11,9 +11,9 @@
 ### 2.1 引入 Facade 模式重構 OrderService
 * **現況**：`OrderService` 職責過重 (God Class)，包含建立、庫存扣減、點數折抵與金流邏輯。
 * **執行計畫**：
-    - [ ] 建立 `OrderProcessFacade` 作為統一入口，負責協調各服務。
-    - [ ] 拆分獨立服務：`InventoryService` (純庫存操作)、`PaymentService` (金流串接)、`MemberService` (點數計算)。
-    - [ ] `OrderService` 僅保留 `Order` Entity 的 CRUD 操作。
+    - [x] 建立 `OrderProcessFacade` 作為統一入口，負責協調各服務。
+    - [x] 拆分獨立服務：`InventoryService` (純庫存操作)、`PaymentService` (金流串接)、`MemberService` (點數計算)。
+    - [x] `OrderService` 僅保留 `Order` Entity 的 CRUD 操作。
 
 ### 2.2 強化 TSID 生成安全性
 * **現況**：`nodeId` 依賴靜態環境變數，容器水平擴展時易發生 ID 衝突。
@@ -24,13 +24,13 @@
 ### 2.3 優化庫存扣減併發控制
 * **現況**：直接鎖定多筆 `InventoryBatch` (FIFO)，高併發下易發生 Deadlock。
 * **執行計畫**：
-    - [ ] 在 `InventoryItem` 新增 `total_quantity` 欄位進行快速預扣 (列級鎖)。
-    - [ ] 將 FIFO 批次扣減與效期管理移至背景非同步處理 (RabbitMQ)，解決高併發效能瓶頸。
+    - [x] 在 `InventoryItem` 新增 `total_quantity` 欄位進行快速預扣 (列級鎖)。
+    - [x] 將 FIFO 批次扣減與效期管理移至背景非同步處理 (RabbitMQ)，解決高併發效能瓶頸。
 
 ### 2.4 統一異常訊息 (I18n)
 * **執行計畫**：
-    - [ ] 引入 `MessageSource`。
-    - [ ] 將 Exception Message 代碼化 (e.g., `error.stock.insufficient`)，支援多語系回應。
+    - [x] 引入 `MessageSource`。
+    - [x] 將 Exception Message 代碼化 (e.g., `error.stock.insufficient`)，支援多語系回應。
 
 ### 2.5 混合式資料存取架構 (Hybrid Data Access Architecture) 🌟 (新加入)
 * **目標**：解決 JPA 在高併發批次更新與複雜報表查詢時的效能瓶頸，同時保留 ORM 在處理複雜關聯上的優勢。
@@ -38,9 +38,9 @@
     * **Command (寫入/複雜關聯)**：保留 **Spring Data JPA**，處理 `Order` -> `OrderItem` 等複雜物件圖。
     * **Query (報表/列表) & Bulk Update (批次扣減)**：引入 **DAO 層 (JdbcTemplate)**，繞過 Hibernate Context 直接執行高效能 SQL。
 * **執行計畫**：
-    - [ ] **重構 `InventoryService`**：新增 `InventoryBatchDAO`，使用 JDBC 執行 `UPDATE ... WHERE id IN (...)` 取代迴圈 JPA Save，減少 DB Round-trip。
-    - [ ] **重構 `ReportRepository`**：將 `DailyStoreStatsRepository` 的複雜 JPQL 遷移至 DAO 使用 Native SQL 實作，利用資料庫特定優化。
-    - [ ] **架構規範**：採用 Spring Data Custom Repository Pattern (`OrderRepositoryCustom`) 封裝 DAO 實作，對上層 Service 隱藏底層差異。
+    - [x] **重構 `InventoryService`**：新增 `InventoryBatchDAO`，使用 JDBC 執行 `UPDATE ... WHERE id IN (...)` 取代迴圈 JPA Save，減少 DB Round-trip。
+    - [x] **重構 `ReportRepository`**：將 `DailyStoreStatsRepository` 的複雜 JPQL 遷移至 DAO 使用 Native SQL 實作，利用資料庫特定優化。
+    - [x] **架構規範**：採用 Spring Data Custom Repository Pattern (`OrderRepositoryCustom`) 封裝 DAO 實作，對上層 Service 隱藏底層差異。
 
 ---
 
@@ -49,15 +49,15 @@
 
 ### 3.1 促銷活動系統 (Promotion Engine)
 * **功能需求**：
-    - [ ] 支援多種策略：滿額折抵、百分比折扣、買 X 送 Y、組合優惠。
-    - [ ] 實作 `PromotionStrategy` 設計模式，確保折扣計算邏輯的可擴充性。
-    - [ ] **效能優化**：在 `@Cacheable` 層快取有效活動列表，減少資料庫查詢。
+    - [x] 支援多種策略：滿額折抵、百分比折扣、買 X 送 Y、組合優惠。
+    - [x] 實作 `PromotionStrategy` 設計模式，確保折扣計算邏輯的可擴充性。
+    - [x] **效能優化**：在 `@Cacheable` 層快取有效活動列表，減少資料庫查詢。
 
 ### 3.2 員工與權限管理 (Staff Management)
 * **功能需求**：
-    - [ ] 完善 `RBAC` (Role-Based Access Control) 模型。
-    - [ ] 實作「店長 (Manager)」與「品牌管理員 (Brand Admin)」的分層權限控管。
-    - [ ] 支援員工跨店調度與停權機制 (Soft Delete)。
+    - [x] 完善 `RBAC` (Role-Based Access Control) 模型。
+    - [x] 實作「店長 (Manager)」與「品牌管理員 (Brand Admin)」的分層權限控管。
+    - [x] 支援員工跨店調度與停權機制 (Soft Delete)。
 
 ---
 
@@ -67,43 +67,39 @@
 ### 4.1 可觀測性 (Observability) 🌟
 * **技術棧**：Micrometer Tracing + Zipkin + OpenTelemetry。
 * **執行計畫**：
-    - [ ] 為所有 HTTP 請求、DB 查詢與 RabbitMQ 訊息注入 `Trace ID` 與 `Span ID`。
-    - [ ] 實現全鏈路追蹤 (Distributed Tracing)，解決非同步架構下「訊息丟失」或「效能瓶頸」難以除錯的問題。
+    - [x] 為所有 HTTP 請求、DB 查詢與 RabbitMQ 訊息注入 `Trace ID` 與 `Span ID`。
+    - [x] 實現全鏈路追蹤 (Distributed Tracing)。
 
 ### 4.2 實作斷點續傳與分片上傳 (Resumable Upload)
 * **場景**：商品圖片、行銷素材等大檔案上傳。
 * **執行計畫**：
-    - [ ] 整合 **MinIO** 作為物件儲存後端。
-    - [ ] 實作 `FileService` 介面：支援 `Check` (檢查分片), `UploadChunk` (上傳分片), `Merge` (合併檔案)。
-    - [ ] **垃圾回收機制 (GC)**：實作 Spring Schedule (`FileCleanupSchedule`)，每日凌晨掃描 Redis 中過期未完成的上傳任務，並呼叫 MinIO API 清理無效暫存分片。
+    - [x] 整合 **MinIO** 作為物件儲存後端。
+    - [x] 實作 `FileService` 介面：支援 `Check`, `UploadChunk`, `Merge`。
+    - [x] **垃圾回收機制 (GC)**：實作 Spring Schedule (`FileCleanupSchedule`)。
 
 ### 4.3 引入 RabbitMQ (Message Queue)
 * **執行計畫**：
-    - [ ] 將「KDS 訂單通知」改為 RabbitMQ Fanout Exchange，確保不漏單。
-    - [ ] 將「報表非同步計算」與「會員點數結算」改為事件驅動 (Event-Driven) 架構。
-    - [ ] 設定 Dead Letter Queue (DLQ) 處理消費失敗的訊息。
+    - [x] 將「KDS 訂單通知」改為 RabbitMQ Fanout Exchange，確保不漏單。
+    - [x] 設定 Dead Letter Queue (DLQ) 處理消費失敗的訊息。
 
 ### 4.4 Redis 多層級快取 & API 冪等性
 * **執行計畫**：
-    - [ ] 針對熱門商品列表 (`ProductController`) 加入 `@Cacheable`。
-    - [ ] 利用 Redis `setIfAbsent` (NX) 實作 **Idempotency Key**，防止網路抖動造成的重複下單。
+    - [x] 針對熱門商品列表 (`ProductController`) 加入 `@Cacheable`。
+    - [x] 利用 Redis `setIfAbsent` (NX) 實作 **Idempotency Key** (`@Idempotent`)。
 
 ### 4.5 效能基準測試 🌟
 * **工具**：**K6** (Load Testing)。
 * **執行計畫**：
-    - [ ] 撰寫負載測試腳本，模擬高併發點餐場景。
-    - [ ] 建立 RPS (Requests Per Second) 與 Latency (P95/P99) 的效能基準線 (Baseline)。
+    - [x] 撰寫負載測試腳本 (`inventory_stress.js`)，模擬高併發庫存扣減。
+    - [x] 驗證 **Pessimistic Lock** 與 **Hybrid DAO** 在高壓下的資料一致性 (No Overselling)。
 
-### 4.6 多語言持久化與審計日誌 (Polyglot Persistence & Audit Logging) 
-* **目標**：引入 NoSQL 資料庫以處理高寫入量、結構鬆散的日誌資料，展現「多語言持久化」架構能力，並滿足企業級資安審計需求。
-* **技術選型**：採用 **MongoDB** (Document-Oriented Database)。
+### 4.6 多語言持久化與審計日誌 (Polyglot Persistence & Audit Logging)
+* **目標**：引入 NoSQL 資料庫處理審計日誌。
+* **技術選型**：採用 **MongoDB**。
 * **執行計畫**：
-    - [ ] **架構整合**：引入 `spring-boot-starter-data-mongodb`，配置與 PostgreSQL 並存的多資料源環境。
-    - [ ] **AOP 切面設計**：實作 `@Audit` 自定義註解與 Aspect，攔截關鍵操作（如：調整員工權限、修改商品價格）。
-    - [ ] **日誌結構設計**：設計 `AuditLog` 文件結構，包含 `traceId` (關聯 Zipkin)、操作者資訊、執行時間與資料變更快照 (Diff)。
-    - [ ] **非同步寫入**：利用 `@Async` 或 RabbitMQ 將日誌寫入 MongoDB，確保不影響主業務回應速度。
-    - [ ] **自動歸檔**：設定 MongoDB **TTL Index** (如 90 天)，自動清理過期日誌，降低維運成本。
-
+    - [x] **架構整合**：引入 `spring-boot-starter-data-mongodb`。
+    - [x] **AOP 切面設計**：實作 `@Audit` 自定義註解與 Aspect。
+    - [x] **非同步寫入**：利用 `@Async` 將日誌寫入 MongoDB `audit_logs` 集合。
 ---
 
 ## 5. 🤝 階段四：即時互動功能 (Real-time Interaction)

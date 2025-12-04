@@ -1,83 +1,126 @@
-🥤 Beverage POS & KDS System (多租戶飲料店點餐與廚房顯示系統)
+# 🥤 Beverage POS & KDS System (多租戶飲料店點餐與廚房顯示系統)
 
-  這是一個專為手搖飲料店設計的 多租戶 (Multi-Tenant) POS 系統。專案採用前後端分離架構，後端基於 Spring Boot，前端使用原生 JavaScript (配合 Vite 打包)。系統整合了訂單管理、複雜的商品選項（如甜度冰塊）、會員點數機制，以及基於 Redis 與 SSE 的即時廚房顯示系統 (KDS)。
+這是一個專為手搖飲料店設計的企業級 **多租戶 (Multi-Tenant) POS 系統**。
+專案採用前後端分離架構，後端基於 Spring Boot 實作 **模組化單體 (Modular Monolith)**，前端使用原生 JavaScript (Vite)。
 
-🚀 專案特色
-  
-  多租戶架構 (Multi-Tenancy)：
+系統整合了複雜的商品客製化（甜度冰塊）、會員點數機制、即時廚房顯示系統 (KDS)，並採用 **多語言持久化 (Polyglot Persistence)** 架構以應對高併發與大數據量的審計需求。
 
-    支援單一系統管理多個品牌 (Brand) 與其下屬分店 (Store)。
+---
 
-    透過 JwtAuthenticationFilter 解析 Token 中的 brandId，實現租戶資料隔離。
+## 🚀 專案亮點與核心功能
 
-  複雜商品選項：
+### 1. 核心業務 (Core Business)
+* **多租戶架構**：單一系統支援多個品牌 (Brand)，資料透過 `BrandContextHolder` 與 JWT 自動隔離。
+* **高度客製化商品**：透過 `OptionGroup` 與 `ProductOption` 實現複雜的飲料客製化（如：半糖、少冰、加椰果）。
+* **狀態模式訂單管理**：使用 **State Pattern** 管理訂單生命週期 (`PENDING` -> `PREPARING` -> `READY` -> `CLOSED`)，確保業務流轉嚴謹。
+* **混合式庫存架構 (Hybrid DAO)**：
+    * **讀取**：使用 JPA 處理複雜關聯。
+    * **寫入**：使用 **JDBC Batch Update** 處理高併發庫存扣減 (FIFO)，大幅降低資料庫鎖定時間。
 
-    支援飲料店特有的客製化需求（如：半糖、少冰、加料），透過 OptionGroup 與 ProductOption 靈活配置。
+### 2. 即時互動與非同步 (Real-time & Async)
+* **事件驅動 KDS**：訂單狀態變更時發布 Domain Event，透過 **RabbitMQ** 廣播，並利用 **SSE (Server-Sent Events)** 推送至廚房螢幕，無需輪詢。
+* **非同步審計日誌**：關鍵操作 (如手動扣庫存、修改權限) 透過 AOP 攔截，並以 `@Async` 非同步寫入 **MongoDB**，實現操作軌跡全記錄。
 
-  狀態模式訂單管理 (State Pattern)：
+### 3. 可靠性與效能 (Reliability & Performance)
+* **分散式鎖**：使用 **ShedLock** 確保排程任務 (如日結報表) 在叢集環境中單一執行。
+* **資料一致性**：庫存扣減採用 `PESSIMISTIC_WRITE` 悲觀鎖，經 **K6** 壓力測試驗證，在高併發搶購場景下無超賣。
+* **檔案分片上傳**：整合 **MinIO** 物件儲存，支援大檔案分片上傳與斷點續傳。
 
-    使用設計模式管理訂單生命週期 (PENDING -> PREPARING -> READY_FOR_PICKUP -> CLOSED / CANCELLED)，確保業務邏輯嚴謹且易於維護。
+---
 
-  即時 KDS (廚房顯示系統)：
+## 🛠️ 技術棧 (Tech Stack)
 
-    利用 Redis Pub/Sub 與 Server-Sent Events (SSE) 實現即時通訊。
+### Backend (後端)
+* **Language**: Java 21
+* **Framework**: Spring Boot 3.x
+* **Databases (Polyglot Persistence)**:
+    * **PostgreSQL**: 核心關聯資料 (關聯查詢強)
+    * **MongoDB**: 審計日誌 (Audit Log) (寫入吞吐量高、結構鬆散)
+    * **Redis**: 快取、Session、分散式鎖、訂單流水號生成
+* **Message Queue**: RabbitMQ (Fanout Exchange 廣播模式)
+* **Object Storage**: MinIO (S3 Compatible)
+* **Security**: Spring Security + JWT (雙層認證：平台管理員 vs 租戶員工)
+* **Testing**: JUnit 5, Mockito, **Testcontainers**, **K6** (Load Testing)
 
-    前台點餐後，透過事件驅動機制，後廚螢幕自動跳出新訂單。
+### Frontend (前端)
+* **Build Tool**: Vite
+* **Core**: Vanilla JavaScript (ES Modules)
+* **UI Components**: Google Material Web Components (MWC)
+* **Charts**: Apache ECharts (報表視覺化)
 
-  會員與點數機制：
+---
 
-    內建會員系統，支援消費累積點數與結帳折抵。
+## 📂 系統架構圖 (簡易)
 
-    使用悲觀鎖 (PESSIMISTIC_WRITE) 處理並發請求，確保點數扣抵的資料一致性。
-
-  安全性：
-
-    基於 Spring Security 與 JWT 的雙層認證機制（平台管理員 vs. 品牌員工）。
-
-🛠️ 技術棧 (Tech Stack)
-  Backend (後端)
-    Language: Java 21
+```mermaid
+graph TD
+    Client[Client (POS/KDS)] <--> LB[Load Balancer]
+    LB <--> App[Spring Boot Application]
     
-    Framework: Spring Boot 3.x
+    subgraph Data Layer
+    App --> PG[(PostgreSQL)]
+    App --> Mongo[(MongoDB - Audit)]
+    App --> Redis[(Redis - Cache/Lock)]
+    App --> MinIO[(MinIO - Files)]
+    end
     
-    Database: PostgreSQL (資料持久化)
-    
-    Cache & Messaging: Redis (用於生成訂單流水號、KDS 事件廣播)
-    
-    Security: Spring Security, JWT (JSON Web Token)
-    
-    Real-time: Server-Sent Events (SSE)
-    
-    Architecture: MVC, Layered Architecture, DDD concepts (Domain Events)
+    subgraph Messaging
+    App --> RMQ[RabbitMQ]
+    RMQ --> App
+    end
+🚀 快速開始 (Quick Start)
+前置需求
+Docker & Docker Compose
 
-  Frontend (前端)
-    Build Tool: Vite
-    
-    Core: Vanilla JavaScript (ES Modules)
-    
-    UI Components: Google Material Web Components (MWC)
-    
-    Styling: CSS3 (Grid/Flexbox)
+Java 21 (若要本機執行)
 
-📂 系統架構設計亮點
-  訂單狀態機 (Order State Machine)：
+啟動步驟
+啟動基礎設施 (資料庫、訊息佇列、儲存服務)：
 
-    定義了 OrderState 介面，針對不同狀態 (PendingState, PreparingState, HeldState 等) 實作具體的行為（如 processPayment, complete, cancel）。
+Bash
 
-    避免了巨型的 if-else 判斷，提高程式碼的可讀性與擴充性。
+docker-compose up -d
+啟動後端應用：
 
-  KDS 事件驅動 (Event-Driven KDS)：
+Bash
 
-    當訂單狀態改變時，發布 OrderStateChangedEvent。
+./mvnw spring-boot:run
+系統啟動時，DataSeeder 會自動初始化測試用的品牌、分店、商品與庫存資料。
 
-    KdsService 監聽事件，根據狀態選擇對應的策略 (KdsEventStrategy) 生成訊息，並透過 Redis 發送廣播。
+啟動前端：
 
-    前端透過 SSE 訂閱特定 Store 的頻道，實現無刷新更新。
+Bash
 
-  資料一致性與防護：
+cd frontend
+npm install
+npm run dev
+預設測試帳號
+品牌管理員: 0911111111 / password123
 
-    使用 PESSIMISTIC_WRITE 鎖 (select for update) 防止會員點數操作的 Race Condition。
+平台超級管理員: admin / admin123
 
-    Redis INCR 原子操作生成每日不重複的訂單流水號，並設定過期時間以節省記憶體。
+🧪 測試與驗證
+執行單元與整合測試
+本專案使用 Testcontainers 啟動真實的 DB 環境進行測試：
 
-    實作簡易的 XSS 防護，過濾使用者輸入的備註欄位。
+Bash
+
+./mvnw verify
+執行 K6 壓力測試
+驗證庫存併發扣減的正確性：
+
+Bash
+
+k6 run tests/k6/scenarios/inventory_stress.js
+📝 開發藍圖 (Roadmap)
+詳細開發進度請參閱 BLUEPRINT_2025_UPGRADE.md。
+
+[x] Phase 1: 核心重構 (Facade, TSID, Hybrid DAO)
+
+[x] Phase 2: 業務擴充 (促銷引擎, RBAC)
+
+[x] Phase 3: 非同步與效能 (RabbitMQ, MinIO, MongoDB Audit, K6)
+
+[ ] Phase 4: 即時互動 (WebSocket 線上揪團) - Next Step
+
+[ ] Phase 5: 微服務拆分
