@@ -1,13 +1,13 @@
 package tw.niels.beverage_api_project.modules.kds.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.context.event.EventListener;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import tw.niels.beverage_api_project.config.RabbitConfig;
 import tw.niels.beverage_api_project.modules.kds.dto.KdsOrderDto;
 import tw.niels.beverage_api_project.modules.kds.strategy.KdsEventStrategy;
 import tw.niels.beverage_api_project.modules.order.entity.Order;
@@ -15,6 +15,7 @@ import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
 import tw.niels.beverage_api_project.modules.order.event.OrderStateChangedEvent;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -25,27 +26,26 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class KdsService {
 
     private static final Logger logger = LoggerFactory.getLogger(KdsService.class);
-    private final StringRedisTemplate redisTemplate;
-    private final ObjectMapper objectMapper;
+
+    // 改用 RabbitTemplate
+    private final RabbitTemplate rabbitTemplate;
 
     // SSE 連線管理
     private final Map<Long, List<SseEmitter>> storeEmitters = new ConcurrentHashMap<>();
     private final Map<OrderStatus, KdsEventStrategy> strategyMap = new EnumMap<>(OrderStatus.class);
 
     public KdsService(List<KdsEventStrategy> strategies,
-                      StringRedisTemplate redisTemplate,
-                      ObjectMapper objectMapper) {
+                      RabbitTemplate rabbitTemplate) {
         for (KdsEventStrategy strategy : strategies) {
             strategyMap.put(strategy.getHandledStatus(), strategy);
         }
-        this.redisTemplate = redisTemplate;
-        this.objectMapper = objectMapper;
+        this.rabbitTemplate = rabbitTemplate;
     }
 
     /**
-     * 觀察者模式：監聽訂單狀態變更事件
+     * 觀察者模式：監聽訂單狀態變更事件 (Local Event)
+     * 動作：「發送 RabbitMQ 訊息」到 Fanout Exchange
      */
-    // 「發送 Redis 訊息」
     @EventListener
     public void handleOrderStateChange(OrderStateChangedEvent event) {
         Order order = event.getOrder();
@@ -59,23 +59,26 @@ public class KdsService {
             KdsBroadcastMessage broadcastMsg = new KdsBroadcastMessage(storeId, message);
 
             try {
-                String json = objectMapper.writeValueAsString(broadcastMsg);
-                // 發布到 Redis
-                redisTemplate.convertAndSend("kds-events", json);
-            } catch (JsonProcessingException e) {
-                logger.error("JSON 序列化失敗", e);
+                // 發布到 RabbitMQ Fanout Exchange (Routing Key 為空字串)
+                // 自動轉為 JSON
+                rabbitTemplate.convertAndSend(RabbitConfig.KDS_EXCHANGE, "", broadcastMsg);
+            } catch (Exception e) {
+                logger.error("RabbitMQ 發送失敗", e);
             }
         }
     }
 
-    // 處理來自 Redis 的訊息 (所有 Server 實例都會收到)
-    public void handleRedisMessage(String messageJson) {
+    /**
+     * 處理來自 RabbitMQ 的訊息
+     * 監聽與此實例綁定的匿名佇列 (SpEL 表達式參考 RabbitConfig 中的 Bean 名稱)
+     */
+    @RabbitListener(queues = "#{kdsAnonymousQueue.name}")
+    public void handleRabbitMessage(KdsBroadcastMessage msg) {
         try {
-            KdsBroadcastMessage msg = objectMapper.readValue(messageJson, KdsBroadcastMessage.class);
             // 檢查這台 Server 有沒有連著該店家的 Emitter
             sendToStore(msg.getStoreId(), msg.getKdsMessage());
         } catch (Exception e) {
-            logger.error("處理 Redis 訊息失敗", e);
+            logger.error("處理 RabbitMQ 訊息失敗", e);
         }
     }
 
@@ -107,13 +110,11 @@ public class KdsService {
     private void sendToStore(Long storeId, KdsMessage message) {
         List<SseEmitter> emitters = storeEmitters.get(storeId);
         if (emitters != null && !emitters.isEmpty()) {
-            // 使用 CopyOnWriteArrayList 的特性，避免 ConcurrentModificationException
             for (SseEmitter emitter : emitters) {
                 try {
                     // 發送物件，Spring 會自動轉為 JSON
                     emitter.send(message);
                 } catch (IOException e) {
-                    // 發送失敗通常代表連線已斷，移除該 emitter
                     emitter.completeWithError(e);
                     removeEmitter(storeId, emitter);
                 }
@@ -121,9 +122,8 @@ public class KdsService {
         }
     }
 
-    // 內部類別用於封裝 SSE 訊息格式
-    // 建議加上 Getter 確保 Jackson 能序列化成 JSON
-    public static class KdsMessage {
+    // DTO 類別 (需實作 Serializable 以便安全傳輸，雖然 JSON Converter 主要看 Getter)
+    public static class KdsMessage implements Serializable {
         private String action;
         private KdsOrderDto payload;
 
@@ -136,9 +136,12 @@ public class KdsService {
 
         public String getAction() { return action; }
         public KdsOrderDto getPayload() { return payload; }
+        // Setters are needed for Jackson deserialization if no constructor matches perfectly or for flexibility
+        public void setAction(String action) { this.action = action; }
+        public void setPayload(KdsOrderDto payload) { this.payload = payload; }
     }
 
-    public static class KdsBroadcastMessage {
+    public static class KdsBroadcastMessage implements Serializable {
         private Long storeId;
         private KdsMessage kdsMessage;
 
@@ -151,11 +154,7 @@ public class KdsService {
         public Long getStoreId() { return storeId; }
         public KdsMessage getKdsMessage() { return kdsMessage; }
 
-        public void setStoreId(Long storeId) {
-            this.storeId = storeId;
-        }
-        public void setKdsMessage(KdsMessage kdsMessage) {
-            this.kdsMessage = kdsMessage;
-        }
+        public void setStoreId(Long storeId) { this.storeId = storeId; }
+        public void setKdsMessage(KdsMessage kdsMessage) { this.kdsMessage = kdsMessage; }
     }
 }
