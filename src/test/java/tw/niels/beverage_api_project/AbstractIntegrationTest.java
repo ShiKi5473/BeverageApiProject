@@ -4,6 +4,7 @@ import com.redis.testcontainers.RedisContainer;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.RabbitMQContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -17,9 +18,15 @@ public abstract class AbstractIntegrationTest {
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:17.5");
 
-    // 修改這裡：改用專用的 RedisContainer
     @Container
     static RedisContainer redis = new RedisContainer(DockerImageName.parse("redis:alpine"));
+
+    @Container
+    static GenericContainer<?> minio = new GenericContainer<>(DockerImageName.parse("minio/minio:latest"))
+            .withEnv("MINIO_ROOT_USER", "minioadmin")
+            .withEnv("MINIO_ROOT_PASSWORD", "minioadmin")
+            .withCommand("server /data") // MinIO 啟動指令
+            .withExposedPorts(9000);
 
     @Container
     static RabbitMQContainer rabbitmq = new RabbitMQContainer(DockerImageName.parse("rabbitmq:3-management"));
@@ -40,5 +47,11 @@ public abstract class AbstractIntegrationTest {
         registry.add("spring.rabbitmq.port", rabbitmq::getAmqpPort);
         registry.add("spring.rabbitmq.username", rabbitmq::getAdminUsername);
         registry.add("spring.rabbitmq.password", rabbitmq::getAdminPassword);
+
+//        MinIO Config (動態對應容器的 Port)
+        registry.add("minio.endpoint", () -> "http://" + minio.getHost() + ":" + minio.getMappedPort(9000));
+        registry.add("minio.access-key", () -> "minioadmin");
+        registry.add("minio.secret-key", () -> "minioadmin");
+        registry.add("minio.bucket-name", () -> "test-bucket");
     }
 }
