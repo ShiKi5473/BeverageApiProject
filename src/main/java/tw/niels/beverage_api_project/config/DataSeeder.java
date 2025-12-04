@@ -10,8 +10,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import tw.niels.beverage_api_project.modules.brand.entity.Brand;
 import tw.niels.beverage_api_project.modules.brand.repository.BrandRepository;
+import tw.niels.beverage_api_project.modules.product.entity.OptionGroup;
 import tw.niels.beverage_api_project.modules.product.entity.Product;
+import tw.niels.beverage_api_project.modules.product.entity.ProductOption;
 import tw.niels.beverage_api_project.modules.product.enums.ProductStatus;
+import tw.niels.beverage_api_project.modules.product.enums.SelectionType;
+import tw.niels.beverage_api_project.modules.product.repository.OptionGroupRepository;
+import tw.niels.beverage_api_project.modules.product.repository.ProductOptionRepository;
 import tw.niels.beverage_api_project.modules.product.repository.ProductRepository;
 import tw.niels.beverage_api_project.modules.store.entity.Store;
 import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
@@ -21,9 +26,10 @@ import tw.niels.beverage_api_project.modules.user.enums.StaffRole;
 import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
 
 import java.math.BigDecimal;
+import java.util.Set;
 
 @Component
-@Profile("dev") // 限制只在 dev 環境執行
+@Profile("dev")
 public class DataSeeder implements CommandLineRunner {
 
     private static final Logger logger = LoggerFactory.getLogger(DataSeeder.class);
@@ -32,17 +38,23 @@ public class DataSeeder implements CommandLineRunner {
     private final BrandRepository brandRepository;
     private final StoreRepository storeRepository;
     private final ProductRepository productRepository;
+    private final OptionGroupRepository optionGroupRepository;
+    private final ProductOptionRepository productOptionRepository;
     private final PasswordEncoder passwordEncoder;
 
     public DataSeeder(UserRepository userRepository,
                       BrandRepository brandRepository,
                       StoreRepository storeRepository,
                       ProductRepository productRepository,
+                      OptionGroupRepository optionGroupRepository,
+                      ProductOptionRepository productOptionRepository,
                       PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.brandRepository = brandRepository;
         this.storeRepository = storeRepository;
         this.productRepository = productRepository;
+        this.optionGroupRepository = optionGroupRepository;
+        this.productOptionRepository = productOptionRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -53,20 +65,20 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private void seedDataForK6Testing() {
-        // 1. 建立品牌 (強制 ID = 1，配合 K6 腳本)
+        // 1. 建立品牌 (ID = 1)
         Brand brand = brandRepository.findById(1L).orElseGet(() -> {
             Brand b = new Brand();
-            b.setId(1L); // 【關鍵】手動指定 ID
+            b.setId(1L);
             b.setName("品茶軒");
             b.setContactPerson("測試員");
             b.setActive(true);
             return brandRepository.save(b);
         });
 
-        // 2. 建立分店 (強制 ID = 1)
+        // 2. 建立分店 (ID = 1)
         Store store = storeRepository.findById(1L).orElseGet(() -> {
             Store s = new Store();
-            s.setId(1L); // 【關鍵】手動指定 ID
+            s.setId(1L);
             s.setBrand(brand);
             s.setName("台北總店");
             s.setAddress("台北市測試路1號");
@@ -74,37 +86,87 @@ public class DataSeeder implements CommandLineRunner {
             return storeRepository.save(s);
         });
 
-        // 3. 建立店員帳號 (0911111111)
+        // 3. 建立店員帳號
         if (userRepository.findByPrimaryPhoneAndBrandId("0911111111", brand.getBrandId()).isEmpty()) {
             User user = new User();
             user.setBrand(brand);
             user.setPrimaryPhone("0911111111");
-            user.setPasswordHash(passwordEncoder.encode("password123")); // 預設密碼
+            user.setPasswordHash(passwordEncoder.encode("password123"));
             user.setActive(true);
 
             StaffProfile profile = new StaffProfile();
             profile.setFullName("K6 測試員");
             profile.setEmployeeNumber("K6-001");
             profile.setRole(StaffRole.MANAGER);
-            profile.setStore(store); // 綁定分店
+            profile.setStore(store);
             user.setStaffProfile(profile);
 
             userRepository.save(user);
-            logger.info("已建立 K6 測試帳號: 0911111111 / password123 (Brand: 1, Store: 1)");
+            logger.info("已建立 K6 測試帳號");
         }
 
-        // 4. 建立測試商品 (強制 ID = 1)
-        if (productRepository.findByBrand_IdAndId(brand.getBrandId(), 1L).isEmpty()) {
-            Product product = new Product();
-            product.setId(1L); // 【關鍵】手動指定 ID
-            product.setBrand(brand);
-            product.setName("招牌紅茶");
-            product.setDescription("K6 測試專用商品");
-            product.setBasePrice(new BigDecimal("30.00"));
-            product.setStatus(ProductStatus.ACTIVE);
+        // 4. 建立選項群組與選項 (固定 ID 以便 K6 使用)
+        // Group 10: 甜度
+        OptionGroup sugarGroup = optionGroupRepository.findById(10L).orElseGet(() -> {
+            OptionGroup g = new OptionGroup();
+            g.setId(10L);
+            g.setBrand(brand);
+            g.setName("甜度");
+            g.setSelectionType(SelectionType.SINGLE);
+            g.setSortOrder(1);
+            return optionGroupRepository.save(g);
+        });
 
+        // Option 11: 半糖
+        if (productOptionRepository.findById(11L).isEmpty()) {
+            ProductOption opt = new ProductOption();
+            opt.setId(11L);
+            opt.setOptionGroup(sugarGroup);
+            opt.setOptionName("半糖");
+            opt.setPriceAdjustment(BigDecimal.ZERO);
+            opt.setDefault(false);
+            productOptionRepository.save(opt);
+        }
+
+        // Group 20: 冰塊
+        OptionGroup iceGroup = optionGroupRepository.findById(20L).orElseGet(() -> {
+            OptionGroup g = new OptionGroup();
+            g.setId(20L);
+            g.setBrand(brand);
+            g.setName("冰塊");
+            g.setSelectionType(SelectionType.SINGLE);
+            g.setSortOrder(2);
+            return optionGroupRepository.save(g);
+        });
+
+        // Option 21: 少冰
+        if (productOptionRepository.findById(21L).isEmpty()) {
+            ProductOption opt = new ProductOption();
+            opt.setId(21L);
+            opt.setOptionGroup(iceGroup);
+            opt.setOptionName("少冰");
+            opt.setPriceAdjustment(BigDecimal.ZERO);
+            opt.setDefault(false);
+            productOptionRepository.save(opt);
+        }
+
+        // 5. 建立或取得商品 (ID = 1)
+        Product product = productRepository.findByBrand_IdAndId(brand.getBrandId(), 1L).orElseGet(() -> {
+            Product p = new Product();
+            p.setId(1L);
+            p.setBrand(brand);
+            p.setName("招牌紅茶");
+            p.setDescription("K6 測試專用商品");
+            p.setBasePrice(new BigDecimal("30.00"));
+            p.setStatus(ProductStatus.ACTIVE);
+            return productRepository.save(p);
+        });
+
+        // 6. 確保商品關聯到選項群組 (即使商品已存在也要更新，以防之前沒有關聯)
+        if (product.getOptionGroups() == null || product.getOptionGroups().isEmpty()) {
+            product.setOptionGroups(Set.of(sugarGroup, iceGroup));
             productRepository.save(product);
-            logger.info("已建立 K6 測試商品: 招牌紅茶 (ID: 1)");
+            logger.info("已更新測試商品(ID:1)的選項群組關聯");
         }
     }
 }
