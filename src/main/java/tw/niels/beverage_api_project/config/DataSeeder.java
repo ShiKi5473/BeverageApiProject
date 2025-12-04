@@ -26,6 +26,7 @@ import tw.niels.beverage_api_project.modules.user.enums.StaffRole;
 import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
 
 import java.math.BigDecimal;
+import java.util.Optional;
 import java.util.Set;
 
 @Component
@@ -86,8 +87,17 @@ public class DataSeeder implements CommandLineRunner {
             return storeRepository.save(s);
         });
 
-        // 3. 建立店員帳號
-        if (userRepository.findByPrimaryPhoneAndBrandId("0911111111", brand.getBrandId()).isEmpty()) {
+        // 3. 建立或更新店員帳號
+        Optional<User> existingUser = userRepository.findByPrimaryPhoneAndBrandId("0911111111", brand.getBrandId());
+
+        if (existingUser.isPresent()) {
+            // 強制重設密碼
+            User user = existingUser.get();
+            user.setPasswordHash(passwordEncoder.encode("password123"));
+            userRepository.save(user);
+            logger.info("DataSeeder: 已更新測試帳號密碼: 0911111111");
+        } else {
+            // 建立新帳號
             User user = new User();
             user.setBrand(brand);
             user.setPrimaryPhone("0911111111");
@@ -102,11 +112,10 @@ public class DataSeeder implements CommandLineRunner {
             user.setStaffProfile(profile);
 
             userRepository.save(user);
-            logger.info("已建立 K6 測試帳號");
+            logger.info("DataSeeder: 已建立 K6 測試帳號: 0911111111");
         }
 
-        // 4. 建立選項群組與選項 (固定 ID 以便 K6 使用)
-        // Group 10: 甜度
+        // 4. 建立選項群組與選項
         OptionGroup sugarGroup = optionGroupRepository.findById(10L).orElseGet(() -> {
             OptionGroup g = new OptionGroup();
             g.setId(10L);
@@ -117,7 +126,6 @@ public class DataSeeder implements CommandLineRunner {
             return optionGroupRepository.save(g);
         });
 
-        // Option 11: 半糖
         if (productOptionRepository.findById(11L).isEmpty()) {
             ProductOption opt = new ProductOption();
             opt.setId(11L);
@@ -128,7 +136,6 @@ public class DataSeeder implements CommandLineRunner {
             productOptionRepository.save(opt);
         }
 
-        // Group 20: 冰塊
         OptionGroup iceGroup = optionGroupRepository.findById(20L).orElseGet(() -> {
             OptionGroup g = new OptionGroup();
             g.setId(20L);
@@ -139,7 +146,6 @@ public class DataSeeder implements CommandLineRunner {
             return optionGroupRepository.save(g);
         });
 
-        // Option 21: 少冰
         if (productOptionRepository.findById(21L).isEmpty()) {
             ProductOption opt = new ProductOption();
             opt.setId(21L);
@@ -150,7 +156,7 @@ public class DataSeeder implements CommandLineRunner {
             productOptionRepository.save(opt);
         }
 
-        // 5. 建立或取得商品 (ID = 1)
+        // 5. 建立商品
         Product product = productRepository.findByBrand_IdAndId(brand.getBrandId(), 1L).orElseGet(() -> {
             Product p = new Product();
             p.setId(1L);
@@ -162,11 +168,11 @@ public class DataSeeder implements CommandLineRunner {
             return productRepository.save(p);
         });
 
-        // 6. 確保商品關聯到選項群組 (即使商品已存在也要更新，以防之前沒有關聯)
         if (product.getOptionGroups() == null || product.getOptionGroups().isEmpty()) {
             product.setOptionGroups(Set.of(sugarGroup, iceGroup));
             productRepository.save(product);
-            logger.info("已更新測試商品(ID:1)的選項群組關聯");
         }
+
+        logger.info("DataSeeder: 初始化資料完成！");
     }
 }
