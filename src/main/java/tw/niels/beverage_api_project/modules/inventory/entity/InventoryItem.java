@@ -21,16 +21,26 @@ public class InventoryItem extends BaseTsidEntity {
     private String name;
 
     @Column(nullable = false, length = 20)
-    private String unit; // 單位 (e.g., "ml", "g", "瓶")
+    private String unit;
 
-    // 總庫存量 (快取欄位，用於快速檢查與鎖定)
+    // --- V9 新增欄位 ---
+
+    @Column(name = "cost_per_unit", precision = 10, scale = 4)
+    private BigDecimal costPerUnit = BigDecimal.ZERO;
+
+    @Column(name = "safety_stock")
+    private Integer safetyStock = 0;
+
+    @Column(name = "is_active", nullable = false)
+    private Boolean isActive = true;
+
+    // --- 原有欄位 (total_quantity) 仍保留，但語義可能轉變為"參考庫存" ---
     @Column(name = "total_quantity", nullable = false, precision = 12, scale = 2)
     private BigDecimal totalQuantity = BigDecimal.ZERO;
 
-    // Constructors
+    // Constructors, Getters & Setters
     public InventoryItem() {}
 
-    // Getters & Setters
     public Long getInventoryItemId() { return getId(); }
     public void setInventoryItemId(Long id) { setId(id); }
 
@@ -42,6 +52,15 @@ public class InventoryItem extends BaseTsidEntity {
 
     public String getUnit() { return unit; }
     public void setUnit(String unit) { this.unit = unit; }
+
+    public BigDecimal getCostPerUnit() { return costPerUnit; }
+    public void setCostPerUnit(BigDecimal costPerUnit) { this.costPerUnit = costPerUnit; }
+
+    public Integer getSafetyStock() { return safetyStock; }
+    public void setSafetyStock(Integer safetyStock) { this.safetyStock = safetyStock; }
+
+    public Boolean getActive() { return isActive; }
+    public void setActive(Boolean active) { isActive = active; }
 
     public BigDecimal getTotalQuantity() { return totalQuantity; }
     public void setTotalQuantity(BigDecimal totalQuantity) { this.totalQuantity = totalQuantity; }
