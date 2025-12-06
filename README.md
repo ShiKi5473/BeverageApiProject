@@ -79,21 +79,18 @@ graph TD
 ### 啟動步驟
 1. **啟動基礎設施 (資料庫、訊息佇列、儲存服務)**：
 
-```markdown
 ```bash
 docker-compose up -d
 ```
 
 
 2. **啟動後端應用**：
-```markdown
 ```bash
 ./mvnw spring-boot:run
 ```
 *系統啟動時，DataSeeder 會自動初始化測試用的品牌、分店、商品與庫存資料。*
 
 3. **啟動前端** ：
-```markdown
 ```bash
 cd frontend
 npm install
@@ -110,7 +107,6 @@ npm run dev
 
 ### 執行單元與整合測試
 本專案使用 **Testcontainers** 啟動真實的 DB 環境進行測試：
-```markdown
 ```bash
 ./mvnw verify
 ```
@@ -118,7 +114,6 @@ npm run dev
 ### 執行 K6 壓力測試
 
 驗證庫存併發扣減的正確性：
-```markdown
 ```bash
 k6 run tests/k6/scenarios/inventory_stress.js
 ```
