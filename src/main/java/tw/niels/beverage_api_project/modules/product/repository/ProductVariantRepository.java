@@ -1,0 +1,52 @@
+package tw.niels.beverage_api_project.modules.product.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.lang.NonNull;
+import org.springframework.stereotype.Repository;
+import tw.niels.beverage_api_project.modules.product.entity.ProductVariant;
+
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface ProductVariantRepository extends JpaRepository<ProductVariant, Long> {
+
+    /**
+     * 查詢指定品牌、指定商品的所有規格
+     * 路徑：ProductVariant -> Product -> Brand
+     */
+    List<ProductVariant> findByProduct_Brand_IdAndProduct_Id(Long brandId, Long productId);
+
+    /**
+     * 查詢指定品牌下的單一規格 (安全查詢)
+     */
+    Optional<ProductVariant> findByProduct_Brand_IdAndId(Long brandId, Long id);
+
+    // --- 安全防護：禁用預設不分租戶的查詢方法 ---
+
+    @Deprecated
+    @Override
+    @NonNull
+    default Optional<ProductVariant> findById(@NonNull Long id) {
+        throw new UnsupportedOperationException("禁止使用 findById()，請改用 findByProduct_Brand_IdAndId() 以確保品牌隔離");
+    }
+
+    @Deprecated
+    @Override
+    @NonNull
+    default List<ProductVariant> findAll() {
+        throw new UnsupportedOperationException("禁止使用 findAll()，請改用 findByProduct_Brand_IdAndProduct_Id() 以確保品牌隔離");
+    }
+
+    @Deprecated
+    @Override
+    default void deleteById(@NonNull Long id) {
+        throw new UnsupportedOperationException("禁止使用 deleteById()，請先查詢驗證 BrandId 後再刪除");
+    }
+
+    @Deprecated
+    @Override
+    default boolean existsById(@NonNull Long id) {
+        throw new UnsupportedOperationException("禁止使用 existsById()，請改用包含 BrandId 的查詢");
+    }
+}

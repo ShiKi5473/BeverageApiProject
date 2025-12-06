@@ -20,10 +20,12 @@ import tw.niels.beverage_api_project.modules.product.dto.ProductSummaryDto;
 import tw.niels.beverage_api_project.modules.product.entity.Category;
 import tw.niels.beverage_api_project.modules.product.entity.OptionGroup;
 import tw.niels.beverage_api_project.modules.product.entity.Product;
+import tw.niels.beverage_api_project.modules.product.entity.ProductVariant;
 import tw.niels.beverage_api_project.modules.product.enums.ProductStatus;
 import tw.niels.beverage_api_project.modules.product.repository.CategoryRepository;
 import tw.niels.beverage_api_project.modules.product.repository.OptionGroupRepository;
 import tw.niels.beverage_api_project.modules.product.repository.ProductRepository;
+import tw.niels.beverage_api_project.modules.product.repository.ProductVariantRepository;
 
 @Service
 public class ProductService {
@@ -31,30 +33,36 @@ public class ProductService {
     private final BrandRepository brandRepository;
     private final CategoryRepository categoryRepository;
     private final OptionGroupRepository optionGroupRepository;
+    private final ProductVariantRepository productVariantRepository;
 
-    public ProductService(ProductRepository productRepository, BrandRepository brandRepository,
-                          CategoryRepository categoryRepository, OptionGroupRepository optionGroupRepository) {
+    public ProductService(ProductRepository productRepository,
+                          BrandRepository brandRepository,
+                          CategoryRepository categoryRepository,
+                          OptionGroupRepository optionGroupRepository,
+                          ProductVariantRepository productVariantRepository) {
         this.productRepository = productRepository;
         this.brandRepository = brandRepository;
         this.categoryRepository = categoryRepository;
         this.optionGroupRepository = optionGroupRepository;
+        this.productVariantRepository = productVariantRepository;
     }
 
     /**
-     * 建立商品，並清除該品牌的相關快取
+     * 建立商品，並自動建立預設規格 (Default Variant)
      */
     @Transactional
-    @CacheEvict(value = {"product-summary", "product-pos"}, key = "#brandId") // 【新增】清除快取
+    @CacheEvict(value = {"product-summary", "product-pos"}, key = "#brandId")
     public Product createProduct(Long brandId, CreateProductRequestDto request) {
         Brand brand = brandRepository.findById(brandId)
                 .orElseThrow(() -> new RuntimeException("找不到品牌，ID：" + brandId));
 
+        // 1. 驗證與設定分類
         Set<Category> categories = categoryRepository.findByBrand_IdAndIdIn(brandId, request.getCategoryIds());
-
         if (categories.size() != request.getCategoryIds().size()) {
             throw new RuntimeException("部分分類 ID 無效");
         }
 
+        // 2. 驗證與設定選項群組
         Set<OptionGroup> optionGroups = new HashSet<>();
         if (request.getOptionGroupIds() != null && !request.getOptionGroupIds().isEmpty()) {
             optionGroups = request.getOptionGroupIds().stream()
@@ -64,6 +72,8 @@ public class ProductService {
                                     "無效的選項群組 ID：" + groupId + " 或不屬於此品牌")))
                     .collect(Collectors.toSet());
         }
+
+        // 3. 建立並儲存 Product (主檔)
         Product newProduct = new Product();
         newProduct.setBrand(brand);
         newProduct.setName(request.getName());
@@ -74,7 +84,19 @@ public class ProductService {
         newProduct.setCategories(categories);
         newProduct.setOptionGroups(optionGroups);
 
-        return productRepository.save(newProduct);
+        Product savedProduct = productRepository.save(newProduct);
+
+        // 4. 【新增邏輯】自動建立預設規格 (Variant)
+        // 為了相容舊系統與簡化操作，預設建立一個名為 "標準" 的規格
+        ProductVariant defaultVariant = new ProductVariant();
+        defaultVariant.setProduct(savedProduct);
+        defaultVariant.setName("標準"); // 或使用 "預設", "Regular"
+        defaultVariant.setPrice(request.getBasePrice()); // 預設價格 = 商品基本價
+        // defaultVariant.setSkuCode(...); // 未來可加入自動生成 SKU 邏輯
+
+        productVariantRepository.save(defaultVariant);
+
+        return savedProduct;
     }
 
     /**
