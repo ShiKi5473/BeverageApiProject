@@ -11,6 +11,7 @@ services:
       - SPRING_DATA_REDIS_HOST=redis
       - SPRING_RABBITMQ_HOST=rabbitmq
       - MINIO_ENDPOINT=http://minio:9000
+      - ZIPKIN_ENDPOINT=http://zipkin:9411/api/v2/spans
     depends_on:
       - postgres
       - redis

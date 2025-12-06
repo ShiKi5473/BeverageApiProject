@@ -30,7 +30,7 @@ public class InventoryController {
     }
 
     @PostMapping("/shipments")
-    @PreAuthorize("hasAnyRole('MANAGER', 'STAFF')")
+    @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
     @Operation(summary = "進貨 (Add Stock)", description = "員工輸入進貨單，系統自動產生 FIFO 批次")
     @Audit(action = "INVENTORY_ADD_SHIPMENT")
     public ResponseEntity<?> addShipment(@PathVariable Long storeId,
@@ -44,7 +44,7 @@ public class InventoryController {
     }
 
     @GetMapping("/{itemId}")
-    @PreAuthorize("hasAnyRole('MANAGER', 'STAFF')")
+    @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
     @Operation(summary = "查詢庫存量", description = "查詢特定原物料的當前總庫存")
     public ResponseEntity<Map<String, BigDecimal>> checkStock(@PathVariable Long storeId,
                                                               @PathVariable Long itemId) {
@@ -58,7 +58,7 @@ public class InventoryController {
      * 權限：店長或店員 (MANAGER, STAFF)
      */
     @PostMapping("/audit")
-    @PreAuthorize("hasAnyRole('MANAGER', 'STAFF')")
+    @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
     @Operation(summary = "提交盤點結果", description = "輸入盤點後的實際數量，系統將自動計算差異並記錄異動")
     @Audit(action = "INVENTORY_AUDIT")
     public ResponseEntity<?> performAudit(
@@ -80,7 +80,7 @@ public class InventoryController {
      * 未來這段邏輯會被 OrderService 自動呼叫。
      */
     @PostMapping("/{itemId}/deduct")
-    @PreAuthorize("hasAnyRole('MANAGER')") // 限制僅店長可手動扣庫存
+    @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER')")
     @Operation(summary = "手動扣減庫存 (測試 FIFO)", description = "測試 FIFO 邏輯是否正確扣減過期批次")
     @Audit(action = "INVENTORY_MANUAL_DEDUCT")
     public ResponseEntity<?> manualDeduct(@PathVariable Long storeId,

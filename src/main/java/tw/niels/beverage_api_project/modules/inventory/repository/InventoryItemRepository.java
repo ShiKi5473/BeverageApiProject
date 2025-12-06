@@ -9,6 +9,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Repository;
 import tw.niels.beverage_api_project.modules.inventory.entity.InventoryItem;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -18,6 +19,9 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, Lo
     List<InventoryItem> findByBrand_Id(Long brandId);
 
     Optional<InventoryItem> findByBrand_IdAndName(Long brandId, String name);
+
+    // 一次查詢多個 ID
+    List<InventoryItem> findByBrand_IdAndIdIn(Long brandId, Collection<Long> ids);
 
     /**
      * 取得原物料並加寫入鎖 (SELECT FOR UPDATE)

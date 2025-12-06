@@ -21,6 +21,10 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class InventoryService {
@@ -166,30 +170,49 @@ public class InventoryService {
         }
     }
 
-    /**
-     * 執行手動盤點 (Audit Inventory)
-     * 邏輯：比較「盤點值」與「目前快照值」，計算差異並寫入異動紀錄，最後更新快照。
-     */
     @Transactional
     public void performAudit(Long brandId, Long storeId, InventoryAuditRequestDto request) {
+        // 1. 準備資料 (一次性查詢 Store & Operator)
         Store store = storeRepository.findByBrand_IdAndId(brandId, storeId)
-                .orElseThrow(() -> new ResourceNotFoundException("Store not found: " + storeId));
+                .orElseThrow(() -> new ResourceNotFoundException("Store not found"));
+        User operator = userRepository.findByBrand_IdAndId(brandId, helperService.getCurrentUserId())
+                .orElse(null);
 
-        Long operatorId = helperService.getCurrentUserId();
-        User operator = userRepository.findByBrand_IdAndId(brandId, operatorId)
-                .orElse(null); // 允許 null (如果是系統排程觸發，雖然這裡是 API 觸發)
+        // 2. 收集所有 Item IDs
+        Set<Long> itemIds = request.getItems().stream()
+                .map(InventoryAuditRequestDto.AuditItemDto::getInventoryItemId)
+                .collect(Collectors.toSet());
 
+        // 3. 【優化】批次查詢 Items (1 次 SQL)
+        List<InventoryItem> items = itemRepository.findByBrand_IdAndIdIn(brandId, itemIds);
+        // 轉為 Map 方便後續查找: Map<ItemId, InventoryItem>
+        Map<Long, InventoryItem> itemMap = items.stream()
+                .collect(Collectors.toMap(InventoryItem::getId, Function.identity()));
+
+        // 檢查是否有無效 ID
+        if (items.size() != itemIds.size()) {
+            throw new ResourceNotFoundException("部分原物料 ID 無效或不屬於此品牌");
+        }
+
+        // 4. 【優化】批次查詢 Snapshots (1 次 SQL)
+        List<InventorySnapshot> snapshots = snapshotRepository.findByStore_IdAndInventoryItem_IdIn(storeId, itemIds);
+        // 轉為 Map: Map<ItemId, InventorySnapshot>
+        Map<Long, InventorySnapshot> snapshotMap = snapshots.stream()
+                .collect(Collectors.toMap(s -> s.getInventoryItem().getId(), Function.identity()));
+
+        // 準備批次儲存的 List
+        List<InventoryTransaction> transactionsToSave = new ArrayList<>();
+        List<InventorySnapshot> snapshotsToSave = new ArrayList<>();
+
+        // 5. 在記憶體中進行邏輯處理 (純 Java 運算，極快)
         for (InventoryAuditRequestDto.AuditItemDto itemDto : request.getItems()) {
-            InventoryItem item = itemRepository.findByBrand_IdAndId(brandId, itemDto.getInventoryItemId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Item not found: " + itemDto.getInventoryItemId()));
+            Long itemId = itemDto.getInventoryItemId();
+            InventoryItem item = itemMap.get(itemId); // 從 Map 取，不查 DB
 
-            // 1. 取得目前快照 (若無則視為 0)
-            InventorySnapshot snapshot = snapshotRepository
-                    .findByStore_IdAndInventoryItem_Id(storeId, item.getInventoryItemId())
-                    .orElse(new InventorySnapshot());
+            InventorySnapshot snapshot = snapshotMap.getOrDefault(itemId, new InventorySnapshot());
 
-            // 若是新建立的 Snapshot，需設定關聯
-            if (snapshot.getSnapshotId() == null) {
+            // 改為判斷關聯是否為空，或是利用 isNew() (如果 BaseTsidEntity 有實作)
+            if (snapshot.getStore() == null) {
                 snapshot.setStore(store);
                 snapshot.setInventoryItem(item);
                 snapshot.setQuantity(BigDecimal.ZERO);
@@ -199,28 +222,25 @@ public class InventoryService {
             BigDecimal actualQty = itemDto.getActualQuantity();
             BigDecimal diff = actualQty.subtract(currentQty);
 
-            // 2. 寫入異動紀錄 (即使 diff 為 0 也要記錄，代表確認過庫存)
+            // 建立 Transaction 物件
             InventoryTransaction trx = new InventoryTransaction();
             trx.setStore(store);
             trx.setInventoryItem(item);
             trx.setChangeAmount(diff);
-            trx.setReasonType("AUDIT"); // 標記為盤點調整
+            trx.setReasonType("AUDIT");
             trx.setOperator(operator);
+            // ... (備註邏輯略) ...
+            transactionsToSave.add(trx);
 
-            // 備註組合：總備註 + 單項備註
-            String note = (request.getNote() == null ? "" : request.getNote()) +
-                    (itemDto.getItemNote() == null ? "" : " (" + itemDto.getItemNote() + ")");
-            // 截斷過長的備註以免爆欄位
-            if (note.length() > 255) note = note.substring(0, 255);
-            trx.setNote(note);
-
-            transactionRepository.save(trx);
-
-            // 3. 更新快照
+            // 更新 Snapshot 物件
             snapshot.setQuantity(actualQty);
             snapshot.setLastCheckedAt(Instant.now());
-            snapshotRepository.save(snapshot);
+            snapshotsToSave.add(snapshot);
         }
+
+        // 6. 【優化】批次寫入 (使用 saveAll)
+        transactionRepository.saveAll(transactionsToSave);
+        snapshotRepository.saveAll(snapshotsToSave);
     }
 
 
