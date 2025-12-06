@@ -84,18 +84,30 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private void seedDataForK6Testing() {
-        // 1. 建立品牌 (ID = 1)
-        Brand brand = brandRepository.findById(1L).orElseGet(() -> {
-            Brand b = new Brand();
-            b.setId(1L);
-            b.setName("品茶軒");
-            b.setContactPerson("測試員");
-            b.setActive(true);
-            return brandRepository.save(b);
+        // ==========================================
+        // 1. 建立品牌 (修正：優先檢查名稱，避免 Unique Constraint 衝突)
+        // ==========================================
+        Brand brand = brandRepository.findByName("品茶軒").orElseGet(() -> {
+            // 如果沒找到名字，再嘗試找 ID (防禦性檢查)
+            return brandRepository.findById(1L).map(existing -> {
+                // ID 1 存在但名字不同 -> 改名為品茶軒 (確保測試環境一致)
+                existing.setName("品茶軒");
+                return brandRepository.save(existing);
+            }).orElseGet(() -> {
+                // 完全不存在 -> 建立新的
+                Brand b = new Brand();
+                b.setId(1L); // 強制指定 ID 為 1
+                b.setName("品茶軒");
+                b.setContactPerson("測試員");
+                b.setActive(true);
+                return brandRepository.save(b);
+            });
         });
-
-        // 2. 建立分店 (ID = 1)
+        // ==========================================
+        // 2. 建立分店 (修正：增加防呆，避免重複建立)
+        // ==========================================
         Store store = storeRepository.findByBrand_IdAndId(brand.getBrandId(), 1L).orElseGet(() -> {
+            // 這裡也可以額外檢查是否已有同名分店，但通常分店ID綁定比較固定，暫時維持 ID 檢查
             Store s = new Store();
             s.setId(1L);
             s.setBrand(brand);
@@ -130,17 +142,28 @@ public class DataSeeder implements CommandLineRunner {
             logger.info("DataSeeder: 已更新測試帳號密碼: 0911111111");
         }
 
-        // 4. 建立選項群組與選項
-        OptionGroup sugarGroup = optionGroupRepository.findByBrand_IdAndId(brand.getBrandId(), 10L).orElseGet(() -> {
-            OptionGroup g = new OptionGroup();
-            g.setId(10L);
-            g.setBrand(brand);
-            g.setName("甜度");
-            g.setSelectionType(SelectionType.SINGLE);
-            g.setSortOrder(1);
-            return optionGroupRepository.save(g);
-        });
+        // ==========================================
+        // 4. 建立選項群組與選項 (【本次修正重點】)
+        // ==========================================
 
+        // --- 4.1 甜度 ---
+        OptionGroup sugarGroup = optionGroupRepository.findByBrand_IdAndName(brand.getBrandId(), "甜度")
+                .orElseGet(() -> optionGroupRepository.findByBrand_IdAndId(brand.getBrandId(), 10L)
+                        .map(existing -> {
+                            existing.setName("甜度");
+                            return optionGroupRepository.save(existing);
+                        })
+                        .orElseGet(() -> {
+                            OptionGroup g = new OptionGroup();
+                            g.setId(10L);
+                            g.setBrand(brand);
+                            g.setName("甜度");
+                            g.setSelectionType(SelectionType.SINGLE);
+                            g.setSortOrder(1);
+                            return optionGroupRepository.save(g);
+                        }));
+
+        // 建立 "半糖" 選項 (檢查邏輯不變，因為 Option 沒有 Unique Name Constraint)
         if (productOptionRepository.findByOptionGroup_Brand_IdAndId(brand.getBrandId(), 11L).isEmpty()) {
             ProductOption opt = new ProductOption();
             opt.setId(11L);
@@ -151,16 +174,24 @@ public class DataSeeder implements CommandLineRunner {
             productOptionRepository.save(opt);
         }
 
-        OptionGroup iceGroup = optionGroupRepository.findByBrand_IdAndId(brand.getBrandId(), 20L).orElseGet(() -> {
-            OptionGroup g = new OptionGroup();
-            g.setId(20L);
-            g.setBrand(brand);
-            g.setName("冰塊");
-            g.setSelectionType(SelectionType.SINGLE);
-            g.setSortOrder(2);
-            return optionGroupRepository.save(g);
-        });
+        // --- 4.2 冰塊 ---
+        OptionGroup iceGroup = optionGroupRepository.findByBrand_IdAndName(brand.getBrandId(), "冰塊")
+                .orElseGet(() -> optionGroupRepository.findByBrand_IdAndId(brand.getBrandId(), 20L)
+                        .map(existing -> {
+                            existing.setName("冰塊");
+                            return optionGroupRepository.save(existing);
+                        })
+                        .orElseGet(() -> {
+                            OptionGroup g = new OptionGroup();
+                            g.setId(20L);
+                            g.setBrand(brand);
+                            g.setName("冰塊");
+                            g.setSelectionType(SelectionType.SINGLE);
+                            g.setSortOrder(2);
+                            return optionGroupRepository.save(g);
+                        }));
 
+        // 建立 "少冰" 選項
         if (productOptionRepository.findByOptionGroup_Brand_IdAndId(brand.getBrandId(), 21L).isEmpty()) {
             ProductOption opt = new ProductOption();
             opt.setId(21L);
@@ -171,38 +202,60 @@ public class DataSeeder implements CommandLineRunner {
             productOptionRepository.save(opt);
         }
 
-        // 5. 建立商品
-        Product product = productRepository.findByBrand_IdAndId(brand.getBrandId(), 1L).orElseGet(() -> {
-            Product p = new Product();
-            p.setId(1L);
-            p.setBrand(brand);
-            p.setName("招牌紅茶");
-            p.setDescription("K6 測試專用商品");
-            p.setBasePrice(new BigDecimal("30.00"));
-            p.setStatus(ProductStatus.ACTIVE);
-            return productRepository.save(p);
-        });
+        // ==========================================
+        // 5. 建立商品 (【本次修正重點】)
+        // ==========================================
+        Product product = productRepository.findByBrand_IdAndName(brand.getBrandId(), "招牌紅茶")
+                .orElseGet(() -> productRepository.findByBrand_IdAndId(brand.getBrandId(), 1L)
+                        .map(existing -> {
+                            existing.setName("招牌紅茶");
+                            return productRepository.save(existing);
+                        })
+                        .orElseGet(() -> {
+                            Product p = new Product();
+                            p.setId(1L);
+                            p.setBrand(brand);
+                            p.setName("招牌紅茶");
+                            p.setDescription("K6 測試專用商品");
+                            p.setBasePrice(new BigDecimal("30.00"));
+                            p.setStatus(ProductStatus.ACTIVE);
+                            // 注意：關聯會在下面處理
+                            return productRepository.save(p);
+                        }));
 
+        // 補上關聯
         if (product.getOptionGroups() == null || product.getOptionGroups().isEmpty()) {
             product.setOptionGroups(Set.of(sugarGroup, iceGroup));
             productRepository.save(product);
         }
 
-        // 6. 【新增】建立庫存資料 (Inventory Item + Batch)
+        // 確保 Variant 存在 (配合 V9 新架構)
+        // 您之後可能需要在此處補上 ProductVariant 的 Seeder 邏輯
 
-        // 6-1. 建立原物料
-        InventoryItem item = inventoryItemRepository.findByBrand_IdAndId(brand.getBrandId(), 1L).orElseGet(() -> {
-            InventoryItem i = new InventoryItem();
-            i.setInventoryItemId(1L);
-            i.setBrand(brand);
-            i.setName("測試用茶葉");
-            i.setUnit("g");
-            i.setTotalQuantity(new BigDecimal("1000.00")); // 初始總量
-            return inventoryItemRepository.save(i);
-        });
+        // ==========================================
+        // 6. 建立庫存資料 (【本次修正重點】)
+        // ==========================================
 
-        // 6-2. 建立進貨單 (PurchaseShipment) - 批次的父層
+        // 6-1. 原物料
+        InventoryItem item = inventoryItemRepository.findByBrand_IdAndName(brand.getBrandId(), "測試用茶葉")
+                .orElseGet(() -> inventoryItemRepository.findByBrand_IdAndId(brand.getBrandId(), 1L)
+                        .map(existing -> {
+                            existing.setName("測試用茶葉");
+                            return inventoryItemRepository.save(existing);
+                        })
+                        .orElseGet(() -> {
+                            InventoryItem i = new InventoryItem();
+                            i.setInventoryItemId(1L);
+                            i.setBrand(brand);
+                            i.setName("測試用茶葉");
+                            i.setUnit("g");
+                            i.setTotalQuantity(new BigDecimal("1000.00"));
+                            return inventoryItemRepository.save(i);
+                        }));
+
+        // 6-2. 進貨單 (Shipment 通常不檢查名稱，維持原樣)
         PurchaseShipment shipment = purchaseShipmentRepository.findByStore_Brand_IdAndId(brand.getBrandId(), 1L).orElseGet(() -> {
+            // ... 維持原樣 ...
             PurchaseShipment s = new PurchaseShipment();
             s.setShipmentId(1L);
             s.setStore(store);
@@ -212,19 +265,19 @@ public class DataSeeder implements CommandLineRunner {
             return purchaseShipmentRepository.save(s);
         });
 
-        // 6-3. 建立庫存批次 (InventoryBatch)
-        // 注意：這裡我們建立一個 ID 為 1 的批次，數量與 Item 總量一致
+        // 6-3. 庫存批次 (Batch 維持原樣，但需注意 V9 新增了 store_id)
+        // 如果您的 Batch Entity 已經更新了 V9 的 store 欄位，這裡需要補上 s.setStore(store);
         inventoryBatchRepository.findByShipment_Store_Brand_IdAndId(brand.getBrandId(), 1L).orElseGet(() -> {
             InventoryBatch b = new InventoryBatch();
-            b.setBatchId(1L); // 設定 ID (因為我們剛加了 setBatchId)
+            b.setBatchId(1L);
             b.setShipment(shipment);
             b.setInventoryItem(item);
+            b.setStore(store);
             b.setQuantityReceived(new BigDecimal("1000.00"));
-            b.setCurrentQuantity(new BigDecimal("1000.00")); // 足夠的庫存
-            b.setExpiryDate(LocalDate.now().plusYears(1)); // 明年過期
+            b.setCurrentQuantity(new BigDecimal("1000.00"));
+            b.setExpiryDate(LocalDate.now().plusYears(1));
             return inventoryBatchRepository.save(b);
         });
-
 
         logger.info("DataSeeder: 初始化資料完成！");
     }

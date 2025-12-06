@@ -185,7 +185,7 @@ public class InventoryService {
 
             // 1. 取得目前快照 (若無則視為 0)
             InventorySnapshot snapshot = snapshotRepository
-                    .findByStore_StoreIdAndInventoryItem_InventoryItemId(storeId, item.getInventoryItemId())
+                    .findByStore_IdAndInventoryItem_Id(storeId, item.getInventoryItemId())
                     .orElse(new InventorySnapshot());
 
             // 若是新建立的 Snapshot，需設定關聯
@@ -232,7 +232,7 @@ public class InventoryService {
     @Transactional(readOnly = true)
     public BigDecimal getCurrentStock(Long storeId, Long itemId) {
         // 從新的 Snapshot 表讀取
-        return snapshotRepository.findByStore_StoreIdAndInventoryItem_InventoryItemId(storeId, itemId)
+        return snapshotRepository.findByStore_IdAndInventoryItem_Id(storeId, itemId)
                 .map(InventorySnapshot::getQuantity)
                 .orElse(BigDecimal.ZERO);
     }

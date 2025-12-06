@@ -17,6 +17,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, Lo
 
     List<InventoryItem> findByBrand_Id(Long brandId);
 
+    Optional<InventoryItem> findByBrand_IdAndName(Long brandId, String name);
+
     /**
      * 取得原物料並加寫入鎖 (SELECT FOR UPDATE)
      * 用於扣減庫存時，鎖定該品項，防止死鎖與超賣。

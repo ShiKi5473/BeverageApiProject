@@ -14,6 +14,10 @@ public interface OptionGroupRepository extends JpaRepository<OptionGroup, Long> 
     List<OptionGroup> findByBrand_Id(Long brandId);
 
     Optional<OptionGroup> findByBrand_IdAndId(Long brandId, Long groupId);
+
+    // 根據品牌 ID 與名稱查詢 (用於 DataSeeder 防呆)
+    Optional<OptionGroup> findByBrand_IdAndName(Long brandId, String name);
+
     /**
      * 禁用預設的 findById，強迫使用 findByBrand_BrandIdAndGroupId()。
      */

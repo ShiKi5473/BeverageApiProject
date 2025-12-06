@@ -10,5 +10,5 @@ import java.util.Optional;
 public interface InventorySnapshotRepository extends JpaRepository<InventorySnapshot, Long> {
 
     // 查詢特定分店、特定物料的最新快照
-    Optional<InventorySnapshot> findByStore_StoreIdAndInventoryItem_InventoryItemId(Long storeId, Long itemId);
+    Optional<InventorySnapshot> findByStore_IdAndInventoryItem_Id(Long storeId, Long itemId);
 }
