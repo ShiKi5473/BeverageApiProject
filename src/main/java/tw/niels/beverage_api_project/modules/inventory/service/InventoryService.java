@@ -6,12 +6,9 @@ import tw.niels.beverage_api_project.common.exception.BadRequestException;
 import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
 import tw.niels.beverage_api_project.common.service.ControllerHelperService;
 import tw.niels.beverage_api_project.modules.inventory.dto.AddShipmentRequestDto;
-import tw.niels.beverage_api_project.modules.inventory.entity.InventoryBatch;
-import tw.niels.beverage_api_project.modules.inventory.entity.InventoryItem;
-import tw.niels.beverage_api_project.modules.inventory.entity.PurchaseShipment;
-import tw.niels.beverage_api_project.modules.inventory.repository.InventoryBatchRepository;
-import tw.niels.beverage_api_project.modules.inventory.repository.InventoryItemRepository;
-import tw.niels.beverage_api_project.modules.inventory.repository.PurchaseShipmentRepository;
+import tw.niels.beverage_api_project.modules.inventory.dto.InventoryAuditRequestDto;
+import tw.niels.beverage_api_project.modules.inventory.entity.*;
+import tw.niels.beverage_api_project.modules.inventory.repository.*;
 import tw.niels.beverage_api_project.modules.store.entity.Store;
 import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
 import tw.niels.beverage_api_project.modules.user.entity.User;
@@ -20,6 +17,7 @@ import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
 import tw.niels.beverage_api_project.modules.inventory.dao.InventoryBatchDAO;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,6 +32,8 @@ public class InventoryService {
     private final UserRepository userRepository;
     private final ControllerHelperService helperService;
     private final InventoryBatchDAO inventoryBatchDAO;
+    private final InventorySnapshotRepository snapshotRepository;
+    private final InventoryTransactionRepository transactionRepository;
 
     public InventoryService(InventoryItemRepository itemRepository,
                             InventoryBatchRepository batchRepository,
@@ -41,7 +41,9 @@ public class InventoryService {
                             PurchaseShipmentRepository shipmentRepository,
                             StoreRepository storeRepository,
                             UserRepository userRepository,
-                            ControllerHelperService helperService) {
+                            ControllerHelperService helperService,
+                            InventorySnapshotRepository snapshotRepository,
+                            InventoryTransactionRepository transactionRepository) {
         this.itemRepository = itemRepository;
         this.batchRepository = batchRepository;
         this.inventoryBatchDAO = inventoryBatchDAO;
@@ -49,6 +51,8 @@ public class InventoryService {
         this.storeRepository = storeRepository;
         this.userRepository = userRepository;
         this.helperService = helperService;
+        this.snapshotRepository = snapshotRepository;
+        this.transactionRepository = transactionRepository;
     }
 
     /**
@@ -163,24 +167,73 @@ public class InventoryService {
     }
 
     /**
-     * 查詢當前總庫存 (改為直接查 Item 表，不需加總 Batch，效能更好)
+     * 執行手動盤點 (Audit Inventory)
+     * 邏輯：比較「盤點值」與「目前快照值」，計算差異並寫入異動紀錄，最後更新快照。
+     */
+    @Transactional
+    public void performAudit(Long brandId, Long storeId, InventoryAuditRequestDto request) {
+        Store store = storeRepository.findByBrand_IdAndId(brandId, storeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Store not found: " + storeId));
+
+        Long operatorId = helperService.getCurrentUserId();
+        User operator = userRepository.findByBrand_IdAndId(brandId, operatorId)
+                .orElse(null); // 允許 null (如果是系統排程觸發，雖然這裡是 API 觸發)
+
+        for (InventoryAuditRequestDto.AuditItemDto itemDto : request.getItems()) {
+            InventoryItem item = itemRepository.findByBrand_IdAndId(brandId, itemDto.getInventoryItemId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Item not found: " + itemDto.getInventoryItemId()));
+
+            // 1. 取得目前快照 (若無則視為 0)
+            InventorySnapshot snapshot = snapshotRepository
+                    .findByStore_StoreIdAndInventoryItem_InventoryItemId(storeId, item.getInventoryItemId())
+                    .orElse(new InventorySnapshot());
+
+            // 若是新建立的 Snapshot，需設定關聯
+            if (snapshot.getSnapshotId() == null) {
+                snapshot.setStore(store);
+                snapshot.setInventoryItem(item);
+                snapshot.setQuantity(BigDecimal.ZERO);
+            }
+
+            BigDecimal currentQty = snapshot.getQuantity();
+            BigDecimal actualQty = itemDto.getActualQuantity();
+            BigDecimal diff = actualQty.subtract(currentQty);
+
+            // 2. 寫入異動紀錄 (即使 diff 為 0 也要記錄，代表確認過庫存)
+            InventoryTransaction trx = new InventoryTransaction();
+            trx.setStore(store);
+            trx.setInventoryItem(item);
+            trx.setChangeAmount(diff);
+            trx.setReasonType("AUDIT"); // 標記為盤點調整
+            trx.setOperator(operator);
+
+            // 備註組合：總備註 + 單項備註
+            String note = (request.getNote() == null ? "" : request.getNote()) +
+                    (itemDto.getItemNote() == null ? "" : " (" + itemDto.getItemNote() + ")");
+            // 截斷過長的備註以免爆欄位
+            if (note.length() > 255) note = note.substring(0, 255);
+            trx.setNote(note);
+
+            transactionRepository.save(trx);
+
+            // 3. 更新快照
+            snapshot.setQuantity(actualQty);
+            snapshot.setLastCheckedAt(Instant.now());
+            snapshotRepository.save(snapshot);
+        }
+    }
+
+
+
+    /**
+     * 查詢即時庫存 (改寫 getCurrentStock)
+     * Phase 3 修改：優先從 Snapshot 讀取，若無則回傳 0
      */
     @Transactional(readOnly = true)
     public BigDecimal getCurrentStock(Long storeId, Long itemId) {
-//        TODO 修正多店架構下的庫存問題
-        // 注意：這裡假設一個 Item 只屬於一個 Store 的庫存管理範疇，
-        // 但目前的架構 InventoryItem 是 Brand 層級的定義，庫存是跟著 Store (透過 Batch)
-        // 為了支援「分店庫存」，我們目前的 total_quantity 是存在 InventoryItem (Brand 層級) 上，
-        // 這在「單一品牌單一倉庫」沒問題，但在「多店」架構下，InventoryItem 的 total_quantity 會變成「全品牌總庫存」。
-
-        // 【修正邏輯】
-        // 由於 InventoryItem 是品牌共用的「定義」，我們不能把分店的庫存寫在 InventoryItem 上。
-        // 如果要優化「分店」庫存查詢，應該要有一張 `StoreInventory` 表。
-        // 但基於目前架構 (Batch 關聯 Store)，我們還是得維持 sumQuantityByStoreAndItem。
-        // 上面新增的 total_quantity 其實變成了「全品牌該物料總數」(若有此需求)。
-
-        // 暫時維持舊邏輯以確保分店資料正確：
-        return batchRepository.sumQuantityByStoreAndItem(storeId, itemId)
+        // 從新的 Snapshot 表讀取
+        return snapshotRepository.findByStore_StoreIdAndInventoryItem_InventoryItemId(storeId, itemId)
+                .map(InventorySnapshot::getQuantity)
                 .orElse(BigDecimal.ZERO);
     }
 

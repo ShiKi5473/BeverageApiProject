@@ -10,6 +10,7 @@ import tw.niels.beverage_api_project.common.annotation.Audit;
 import tw.niels.beverage_api_project.common.constants.ApiPaths;
 import tw.niels.beverage_api_project.common.service.ControllerHelperService;
 import tw.niels.beverage_api_project.modules.inventory.dto.AddShipmentRequestDto;
+import tw.niels.beverage_api_project.modules.inventory.dto.InventoryAuditRequestDto;
 import tw.niels.beverage_api_project.modules.inventory.service.InventoryService;
 
 import java.math.BigDecimal;
@@ -51,6 +52,27 @@ public class InventoryController {
         BigDecimal qty = inventoryService.getCurrentStock(storeId, itemId);
         return ResponseEntity.ok(Map.of("currentQuantity", qty));
     }
+
+    /**
+     * 執行盤點 (Audit)
+     * 權限：店長或店員 (MANAGER, STAFF)
+     */
+    @PostMapping("/audit")
+    @PreAuthorize("hasAnyRole('MANAGER', 'STAFF')")
+    @Operation(summary = "提交盤點結果", description = "輸入盤點後的實際數量，系統將自動計算差異並記錄異動")
+    @Audit(action = "INVENTORY_AUDIT")
+    public ResponseEntity<?> performAudit(
+            @PathVariable Long storeId,
+            @Valid @RequestBody InventoryAuditRequestDto request) {
+
+        helperService.validateStoreAccess(storeId);
+        Long brandId = helperService.getCurrentBrandId();
+
+        inventoryService.performAudit(brandId, storeId, request);
+
+        return ResponseEntity.ok(Map.of("message", "盤點完成，庫存已更新。"));
+    }
+
 
     /**
      * 手動扣減測試 API
