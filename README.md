@@ -17,11 +17,20 @@
     * **讀取**：使用 JPA 處理複雜關聯。
     * **寫入**：使用 **JDBC Batch Update** 處理高併發庫存扣減 (FIFO)，大幅降低資料庫鎖定時間。
 
-### 2. 即時互動與非同步 (Real-time & Async)
+### 2. 智慧庫存與耗損管理 (Smart Inventory & Waste Analysis)
+* **週期性盤點架構 (Periodic Review)**：
+    * 放棄傳統的銷售即扣庫存模式，改採 **「手動盤點 (Audit) + 快照 (Snapshot)」** 機制，更符合餐飲業實務。
+    * 支援 **批次盤點 API**，自動計算差異並寫入稽核日誌。
+* **配方倒扣與耗損分析 (BOM & Variance Report)**：
+    * 建立 `Recipe` (配方表)，定義飲品規格與原物料的關聯。
+    * **耗損報表**：自動計算「理論消耗量」與「實際盤點消耗量」的差異，精準抓出原料浪費與異常耗損。
+* **進貨履歷與食安追溯**：保留 `InventoryBatch` 作為進貨履歷，支援食安效期追溯。
+
+### 3. 即時互動與非同步 (Real-time & Async)
 * **事件驅動 KDS**：訂單狀態變更時發布 Domain Event，透過 **RabbitMQ** 廣播，並利用 **SSE (Server-Sent Events)** 推送至廚房螢幕，無需輪詢。
 * **非同步審計日誌**：關鍵操作 (如手動扣庫存、修改權限) 透過 AOP 攔截，並以 `@Async` 非同步寫入 **MongoDB**，實現操作軌跡全記錄。
 
-### 3. 可靠性與效能 (Reliability & Performance)
+### 4. 可靠性與效能 (Reliability & Performance)
 * **分散式鎖**：使用 **ShedLock** 確保排程任務 (如日結報表) 在叢集環境中單一執行。
 * **資料一致性**：庫存扣減採用 `PESSIMISTIC_WRITE` 悲觀鎖，經 **K6** 壓力測試驗證，在高併發搶購場景下無超賣。
 * **檔案分片上傳**：整合 **MinIO** 物件儲存，支援大檔案分片上傳與斷點續傳。
