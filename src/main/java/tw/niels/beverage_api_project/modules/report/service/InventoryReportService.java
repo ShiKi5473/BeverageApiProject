@@ -116,7 +116,7 @@ public class InventoryReportService {
 
             // A. 期初 (Start)
             InventoryTransaction startTx = transactionRepository
-                    .findFirstByStore_StoreIdAndInventoryItem_InventoryItemIdAndCreatedAtLessThanEqualOrderByCreatedAtDesc(
+                    .findFirstByStore_IdAndInventoryItem_IdAndCreatedAtLessThanEqualOrderByCreatedAtDesc(
                             storeId, itemId, startInstant)
                     .orElse(null);
             BigDecimal opening = startTx != null && startTx.getBalanceAfter() != null ?
@@ -124,7 +124,7 @@ public class InventoryReportService {
 
             // B. 期末 (End)
             InventoryTransaction endTx = transactionRepository
-                    .findFirstByStore_StoreIdAndInventoryItem_InventoryItemIdAndCreatedAtLessThanEqualOrderByCreatedAtDesc(
+                    .findFirstByStore_IdAndInventoryItem_IdAndCreatedAtLessThanEqualOrderByCreatedAtDesc(
                             storeId, itemId, endInstant)
                     .orElse(null);
             BigDecimal closing = endTx != null && endTx.getBalanceAfter() != null ?

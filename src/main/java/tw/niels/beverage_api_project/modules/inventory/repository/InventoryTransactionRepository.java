@@ -12,13 +12,13 @@ import java.util.Optional;
 @Repository
 public interface InventoryTransactionRepository extends JpaRepository<InventoryTransaction, Long> {
 
-    // 查詢某店、某物料、在指定時間點「之前」的最後一筆異動 (用於找期初餘額)
-    Optional<InventoryTransaction> findFirstByStore_StoreIdAndInventoryItem_InventoryItemIdAndCreatedAtLessThanEqualOrderByCreatedAtDesc(
+    // 找某個時間點之前的最後一筆紀錄 (用於決定期初/期末水位)
+    Optional<InventoryTransaction> findFirstByStore_IdAndInventoryItem_IdAndCreatedAtLessThanEqualOrderByCreatedAtDesc(
             Long storeId, Long itemId, Instant timestamp);
 
-    // 查詢期間內的進貨總量
+    // 統計區間內的進貨總量
     @Query("SELECT SUM(t.changeAmount) FROM InventoryTransaction t " +
-            "WHERE t.store.storeId = :storeId AND t.inventoryItem.inventoryItemId = :itemId " +
+            "WHERE t.store.id = :storeId AND t.inventoryItem.id = :itemId " +
             "AND t.reasonType = 'RESTOCK' " +
             "AND t.createdAt > :start AND t.createdAt <= :end")
     BigDecimal sumRestockBetween(Long storeId, Long itemId, Instant start, Instant end);
