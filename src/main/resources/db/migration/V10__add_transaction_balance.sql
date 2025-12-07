@@ -1,5 +1,5 @@
 /*
-  Flyway V11
+  Flyway V10
   Description: 為庫存異動紀錄新增「異動後餘額」欄位，以支援區間耗損計算
 */
 
