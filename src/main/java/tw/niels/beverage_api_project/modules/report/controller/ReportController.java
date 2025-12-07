@@ -9,11 +9,13 @@ import org.springframework.web.bind.annotation.*;
 import tw.niels.beverage_api_project.common.constants.ApiPaths;
 import tw.niels.beverage_api_project.common.service.ControllerHelperService;
 import tw.niels.beverage_api_project.modules.report.dto.BrandSalesSummaryDto;
+import tw.niels.beverage_api_project.modules.report.dto.InventoryVarianceReportDto;
 import tw.niels.beverage_api_project.modules.report.dto.ProductSalesStatsDto;
 import tw.niels.beverage_api_project.modules.report.dto.StoreRankingDto;
 import tw.niels.beverage_api_project.modules.report.entity.DailyStoreStats;
 import tw.niels.beverage_api_project.modules.report.repository.DailyProductStatsRepository;
 import tw.niels.beverage_api_project.modules.report.repository.DailyStoreStatsRepository;
+import tw.niels.beverage_api_project.modules.report.service.InventoryReportService;
 import tw.niels.beverage_api_project.modules.report.service.ReportAggregationService;
 import tw.niels.beverage_api_project.modules.store.entity.Store;
 import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
@@ -34,17 +36,20 @@ public class ReportController {
     private final ReportAggregationService reportAggregationService;
     private final ControllerHelperService helperService;
     private final StoreRepository storeRepository;
+    private final InventoryReportService inventoryReportService;
 
     public ReportController(DailyStoreStatsRepository dailyStoreStatsRepository,
                             DailyProductStatsRepository dailyProductStatsRepository,
                             ReportAggregationService reportAggregationService,
                             ControllerHelperService helperService,
-                            StoreRepository storeRepository) {
+                            StoreRepository storeRepository,
+                            InventoryReportService inventoryReportService) {
         this.dailyStoreStatsRepository = dailyStoreStatsRepository;
         this.dailyProductStatsRepository = dailyProductStatsRepository;
         this.reportAggregationService = reportAggregationService;
         this.helperService = helperService;
         this.storeRepository = storeRepository;
+        this.inventoryReportService = inventoryReportService;
     }
 
     /**
@@ -175,5 +180,24 @@ public class ReportController {
         reportAggregationService.generateDailyStats(date);
 
         return ResponseEntity.ok("已手動觸發 " + date + " 的報表結算。");
+    }
+
+    /**
+     * 【分店端】查詢庫存耗損分析報表
+     */
+    @GetMapping("/inventory-variance")
+    @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER')") // 僅管理員與店長可看
+    @Operation(summary = "庫存耗損分析報表", description = "計算指定區間內的 理論耗用 vs 實際耗用 差異")
+    public ResponseEntity<List<InventoryVarianceReportDto>> getInventoryVariance(
+            @RequestParam Long storeId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+        helperService.validateStoreAccess(storeId);
+        Long brandId = helperService.getCurrentBrandId();
+
+        List<InventoryVarianceReportDto> report = inventoryReportService.generateVarianceReport(brandId, storeId, startDate, endDate);
+
+        return ResponseEntity.ok(report);
     }
 }

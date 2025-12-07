@@ -95,11 +95,33 @@ public class InventoryService {
 
             batchRepository.save(batch);
 
-            // 【新增】同步增加總庫存量
-            item.setTotalQuantity(item.getTotalQuantity().add(itemDto.getQuantity()));
-            itemRepository.save(item);
+            InventorySnapshot snapshot = snapshotRepository
+                    .findByStore_IdAndInventoryItem_Id(storeId, itemDto.getInventoryItemId())
+                    .orElseGet(() -> {
+                        InventorySnapshot newSnap = new InventorySnapshot();
+                        newSnap.setStore(store);
+                        newSnap.setInventoryItem(item);
+                        newSnap.setQuantity(BigDecimal.ZERO);
+                        return newSnap;
+                    });
+
+            BigDecimal newQuantity = snapshot.getQuantity().add(itemDto.getQuantity());
+            snapshot.setQuantity(newQuantity);
+            snapshotRepository.save(snapshot);
+
+            // 記錄進貨異動 (這裡原本好像漏了寫入 Transaction，趁機補上)
+            InventoryTransaction trx = new InventoryTransaction();
+            trx.setStore(store);
+            trx.setInventoryItem(item);
+            trx.setChangeAmount(itemDto.getQuantity());
+            trx.setBalanceAfter(newQuantity); // 【V11 新增】
+            trx.setReasonType("RESTOCK");
+            trx.setOperator(staff); // 進貨員工
+            trx.setNote("進貨單號: " + shipment.getShipmentId());
+            transactionRepository.save(trx);
         }
         return shipment;
+
     }
 
     /**
@@ -227,8 +249,10 @@ public class InventoryService {
             trx.setStore(store);
             trx.setInventoryItem(item);
             trx.setChangeAmount(diff);
+            trx.setBalanceAfter(actualQty);
             trx.setReasonType("AUDIT");
             trx.setOperator(operator);
+
             // ... (備註邏輯略) ...
             transactionsToSave.add(trx);
 

@@ -38,6 +38,9 @@ public class InventoryTransaction extends BaseTsidEntity {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 
+    @Column(name = "balance_after", precision = 12, scale = 2)
+    private BigDecimal balanceAfter; // V10 新增
+
     // Getters & Setters
     public Long getTransactionId() { return getId(); }
     public void setTransactionId(Long id) { setId(id); }
@@ -62,4 +65,7 @@ public class InventoryTransaction extends BaseTsidEntity {
 
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+
+    public BigDecimal getBalanceAfter() { return balanceAfter; }
+    public void setBalanceAfter(BigDecimal balanceAfter) { this.balanceAfter = balanceAfter; }
 }
