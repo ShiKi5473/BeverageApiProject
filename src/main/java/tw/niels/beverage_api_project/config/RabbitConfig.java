@@ -8,13 +8,24 @@ import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.HashMap;
+import java.util.Map;
+
 @Configuration
 public class RabbitConfig {
 
-    // 定義交換機名稱
+    // KDS 廣播用
     public static final String KDS_EXCHANGE = "kds.exchange";
+
+    // 死信佇列設定
     public static final String DLQ_EXCHANGE = "dlq.exchange";
     public static final String DLQ_QUEUE = "dlq.queue";
+    public static final String DLQ_ROUTING_KEY = "dead.letter";
+
+    // 線上訂單削峰填谷設定
+    public static final String ONLINE_ORDER_EXCHANGE = "online.order.exchange";
+    public static final String ONLINE_ORDER_QUEUE = "online.order.queue";
+    public static final String ONLINE_ORDER_ROUTING_KEY = "create.order";
 
     /**
      * 使用 JSON 序列化訊息，而非預設的 Java Serialization
@@ -75,5 +86,38 @@ public class RabbitConfig {
     @Bean
     public Binding kdsBinding(FanoutExchange kdsExchange, Queue kdsAnonymousQueue) {
         return BindingBuilder.bind(kdsAnonymousQueue).to(kdsExchange);
+    }
+
+    // --- 3. 線上訂單佇列設定 ---
+
+    @Bean
+    public DirectExchange onlineOrderExchange() {
+        return new DirectExchange(ONLINE_ORDER_EXCHANGE);
+    }
+
+    /**
+     * 定義訂單處理佇列
+     * 設定 Dead Letter Arguments：當處理失敗或被拒絕時，轉發到 DLQ
+     */
+    @Bean
+    public Queue onlineOrderQueue() {
+        Map<String, Object> args = new HashMap<>();
+        // 設定死信交換機
+        args.put("x-dead-letter-exchange", DLQ_EXCHANGE);
+        // 設定死信 Routing Key
+        args.put("x-dead-letter-routing-key", DLQ_ROUTING_KEY);
+        // 設定 TTL (可選，例如訂單在 Queue 中超過 30 分鐘未處理則過期)
+        // args.put("x-message-ttl", 1800000);
+
+        return QueueBuilder.durable(ONLINE_ORDER_QUEUE)
+                .withArguments(args)
+                .build();
+    }
+
+    @Bean
+    public Binding onlineOrderBinding() {
+        return BindingBuilder.bind(onlineOrderQueue())
+                .to(onlineOrderExchange())
+                .with(ONLINE_ORDER_ROUTING_KEY);
     }
 }
