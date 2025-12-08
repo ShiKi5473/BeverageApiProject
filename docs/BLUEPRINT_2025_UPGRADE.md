@@ -114,12 +114,17 @@
 ## 7. 🤝 階段六：即時互動功能 (Real-time Interaction)
 *目標：升級通訊協定，實作技術亮點功能。*
 
-### 7.1 WebSocket (STOMP) 基礎建設
-* **執行計畫**：
-    - [x] 實作 SSE (Server-Sent Events) 推播訂單狀態給 KDS。
-    - [ ] 配置 STOMP over WebSocket (`/ws-client`)。
+### 7.1 後端基礎建設 (Backend Infrastructure) - ✅ 已完成
+* [x] **啟用 STOMP**：配置 `WebSocketConfig` 與端點 `/ws-kds`。
+* [x] **安全性整合**：實作 `JwtAuthChannelInterceptor` 攔截 WebSocket 連線並驗證 Token。
+* [x] **主動推播邏輯**：整合 `SimpMessagingTemplate` 至 `OrderMessageConsumer`，在訂單寫入成功後推播至 `/user/queue/orders`。
 
-### 7.2 線上揪團功能 (Group Ordering)
+### 7.2 前端整合 (Frontend Integration) - 📝 待辦事項 (To-Do)
+* [ ] **升級 Client**：修改 `ws-client.js` 以支援 JWT Header 帶入。
+* [ ] **訂閱頻道**：實作訂閱 `/user/queue/orders` 的邏輯。
+* [ ] **UI 通知**：在收到 `ORDER_CREATED` 訊息時顯示 Toast 或 Alert 通知使用者。
+
+### 7.3 線上揪團功能 (Group Ordering)
 * **邏輯設計**：
     - [ ] 實作「揪團房間」邏輯，利用 Redis Hash 儲存房間狀態。
 

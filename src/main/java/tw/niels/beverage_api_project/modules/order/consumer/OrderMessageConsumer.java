@@ -13,7 +13,6 @@ import tw.niels.beverage_api_project.config.RabbitConfig;
 import tw.niels.beverage_api_project.modules.order.dto.AsyncOrderTaskDto;
 import tw.niels.beverage_api_project.modules.order.entity.Order;
 import tw.niels.beverage_api_project.modules.order.facade.OrderProcessFacade;
-import tw.niels.beverage_api_project.modules.user.entity.User;
 import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
 
 import java.io.IOException;
