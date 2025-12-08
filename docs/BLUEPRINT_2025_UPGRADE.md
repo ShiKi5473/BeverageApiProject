@@ -97,13 +97,13 @@
 
 ### 6.4 線上訂單削峰填谷 (Queue-Based Load Leveling)
 * **執行計畫**：
-    - [ ] **定義 DTO**：建立 `AsyncOrderTaskDto`。
-    - [ ] **生產者 (API)**：新增 `OnlineOrderController`。
-    - [ ] **消費者 (Worker)**：實作 `OrderMessageConsumer`。
+    - [x] **定義 DTO**：建立 `AsyncOrderTaskDto`。
+    - [x] **生產者 (API)**：新增 `OnlineOrderController`。
+    - [x] **消費者 (Worker)**：實作 `OrderMessageConsumer`。
 
 ### 6.5 效能基準測試 (Load Testing)
 * **執行計畫**：
-    - [x] 撰寫 K6 腳本 (`inventory_stress.js`, `pos_ordering_flow.js`)。
+    - [x] 撰寫 K6 腳本 (`inventory_stress.js`, `pos_ordering_flow.js`, `online_ordering_async.js`)。
 
 ### 6.6 審計日誌 (Audit Logging)
 * **執行計畫**：
