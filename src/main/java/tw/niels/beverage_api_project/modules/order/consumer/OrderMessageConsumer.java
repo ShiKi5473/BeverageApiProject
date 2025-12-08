@@ -1,18 +1,23 @@
 package tw.niels.beverage_api_project.modules.order.consumer;
 
 import com.rabbitmq.client.Channel;
+import lombok.Data;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.support.AmqpHeaders;
 import org.springframework.messaging.handler.annotation.Header;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 import tw.niels.beverage_api_project.config.RabbitConfig;
 import tw.niels.beverage_api_project.modules.order.dto.AsyncOrderTaskDto;
 import tw.niels.beverage_api_project.modules.order.entity.Order;
 import tw.niels.beverage_api_project.modules.order.facade.OrderProcessFacade;
+import tw.niels.beverage_api_project.modules.user.entity.User;
+import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
 
 import java.io.IOException;
+import java.io.Serializable;
 
 @Component
 public class OrderMessageConsumer {
@@ -20,17 +25,17 @@ public class OrderMessageConsumer {
     private static final Logger logger = LoggerFactory.getLogger(OrderMessageConsumer.class);
 
     private final OrderProcessFacade orderProcessFacade;
+    private final SimpMessagingTemplate messagingTemplate; // 注入 WebSocket 發送工具
+    private final UserRepository userRepository; // 用於查詢使用者的 username (手機號)
 
-    public OrderMessageConsumer(OrderProcessFacade orderProcessFacade) {
+    public OrderMessageConsumer(OrderProcessFacade orderProcessFacade,
+                                SimpMessagingTemplate messagingTemplate,
+                                UserRepository userRepository) {
         this.orderProcessFacade = orderProcessFacade;
+        this.messagingTemplate = messagingTemplate;
+        this.userRepository = userRepository;
     }
 
-    /**
-     * 監聽線上訂單佇列
-     * 使用手動 Ack 模式 (在 application.properties 中配置 listener.simple.acknowledge-mode=manual 或 auto)
-     * 這裡假設使用 Spring Boot 預設 (Auto Ack on success, Nack on exception)
-     * 但為了更細緻控制，我們可以在程式碼中處理例外。
-     */
     @RabbitListener(queues = RabbitConfig.ONLINE_ORDER_QUEUE)
     public void handleOrderMessage(AsyncOrderTaskDto task,
                                    Channel channel,
@@ -39,7 +44,7 @@ public class OrderMessageConsumer {
         logger.info("【Consumer】收到訂單任務，RequestId: {}", task.getRequestId());
 
         try {
-            // 呼叫 Facade 執行實際的資料庫寫入交易
+            // 1. 執行核心業務：寫入訂單
             Order createdOrder = orderProcessFacade.createOrder(
                     task.getBrandId(),
                     task.getStoreId(),
@@ -50,17 +55,55 @@ public class OrderMessageConsumer {
             logger.info("【Consumer】訂單建立成功: {} (RequestId: {})",
                     createdOrder.getOrderNumber(), task.getRequestId());
 
-            // TODO: 在此處可以發送 WebSocket 通知前端「訂單已成立」
+            // 2. 發送 WebSocket 通知
+            // 由於 convertAndSendToUser 預設使用 Principal.getName() (即 username/phone) 作為目標
+            // 我們需要確保發送給正確的 "username"
+            // AsyncOrderTaskDto 只有 userId，我們需要查出 username (phone)
+            // (為了效能，其實也可以讓 DTO 直接帶入 username，但這裡先查 DB 確保正確性)
+            userRepository.findById(task.getUserId()).ifPresent(user -> {
+                String username = user.getPrimaryPhone();
+
+                OrderNotification notification = new OrderNotification(
+                        "ORDER_CREATED",
+                        task.getRequestId(),
+                        createdOrder.getOrderId(),
+                        createdOrder.getOrderNumber(),
+                        "訂單建立成功！"
+                );
+
+                // 推送到: /user/{username}/queue/orders
+                messagingTemplate.convertAndSendToUser(
+                        username,
+                        "/queue/orders",
+                        notification
+                );
+
+                logger.debug("已發送 WebSocket 通知給使用者: {}", username);
+            });
 
         } catch (Exception e) {
             logger.error("【Consumer】訂單處理失敗 (RequestId: {}): {}", task.getRequestId(), e.getMessage());
-
-            // 錯誤處理策略：
-            // 如果是業務邏輯錯誤 (如庫存不足 BadRequestException)，我們不應該重試，應該直接丟棄或進入死信
-            // 如果是系統錯誤 (如 DB 連線失敗)，Spring 預設會重試
-
-            // 這裡我們簡單地將例外拋出，讓 Spring AMQP 的 Retry 機制或 Dead Letter 機制接手
+            // 這裡可以選擇發送 "失敗通知" 給前端
+            // 為了簡化，暫時只記錄 Log 並拋出例外讓 MQ 處理重試/死信
             throw e;
+        }
+    }
+
+    // 內部類別：通知訊息 DTO
+    @Data
+    public static class OrderNotification implements Serializable {
+        private String type; // e.g., ORDER_CREATED, ORDER_FAILED
+        private String ticketId;
+        private Long orderId;
+        private String orderNumber;
+        private String message;
+
+        public OrderNotification(String type, String ticketId, Long orderId, String orderNumber, String message) {
+            this.type = type;
+            this.ticketId = ticketId;
+            this.orderId = orderId;
+            this.orderNumber = orderNumber;
+            this.message = message;
         }
     }
 }
