@@ -7,11 +7,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.transaction.support.TransactionTemplate; // 【新增 Import】
+import org.springframework.transaction.support.TransactionTemplate;
 import tw.niels.beverage_api_project.AbstractIntegrationTest;
 import tw.niels.beverage_api_project.modules.order.dto.CreateOrderRequestDto;
 import tw.niels.beverage_api_project.modules.order.dto.OrderItemDto;
