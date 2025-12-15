@@ -88,6 +88,9 @@ public class OrderProcessFacade {
         order.setItems(itemResult.orderItems);
         order.setTotalAmount(itemResult.totalAmount);
 
+        // 在這裡先存檔一次！讓 Order 變成 Persistent 狀態 (有 ID)
+        order = orderService.saveOrder(order);
+
         // 4. (TODO) 處理庫存扣減 (未來串接 InventoryService)
         // inventoryService.deductInventory(...);
 
