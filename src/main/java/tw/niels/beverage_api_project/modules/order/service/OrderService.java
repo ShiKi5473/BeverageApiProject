@@ -53,6 +53,13 @@ public class OrderService {
         order.setDiscountAmount(BigDecimal.ZERO);
         order.setPointsEarned(0L);
 
+        order.setDiscountAmount(BigDecimal.ZERO);
+        order.setTotalAmount(BigDecimal.ZERO); // 防止存檔時為 null
+        order.setFinalAmount(BigDecimal.ZERO); // 防止存檔時為 null (這行是解決本次錯誤的關鍵)
+
+        // 設定初始狀態，避免第一次 save 時報錯
+        order.setStatus(OrderStatus.PENDING);
+
         return order;
     }
 
