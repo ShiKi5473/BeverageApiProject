@@ -13,7 +13,7 @@ import tw.niels.beverage_api_project.modules.order.event.OrderStateChangedEvent;
 import tw.niels.beverage_api_project.modules.order.repository.PaymentMethodRepository;
 import tw.niels.beverage_api_project.modules.order.service.OrderItemProcessorService;
 import tw.niels.beverage_api_project.modules.order.vo.MemberSnapshot;
-import tw.niels.beverage_api_project.modules.promotion.service.PromotionService; // 新增匯入
+import tw.niels.beverage_api_project.modules.promotion.service.PromotionService;
 import tw.niels.beverage_api_project.modules.user.entity.User;
 import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
 
@@ -45,12 +45,12 @@ public abstract class AbstractPrePaymentState extends AbstractOrderState {
     @Override
     public void update(Order order, CreateOrderRequestDto dto) {
         Long brandId = order.getBrand().getBrandId();
-        OrderItemProcessorService.ProcessedItemsResult result =
+        OrderItemProcessorService.ProcessResult result =
                 orderItemProcessorService.processOrderItems(order, dto.getItems(), brandId);
         order.getItems().clear();
-        order.getItems().addAll(result.orderItems);
-        order.setTotalAmount(result.totalAmount);
-        order.setFinalAmount(result.totalAmount);
+        order.getItems().addAll(result.orderItems());
+        order.setTotalAmount(result.totalAmount());
+        order.setFinalAmount(result.totalAmount());
         order.setPointsUsed(0L);
         order.setDiscountAmount(BigDecimal.ZERO);
         order.setStatus(dto.getStatus());

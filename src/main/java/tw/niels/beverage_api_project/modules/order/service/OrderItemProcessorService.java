@@ -18,9 +18,9 @@ import org.jsoup.Jsoup;
 import org.jsoup.safety.Safelist;
 
 import java.math.BigDecimal;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * 專門負責處理 OrderItem DTOs 轉換為 Entities 並計算總金額。
@@ -37,41 +37,76 @@ public class OrderItemProcessorService {
         this.productOptionRepository = productOptionRepository;
     }
 
-    // 用於封裝品項處理結果的內部類別
-    public static class ProcessedItemsResult {
-        public final Set<OrderItem> orderItems;
-        public final BigDecimal totalAmount;
+    // 定義回傳 Record
+    public record ProcessResult(
+            Set<OrderItem> orderItems,
+            BigDecimal totalAmount) {}
 
-        public ProcessedItemsResult(Set<OrderItem> orderItems, BigDecimal totalAmount) {
-            this.orderItems = orderItems;
-            this.totalAmount = totalAmount;
-        }
-    }
 
     /**
      * 處理訂單品項的核心邏輯：建立 OrderItem 實體並計算總金額
      * (從 OrderService 搬移至此)
      */
-    public ProcessedItemsResult processOrderItems(Order order, List<OrderItemDto> itemDtos, Long brandId) {
+    public ProcessResult processOrderItems(Order order, List<OrderItemDto> itemDtos, Long brandId) {
+        // 1. 邊界檢查
+        if (itemDtos == null || itemDtos.isEmpty()) {
+            return new ProcessResult(new HashSet<>(), BigDecimal.ZERO);
+        }
+
+        // 2. 收集所有 Product ID 與 Option ID
+        Set<Long> productIds = new HashSet<>();
+        Set<Long> allOptionIds = new HashSet<>();
+
+        for (OrderItemDto dto : itemDtos) {
+            if (dto.getProductId() != null) {
+                productIds.add(dto.getProductId());
+            }
+            if (dto.getOptionIds() != null) {
+                allOptionIds.addAll(dto.getOptionIds());
+            }
+        }
+
+        // 3. 一次性批次查詢 Product (轉為 Map)
+        // 確保 Repository 的 findByBrand_IdAndIdIn 有使用 JOIN FETCH categories
+        Map<Long, Product> productMap = productRepository.findByBrand_IdAndIdIn(brandId, productIds)
+                .stream()
+                .collect(Collectors.toMap(Product::getId, Function.identity()));
+
+        // 4. 一次性批次查詢 ProductOption (轉為 Map)
+        Map<Long, ProductOption> optionMap = new HashMap<>();
+        if (!allOptionIds.isEmpty()) {
+            optionMap = productOptionRepository.findByOptionGroup_Brand_IdAndIdIn(brandId, allOptionIds)
+                    .stream()
+                    .collect(Collectors.toMap(ProductOption::getId, Function.identity()));
+        }
+
         Set<OrderItem> orderItems = new HashSet<>();
         BigDecimal totalAmount = BigDecimal.ZERO;
 
+        // 5. 記憶體內迴圈處理 (純 Java 運算)
         for (OrderItemDto itemDto : itemDtos) {
-            Product product = productRepository.findByBrand_IdAndId(brandId, itemDto.getProductId())
-                    .orElseThrow(() -> new ResourceNotFoundException("找不到商品，ID：" + itemDto.getProductId()));
+            // 取得商品
+            Product product = productMap.get(itemDto.getProductId());
+            if (product == null) {
+                // 【修正】變數名稱從 dto 改為 itemDto
+                throw new ResourceNotFoundException("商品不存在或已下架，ID: " + itemDto.getProductId());
+            }
 
+            // 建立 OrderItem
             OrderItem orderItem = new OrderItem();
             orderItem.setOrder(order);
             orderItem.setProduct(product);
             orderItem.setQuantity(itemDto.getQuantity());
-            //XSS 防護：移除所有 HTML 標籤
+
+            // XSS 防護
             String notes = itemDto.getNotes();
             if (notes != null) {
-                // 使用 Safelist.none() 清除所有 HTML 標籤，僅保留純文字
                 notes = Jsoup.clean(notes, Safelist.none());
             }
             orderItem.setNotes(notes);
 
+            // 設定快照 (CategoryName)
+            // 注意：確保 ProductRepository 有 fetch categories，否則這裡會觸發 N+1
             String categoryName = product.getCategories().stream()
                     .findFirst()
                     .map(Category::getName)
@@ -85,23 +120,23 @@ public class OrderItemProcessorService {
             );
             orderItem.setProductSnapshot(snapshot);
 
+            // 處理選項 (從 Map 取得，不查 DB)
             BigDecimal optionsPrice = BigDecimal.ZERO;
             if (itemDto.getOptionIds() != null && !itemDto.getOptionIds().isEmpty()) {
-                Set<Long> requestOptionIds = new HashSet<>(itemDto.getOptionIds());
+                Set<ProductOption> selectedOptions = new HashSet<>();
 
-                Set<ProductOption> options = productOptionRepository.findByOptionGroup_Brand_IdAndIdIn(brandId, itemDto.getOptionIds());
-
-                if (options.size() != requestOptionIds.size()) {
-                    throw new BadRequestException("部分選項 ID 無效或不屬於此品牌");
+                for (Long optionId : itemDto.getOptionIds()) {
+                    ProductOption option = optionMap.get(optionId);
+                    if (option == null) {
+                        throw new BadRequestException("選項 ID 無效或不屬於此品牌: " + optionId);
+                    }
+                    selectedOptions.add(option);
+                    optionsPrice = optionsPrice.add(option.getPriceAdjustment());
                 }
-
-                orderItem.setOptions(options);
-                optionsPrice = options.stream()
-                        .map(ProductOption::getPriceAdjustment)
-                        .reduce(BigDecimal.ZERO, BigDecimal::add);
-
+                orderItem.setOptions(selectedOptions);
             }
 
+            // 計算金額
             BigDecimal unitPrice = product.getBasePrice().add(optionsPrice);
             orderItem.setUnitPrice(unitPrice);
 
@@ -111,6 +146,9 @@ public class OrderItemProcessorService {
             orderItems.add(orderItem);
             totalAmount = totalAmount.add(subtotal);
         }
-        return new ProcessedItemsResult(orderItems, totalAmount);
+
+        return new ProcessResult(orderItems, totalAmount);
     }
+
+
 }

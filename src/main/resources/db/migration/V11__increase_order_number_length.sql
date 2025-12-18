@@ -1,0 +1,1 @@
+ALTER TABLE orders ALTER COLUMN order_number TYPE VARCHAR(50);

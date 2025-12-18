@@ -1,10 +1,13 @@
 package tw.niels.beverage_api_project.modules.product.repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Repository;
 
@@ -12,7 +15,22 @@ import tw.niels.beverage_api_project.modules.product.entity.ProductOption;
 
 @Repository
 public interface ProductOptionRepository extends JpaRepository<ProductOption, Long> {
-    Set<ProductOption> findByOptionGroup_Brand_IdAndIdIn(Long brandId, List<Long> optionIds);
+
+    /**
+     * 【優化版】批次查詢選項，並同時抓取 OptionGroup
+     * 使用 JOIN FETCH 確保不會因為存取關聯而觸發額外 SQL
+     */
+    @Query("""
+        SELECT po 
+        FROM ProductOption po 
+        JOIN FETCH po.optionGroup og 
+        WHERE og.brand.id = :brandId 
+        AND po.id IN :optionIds
+    """)
+    Set<ProductOption> findByOptionGroup_Brand_IdAndIdIn(
+            @Param("brandId") Long brandId,
+            @Param("optionIds") Collection<Long> optionIds // 改用 Collection 更通用
+    );
 
     @Deprecated
     Set<ProductOption> findByIdIn(List<Long> optionIds);

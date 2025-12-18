@@ -48,7 +48,7 @@ public class Order extends BaseTsidEntity {
     @JoinColumn(name = "staff_user_id")
     private User staff;
 
-    @Column(name = "order_number", nullable = false, length = 30)
+    @Column(name = "order_number", nullable = false, length = 50)
     private String orderNumber;
 
     @Enumerated(EnumType.STRING)

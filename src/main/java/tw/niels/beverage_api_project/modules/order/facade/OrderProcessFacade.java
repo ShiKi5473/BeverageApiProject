@@ -85,8 +85,8 @@ public class OrderProcessFacade {
 
         // 3. 處理訂單品項與金額 (委派給 Processor)
         var itemResult = orderItemProcessorService.processOrderItems(order, requestDto.getItems(), brandId);
-        order.setItems(itemResult.orderItems);
-        order.setTotalAmount(itemResult.totalAmount);
+        order.setItems(itemResult.orderItems());
+        order.setTotalAmount(itemResult.totalAmount());
 
         // 在這裡先存檔一次！讓 Order 變成 Persistent 狀態 (有 ID)
         order = orderService.saveOrder(order);
@@ -150,9 +150,9 @@ public class OrderProcessFacade {
         order.setStatus(requestDto.getStatus());
 
         var result = orderItemProcessorService.processOrderItems(order, requestDto.getItems(), brandId);
-        order.setItems(result.orderItems);
-        order.setTotalAmount(result.totalAmount);
-        order.setFinalAmount(result.totalAmount); // 暫無折扣
+        order.setItems(result.orderItems());
+        order.setTotalAmount(result.totalAmount());
+        order.setFinalAmount(result.totalAmount()); // 暫無折扣
 
         return orderService.saveOrder(order);
     }
@@ -165,6 +165,6 @@ public class OrderProcessFacade {
     public OrderTotalDto calculateOrderTotal(Long brandId, CreateOrderRequestDto requestDto) {
         // 傳入 null 作為 order，因為只是試算，不需要實體
         var result = orderItemProcessorService.processOrderItems(null, requestDto.getItems(), brandId);
-        return new OrderTotalDto(result.totalAmount);
+        return new OrderTotalDto(result.totalAmount());
     }
 }

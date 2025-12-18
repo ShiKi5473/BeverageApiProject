@@ -1,5 +1,6 @@
 package tw.niels.beverage_api_project.modules.product.repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -42,6 +43,13 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     Optional<Product> findByBrand_IdAndName(Long brandId, String name);
 
+
+    // 批次查詢商品 (包含關聯，避免後續存取 snapshot 再次查詢)
+    @Query("SELECT DISTINCT p FROM Product p " +
+            "LEFT JOIN FETCH p.categories " +
+            "LEFT JOIN FETCH p.optionGroups " +
+            "WHERE p.brand.id = :brandId AND p.id IN :ids")
+    List<Product> findByBrand_IdAndIdIn(@Param("brandId") Long brandId, @Param("ids") Collection<Long> ids);
 
 
     /**
