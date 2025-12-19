@@ -1,7 +1,10 @@
 package tw.niels.beverage_api_project;
 
 import com.redis.testcontainers.RedisContainer;
+import org.junit.jupiter.api.AfterEach;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
@@ -77,5 +80,31 @@ public abstract class AbstractIntegrationTest {
         registry.add("minio.access-key", () -> "minioadmin");
         registry.add("minio.secret-key", () -> "minioadmin");
         registry.add("minio.bucket-name", () -> "test-bucket");
+    }
+
+    // 注入 JdbcTemplate 用於執行原生 SQL
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    /**
+     * 全域清理方法：在每個測試方法結束後執行。
+     * 使用 TRUNCATE ... CASCADE 可以忽略外鍵約束，一次清空所有資料。
+     */
+    @AfterEach
+    public void cleanupDatabase() {
+        // 列出所有需要清理的業務表
+        // 注意：不要包含 flyway_schema_history 或 payment_methods (如果是靜態字典表)
+        // 這裡包含了您專案中主要的動態資料表
+        String truncateSql = "TRUNCATE TABLE " +
+                "order_items, orders, " +
+                "inventory_transactions, inventory_snapshots, inventory_batches, purchase_shipments, inventory_items, " +
+                "product_options, product_variants, recipes, products, option_groups, categories, " +
+                "staff_profiles, member_profiles, users, " +
+                "stores, brands, " +
+                "promotions, " +
+                "daily_store_stats, daily_product_stats " +
+                "CASCADE"; // CASCADE 是關鍵，它會自動處理關聯刪除
+
+        jdbcTemplate.execute(truncateSql);
     }
 }
