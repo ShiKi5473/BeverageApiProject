@@ -14,28 +14,39 @@ import org.testcontainers.utility.DockerImageName;
 import java.time.Duration;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Testcontainers
 public abstract class AbstractIntegrationTest {
 
-    // 優化 1: 改用 Alpine 版本，記憶體佔用較低
-    @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:17.5-alpine")
-            .withStartupTimeout(java.time.Duration.ofMinutes(2)); // 延長等待時間
+    // 宣告為 static final，但移除 @Container 註解
+    static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:17.5-alpine")
+            .withStartupTimeout(Duration.ofMinutes(3))
+            .withReuse(true); // 啟用 Reuse (雖然在 CI 環境通常無效，但本地有用)
 
-    @Container
-    static RedisContainer redis = new RedisContainer(DockerImageName.parse("redis:alpine"));
+    static final RedisContainer redis = new RedisContainer(DockerImageName.parse("redis:alpine"))
+            .withStartupTimeout(Duration.ofMinutes(3))
+            .withReuse(true);
 
-    @Container
-    static GenericContainer<?> minio = new GenericContainer<>(DockerImageName.parse("minio/minio:latest"))
+    static final GenericContainer<?> minio = new GenericContainer<>(DockerImageName.parse("minio/minio:latest"))
             .withEnv("MINIO_ROOT_USER", "minioadmin")
             .withEnv("MINIO_ROOT_PASSWORD", "minioadmin")
             .withCommand("server /data")
-            .withExposedPorts(9000);
+            .withExposedPorts(9000)
+            .withStartupTimeout(Duration.ofMinutes(3))
+            .withReuse(true);
 
-    // 優化 2: 移除 -management 後綴，改用純核心版本 (節省約 100MB+ RAM)
-    @Container
-    static RabbitMQContainer rabbitmq = new RabbitMQContainer(DockerImageName.parse("rabbitmq:3.12-alpine"))
-            .withStartupTimeout(Duration.ofMinutes(3));
+    static final RabbitMQContainer rabbitmq = new RabbitMQContainer(DockerImageName.parse("rabbitmq:3.12-alpine"))
+            .withStartupTimeout(Duration.ofMinutes(3))
+            .withReuse(true);
+
+    // 使用 static block 確保容器只啟動一次
+    static {
+        // 並行啟動容器以節省時間 (使用 parallel stream)
+        // 注意：這需要您的機器有足夠的 CPU，如果 CI 只有 2核，依序啟動可能更穩定
+        // 這裡我們採用依序啟動最保險
+        postgres.start();
+        redis.start();
+        minio.start();
+        rabbitmq.start();
+    }
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
