@@ -91,8 +91,7 @@ public class OrderProcessFacade {
         // 在這裡先存檔一次！讓 Order 變成 Persistent 狀態 (有 ID)
         order = orderService.saveOrder(order);
 
-        // 4. (TODO) 處理庫存扣減 (未來串接 InventoryService)
-        // inventoryService.deductInventory(...);
+        // 4. 庫存管理模式是 「週期性盤點 (Periodic Review)」，不進行實時扣減。
 
         // 5. 處理會員與點數
         BigDecimal pointDiscount = BigDecimal.ZERO;

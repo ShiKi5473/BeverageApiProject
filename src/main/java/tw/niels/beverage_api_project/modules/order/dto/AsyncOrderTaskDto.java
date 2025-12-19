@@ -23,6 +23,8 @@ public class AsyncOrderTaskDto implements Serializable {
     private Long storeId;
     private Long userId; // 下單的使用者 (會員或店員)
 
+    private String userPhone;
+
     // 原始訂單請求內容
     private CreateOrderRequestDto orderRequest;
 }

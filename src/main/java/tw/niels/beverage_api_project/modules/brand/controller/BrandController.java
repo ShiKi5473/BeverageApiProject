@@ -35,10 +35,10 @@ public class BrandController {
 
     // 取得所有品牌
     @GetMapping
-    @Operation(summary = "取得所有品牌列表", description = "列出系統中所有已註冊的品牌")
+    @Operation(summary = "取得所有品牌列表 (僅限平台管理員)")
+    @PreAuthorize("hasRole('PLATFORM_ADMIN')")
     public ResponseEntity<List<Brand>> getAllBrands() {
-        List<Brand> brands = brandService.getAllBrands();
-        return ResponseEntity.ok(brands);
+        return ResponseEntity.ok(brandService.getAllBrandsForAdmin());
     }
 
     // 根據 ID 取得單一品牌

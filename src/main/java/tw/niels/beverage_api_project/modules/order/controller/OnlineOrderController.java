@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -50,6 +51,8 @@ public class OnlineOrderController {
         Long storeId = helperService.getCurrentStoreId(); // 線上點餐時，前端通常需帶入 storeId，這邊假設已在 Token 或 Context 中
         Long userId = helperService.getCurrentUserId();
 
+        String userPhone = SecurityContextHolder.getContext().getAuthentication().getName();
+
         // 對於純會員 (MEMBER)，Context 可能沒有 StoreId，這部分需依據您的業務邏輯調整
         // 這裡假設前端在 Header 或其他方式已讓 helperService 能解析到目標 StoreId
         // 若 helperService 沒辦法從 Token 拿到 StoreId (例如會員跨店點餐)，則 requestDto 應該包含 storeId
@@ -67,6 +70,7 @@ public class OnlineOrderController {
                 brandId,
                 storeId,
                 userId,
+                userPhone,
                 requestDto
         );
 

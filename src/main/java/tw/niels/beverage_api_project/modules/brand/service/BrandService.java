@@ -3,6 +3,7 @@ package tw.niels.beverage_api_project.modules.brand.service;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,6 +14,7 @@ import tw.niels.beverage_api_project.modules.brand.entity.Brand;
 import tw.niels.beverage_api_project.modules.brand.entity.BrandPointConfig;
 import tw.niels.beverage_api_project.modules.brand.repository.BrandPointConfigRepository;
 import tw.niels.beverage_api_project.modules.brand.repository.BrandRepository;
+import tw.niels.beverage_api_project.security.BrandContextHolder;
 
 @Service
 public class BrandService {
@@ -41,6 +43,22 @@ public class BrandService {
         return brandRepository.save(brand);
     }
 
+    /**
+     * 【品牌端用戶專用】
+     * 取得當前登入用戶所屬的品牌資訊
+     * 安全性由 ContextHolder 保證
+     */
+    public Brand getCurrentBrandProfile() {
+        Long currentBrandId = BrandContextHolder.getBrandId();
+
+        if (currentBrandId == null) {
+            throw new IllegalStateException("無法取得當前品牌 Context");
+        }
+
+        return brandRepository.findById(currentBrandId)
+                .orElseThrow(() -> new ResourceNotFoundException("找不到當前品牌資訊 (ID: " + currentBrandId + ")"));
+    }
+
     @Transactional
     public BrandPointConfig updatePointConfig(Long brandId, UpdatePointConfigDto dto) {
         // 1. 確保品牌存在
@@ -65,11 +83,26 @@ public class BrandService {
         return brandPointConfigRepository.save(config);
     }
 
-    public List<Brand> getAllBrands() {
+    /**
+     * 【危險方法】僅供平台管理員使用
+     * 建議重新命名以明確意圖，例如 getAllBrandsForAdmin
+     */
+    @PreAuthorize("hasRole('PLATFORM_ADMIN')") // Service 層也可加防護
+    public List<Brand> getAllBrandsForAdmin() {
         return brandRepository.findAll();
     }
 
+    /**
+     * 【平台管理員專用】
+     * 允許查詢系統中的任何品牌
+     * 建議加上 @PreAuthorize("hasRole('PLATFORM_ADMIN')")
+     */
     public Optional<Brand> getBrandById(Long id) {
-        return brandRepository.findById(id);
+        return brandRepository.findById(id); // 這裡必須能呼叫 findById
+    }
+
+
+    public List<Brand> getActiveBrands() {
+        return brandRepository.findByIsActiveTrue();
     }
 }
