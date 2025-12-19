@@ -59,8 +59,9 @@ public class OrderMessageConsumer {
             // 我們需要確保發送給正確的 "username"
             // AsyncOrderTaskDto 只有 userId，我們需要查出 username (phone)
             // (為了效能，其實也可以讓 DTO 直接帶入 username，但這裡先查 DB 確保正確性)
-            userRepository.findById(task.getUserId()).ifPresent(user -> {
-                String username = user.getPrimaryPhone();
+            userRepository.findByBrand_IdAndId(task.getBrandId(), task.getUserId())
+                    .ifPresent(user -> {
+                        String username = user.getPrimaryPhone();
 
                 OrderNotification notification = new OrderNotification(
                         "ORDER_CREATED",
