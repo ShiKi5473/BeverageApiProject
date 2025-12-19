@@ -24,7 +24,15 @@ jobs:
 
       - name: Build and Test with Maven
         # 這裡執行 mvn verify 會自動觸發我們剛寫好的 TestContainers 測試
+        env:
+          # 限制 Maven/Surefire 的最大記憶體為 1.5GB ~ 2GB，留空間給 Docker
+          MAVEN_OPTS: "-Xmx1536m -Xms512m"
         run: mvn verify
+               - name: Check for OOM Killer logs
+               if: failure()
+               run: |
+                 sudo dmesg | grep -i 'killed process'
+                 docker ps -a
 
       - name: Qodana Scan
         uses: JetBrains/qodana-action@v2023.3
@@ -34,3 +42,4 @@ jobs:
       - name: Build Docker Image (Dry Run)
         # 驗證 Dockerfile 是否能成功建置 Image
         run: docker build . --file Dockerfile --tag beverage-api:latest
+
