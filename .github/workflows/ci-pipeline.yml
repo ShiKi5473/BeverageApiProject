@@ -39,7 +39,12 @@ jobs:
 
       - name: Qodana Scan
         uses: JetBrains/qodana-action@v2023.3
-        # Qodana 會產出程式碼品質報告，如果有設定 QODANA_TOKEN 可上傳雲端，否則僅本地檢查
+        with:
+          # 【關鍵修改】指定使用社群版 (Community)，不需要 QODANA_TOKEN
+          args: --linter,jetbrains/qodana-jvm-community
+          upload-result: false
+          use-annotations: true
+          pr-mode: true
         continue-on-error: true # 暫時允許掃描失敗不中斷流程，初期調整用
 
       - name: Build Docker Image (Dry Run)
