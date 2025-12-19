@@ -11,6 +11,8 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
+import java.time.Duration;
+
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers
 public abstract class AbstractIntegrationTest {
@@ -32,7 +34,8 @@ public abstract class AbstractIntegrationTest {
 
     // 優化 2: 移除 -management 後綴，改用純核心版本 (節省約 100MB+ RAM)
     @Container
-    static RabbitMQContainer rabbitmq = new RabbitMQContainer(DockerImageName.parse("rabbitmq:3.12-alpine"));
+    static RabbitMQContainer rabbitmq = new RabbitMQContainer(DockerImageName.parse("rabbitmq:3.12-alpine"))
+            .withStartupTimeout(Duration.ofMinutes(3));
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
@@ -40,15 +43,17 @@ public abstract class AbstractIntegrationTest {
         registry.add("spring.datasource.url", postgres::getJdbcUrl);
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
-        // 優化 3: 顯式設定連線池大小，避免測試並發搶佔資源
-        registry.add("spring.datasource.hikari.maximum-pool-size", () -> "5");
+        // 【關鍵優化】限制連線池大小，避免搶佔資源
+        registry.add("spring.datasource.hikari.maximum-pool-size", () -> "4");
         registry.add("spring.datasource.hikari.minimum-idle", () -> "1");
+        // 延長連線超時，避免 CI CPU 忙碌時連線失敗
+        registry.add("spring.datasource.hikari.connection-timeout", () -> "30000");
 
         // Redis Config
         registry.add("spring.data.redis.host", redis::getHost);
         registry.add("spring.data.redis.port", redis::getFirstMappedPort);
         // 增加 Redis 超時設定
-        registry.add("spring.data.redis.timeout", () -> "5000");
+        registry.add("spring.data.redis.timeout", () -> "10s");
 
         // RabbitMQ Config
         registry.add("spring.rabbitmq.host", rabbitmq::getHost);

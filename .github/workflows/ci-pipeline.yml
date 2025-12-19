@@ -25,8 +25,10 @@ jobs:
       - name: Build and Test with Maven
         # 這裡執行 mvn verify 會自動觸發我們剛寫好的 TestContainers 測試
         env:
-          # 限制 Maven/Surefire 的最大記憶體為 1.5GB ~ 2GB，留空間給 Docker
+          # 1. 強制限制 JVM Heap 為 1.5GB (避免 Java 吃光所有 RAM)
+          # 2. 停用 Ryuk (Testcontainers 的資源回收車)，CI 跑完會自動銷毀環境，不需要它佔用資源
           MAVEN_OPTS: "-Xmx1536m -Xms512m -XX:+TieredCompilation -XX:TieredStopAtLevel=1"
+          TESTCONTAINERS_RYUK_DISABLED: "true"
         run: mvn verify
 
       - name: Check for OOM Killer logs
