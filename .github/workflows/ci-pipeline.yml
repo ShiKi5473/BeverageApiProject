@@ -28,11 +28,12 @@ jobs:
           # 限制 Maven/Surefire 的最大記憶體為 1.5GB ~ 2GB，留空間給 Docker
           MAVEN_OPTS: "-Xmx1536m -Xms512m"
         run: mvn verify
-               - name: Check for OOM Killer logs
-               if: failure()
-               run: |
-                 sudo dmesg | grep -i 'killed process'
-                 docker ps -a
+
+      - name: Check for OOM Killer logs
+        if: failure() # 只有在前一個步驟失敗時才執行
+        run: |
+          sudo dmesg | grep -i 'killed process' || true
+          docker ps -a
 
       - name: Qodana Scan
         uses: JetBrains/qodana-action@v2023.3
