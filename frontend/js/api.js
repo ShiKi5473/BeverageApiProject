@@ -292,26 +292,28 @@ export async function getStoreRanking(startDate, endDate) {
 // ==========================================
 
 /**
- * 取得當前所有庫存項目的快照 (用於盤點)
- * 對應後端: GET /api/v1/inventory/items (假設路徑)
+ * 取得當前使用者所屬分店的庫存清單
+ * 對應後端: GET /api/v1/inventory/audit-list (自動識別 Store)
  */
 export async function getInventoryItems() {
-    const response = await fetchWithAuth("/api/v1/inventory/items", {
+    // 不需要再傳 storeId，後端會自己查
+    const response = await fetchWithAuth(`/api/v1/inventory/audit-list`, {
         method: "GET",
     });
+
     if (!response.ok) {
-        throw new Error("無法取得庫存列表");
+        const errText = await response.text();
+        throw new Error(errText || "無法取得庫存列表");
     }
     return response.json();
 }
 
 /**
  * 提交盤點結果
- * 對應後端: POST /api/v1/inventory/audit
- * @param {object} auditData - 包含 items 的盤點資料物件
+ * 對應後端: POST /api/v1/inventory/audit (自動識別 Store)
  */
 export async function submitInventoryAudit(auditData) {
-    const response = await fetchWithAuth("/api/v1/inventory/audit", {
+    const response = await fetchWithAuth(`/api/v1/inventory/audit`, {
         method: "POST",
         body: JSON.stringify(auditData),
     });

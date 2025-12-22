@@ -1,6 +1,8 @@
 import { createNavbar } from './components/Navbar.js';
 import { getInventoryItems, submitInventoryAudit } from './api.js';
 
+let currentStoreId = null; // 全域變數儲存 storeId
+
 // 初始化
 document.addEventListener('DOMContentLoaded', async () => {
     // 1. 掛載導覽列
@@ -75,18 +77,13 @@ async function loadInventoryItems() {
     const listContainer = document.getElementById('audit-list');
     const loadingIndicator = document.getElementById('loading-indicator');
 
-    loadingIndicator.style.display = 'block';
-    listContainer.innerHTML = ''; // 清空
+    if(loadingIndicator) loadingIndicator.style.display = 'block';
+    if(listContainer) listContainer.innerHTML = '';
 
     try {
-        // TODO: 待後端實作 GET /api/v1/inventory/items 後，切換為真實 API
-        // const items = await getInventoryItems();
+        const items = await getInventoryItems();
 
-        // --- [暫時使用模擬資料] ---
-        const items = await mockFetchInventory();
-        // -------------------------
-
-        if (items.length === 0) {
+        if (!items || items.length === 0) {
             document.getElementById('empty-state').style.display = 'block';
             return;
         }
@@ -96,14 +93,18 @@ async function loadInventoryItems() {
             listContainer.appendChild(row);
         });
 
-        updateProgress(); // 更新進度條
+        updateProgress();
         document.getElementById('btn-submit').disabled = false;
 
     } catch (error) {
         console.error('載入庫存失敗:', error);
-        alert('無法載入庫存列表，請稍後再試。');
+        alert(`無法載入庫存列表: ${error.message}`);
+        // 如果錯誤是因為 "User not found" 或 "不屬於任何分店"，可能要導回登入頁
+        if (error.message.includes("不屬於任何分店")) {
+            window.location.href = 'login.html';
+        }
     } finally {
-        loadingIndicator.style.display = 'none';
+        if(loadingIndicator) loadingIndicator.style.display = 'none';
     }
 }
 
@@ -192,9 +193,8 @@ async function submitAudit() {
         // Phase 4 藍圖建議全部提交以建立完整 Snapshot
         auditData.push({
             inventoryItemId: id,
-            systemQuantity: systemQty,
-            actualQuantity: actualQty,
-            variance: actualQty - systemQty
+            actualQuantity: actualQty, // DTO 欄位名稱要對應後端 InventoryAuditRequestDto
+            itemNote: "" // 暫時留空
         });
     });
 
@@ -204,9 +204,13 @@ async function submitAudit() {
         btn.disabled = true;
         btn.textContent = '提交中...';
 
-        // 呼叫後端 API
-        await submitInventoryAudit({ items: auditData });
+        const requestPayload = {
+            note: "日常盤點 (Web)",
+            items: auditData
+        };
 
+        // 呼叫後端 API
+        await submitInventoryAudit(requestPayload);
         if (!response.ok) throw new Error(await response.text());
 
         alert('✅ 盤點完成！庫存已更新。');

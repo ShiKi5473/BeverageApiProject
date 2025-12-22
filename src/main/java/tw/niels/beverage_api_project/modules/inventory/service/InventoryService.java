@@ -6,6 +6,7 @@ import tw.niels.beverage_api_project.common.exception.BadRequestException;
 import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
 import tw.niels.beverage_api_project.common.service.ControllerHelperService;
 import tw.niels.beverage_api_project.modules.inventory.dto.AddShipmentRequestDto;
+import tw.niels.beverage_api_project.modules.inventory.dto.InventoryAuditItemResponseDto;
 import tw.niels.beverage_api_project.modules.inventory.dto.InventoryAuditRequestDto;
 import tw.niels.beverage_api_project.modules.inventory.entity.*;
 import tw.niels.beverage_api_project.modules.inventory.repository.*;
@@ -326,6 +327,37 @@ public class InventoryService {
                 .orElseThrow(() -> new ResourceNotFoundException("error.resource.not_found", "Store ID: " + storeId));
         deductInventory(store.getBrand().getId(), storeId, itemId, quantity);
     }
+
+    /**
+     * 取得盤點清單 (Audit List)
+     * 邏輯：列出品牌下所有原物料，並關聯該分店目前的庫存快照。
+     */
+    @Transactional(readOnly = true)
+    public List<InventoryAuditItemResponseDto> getAuditList(Long brandId, Long storeId) {
+        // 1. 查詢該品牌所有定義的原物料 (Master Data)
+        List<InventoryItem> allItems = itemRepository.findByBrand_Id(brandId); // 需確認 Repository 有此方法
+
+        // 2. 查詢該分店目前的庫存快照 (Transaction Data)
+        List<InventorySnapshot> snapshots = snapshotRepository.findByStore_Id(storeId);
+
+        // 轉為 Map<ItemId, Quantity> 以便快速查找
+        Map<Long, BigDecimal> stockMap = snapshots.stream()
+                .collect(Collectors.toMap(
+                        s -> s.getInventoryItem().getId(),
+                        InventorySnapshot::getQuantity
+                ));
+
+        // 3. 組合結果 (使用 Record 建構子)
+        return allItems.stream()
+                .map(item -> new tw.niels.beverage_api_project.modules.inventory.dto.InventoryAuditItemResponseDto(
+                        item.getId(),
+                        item.getName(),
+                        item.getUnit(),
+                        stockMap.getOrDefault(item.getId(), BigDecimal.ZERO) // 若無快照，預設為 0
+                ))
+                .collect(Collectors.toList());
+    }
+
 
     /**
      * 合併主單備註與單項備註
