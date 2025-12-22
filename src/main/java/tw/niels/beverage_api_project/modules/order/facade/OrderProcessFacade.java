@@ -5,7 +5,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tw.niels.beverage_api_project.common.exception.BadRequestException;
 import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
-import tw.niels.beverage_api_project.modules.inventory.service.InventoryService;
 import tw.niels.beverage_api_project.modules.member.service.MemberPointService;
 import tw.niels.beverage_api_project.modules.order.dto.CreateOrderRequestDto;
 import tw.niels.beverage_api_project.modules.order.dto.OrderTotalDto;
