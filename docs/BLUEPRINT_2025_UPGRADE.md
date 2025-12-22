@@ -130,7 +130,46 @@
 
 ---
 
-## 8. 🏗️ 階段七：微服務拆分與治理 (Microservices Transformation)
+## 8. 🎨 階段七：前端生態系補完 (Frontend Ecosystem Completion) 
+*目標：為強大的後端功能提供對應的視覺化操作介面，完善使用者體驗 (UX)。*
+
+### 8.1 智慧庫存作業 (Smart Inventory UI) - 🔥 最高優先 (Priority)
+* **對應後端**：Phase 4 (Inventory Audit) & Phase 5 (Waste Analysis)
+* **執行計畫**：
+    - [ ] **盤點作業 App (Mobile-first)**：
+        - 開發 `inventory_audit.html`。
+        - 實作「理論庫存 vs 實際盤點」輸入介面。
+        - 整合 `InventoryService.performAudit` API，支援批次提交盤點數據。
+    - [ ] **進貨驗收 (Restock)**：
+        - 開發 `inventory_restock.html`。
+        - 實作進貨單輸入表單，建立 `InventoryBatch` (紀錄效期與成本)。
+
+### 8.2 營運管理後台 (Admin Dashboard)
+* **對應後端**：Phase 2 (Business Expansion) & Phase 3 (Staff)
+* **執行計畫**：
+    - [ ] **商品管理中心** (`admin_product.html`)：
+        - 實作商品 (Product) 與配方 (Recipe) 的 CRUD 介面。
+        - 處理 `OptionGroup` (客製化選項) 的動態關聯。
+    - [ ] **行銷活動配置** (`admin_promotion.html`)：
+        - 視覺化設定促銷規則 (買X送Y、滿額折抵)。
+    - [ ] **人員權限控管** (`admin_staff.html`)：
+        - 實作員工帳號管理與 RBAC 角色指派。
+
+### 8.3 報表視覺化升級 (Advanced Reporting)
+* **執行計畫**：
+    - [ ] **耗損分析報表**：
+        - 在 `report.html` 新增「庫存差異分析」頁籤。
+        - 整合 ECharts 顯示「理論消耗」與「實際消耗」的差異曲線。
+
+### 8.4 消費者端 (Customer Facing)
+
+* [ ] **線上點餐 Web App**：開發 RWD 響應式點餐頁面，整合 AsyncOrderTask 提交訂單。
+
+* [ ] **即時動態追蹤**：利用 WebSocket 訂閱 /user/queue/orders，即時顯示「製作中」與「請取餐」動畫。
+
+---
+
+## 9. 🏗️ 階段八：微服務拆分與治理 (Microservices Transformation)
 * **執行計畫**：
     - [ ] 模組化單體重構 (Modular Monolith)。
     - [ ] 分散式治理 (Redisson, Resilience4j)。
