@@ -39,9 +39,9 @@ public class StaffDto {
         // 從 User 實體中映射資料
         dto.setUserId(user.getUserId());
         dto.setPrimaryPhone(user.getPrimaryPhone());
-        dto.setActive(user.getActive());
+        dto.setActive(user.getIsActive());
         if (user.getBrand() != null) {
-            dto.setBrandId(user.getBrand().getBrandId());
+            dto.setBrandId(user.getBrand().getId());
         }
 
         // 從 StaffProfile 實體中映射資料
@@ -50,7 +50,7 @@ public class StaffDto {
 
         // 處理可能為 null 的 Store 關聯 (例如品牌管理員沒有 store)
         if (profile.getStore() != null) {
-            dto.setStoreId(profile.getStore().getStoreId());
+            dto.setStoreId(profile.getStore().getId());
             dto.setStoreName(profile.getStore().getName());
         }
 

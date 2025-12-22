@@ -1,6 +1,8 @@
 package tw.niels.beverage_api_project.modules.promotion.entity;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
 import tw.niels.beverage_api_project.modules.brand.entity.Brand;
 import tw.niels.beverage_api_project.modules.product.entity.Product;
@@ -12,6 +14,8 @@ import java.util.HashSet;
 import java.util.Set;
 
 @Entity
+@Getter
+@Setter
 @Table(name = "promotions")
 @AttributeOverride(name = "id", column = @Column(name = "promotion_id"))
 public class Promotion extends BaseTsidEntity {
@@ -57,37 +61,4 @@ public class Promotion extends BaseTsidEntity {
     )
     private Set<Product> applicableProducts = new HashSet<>();
 
-    // Getters & Setters
-    public Long getPromotionId() { return getId(); }
-    public void setPromotionId(Long id) { setId(id); }
-
-    public Brand getBrand() { return brand; }
-    public void setBrand(Brand brand) { this.brand = brand; }
-
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-
-    public String getDescription() { return description; }
-    public void setDescription(String description) { this.description = description; }
-
-    public PromotionType getType() { return type; }
-    public void setType(PromotionType type) { this.type = type; }
-
-    public BigDecimal getValue() { return value; }
-    public void setValue(BigDecimal value) { this.value = value; }
-
-    public BigDecimal getMinSpend() { return minSpend; }
-    public void setMinSpend(BigDecimal minSpend) { this.minSpend = minSpend; }
-
-    public LocalDateTime getStartDate() { return startDate; }
-    public void setStartDate(LocalDateTime startDate) { this.startDate = startDate; }
-
-    public LocalDateTime getEndDate() { return endDate; }
-    public void setEndDate(LocalDateTime endDate) { this.endDate = endDate; }
-
-    public Boolean getActive() { return isActive; }
-    public void setActive(Boolean active) { isActive = active; }
-
-    public Set<Product> getApplicableProducts() { return applicableProducts; }
-    public void setApplicableProducts(Set<Product> applicableProducts) { this.applicableProducts = applicableProducts; }
 }

@@ -1,5 +1,6 @@
 package tw.niels.beverage_api_project.security;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -16,10 +17,10 @@ import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
  */
 
 @Service("customUserDetailsService")
+@RequiredArgsConstructor
 public class CustomUserDetailsService implements UserDetailsService {
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
 
     @Override
     @Transactional // 加上交易註解以確保能懶加載 (Lazy Loading) 關聯的 Profile

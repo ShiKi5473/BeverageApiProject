@@ -1,6 +1,8 @@
 package tw.niels.beverage_api_project.modules.product.entity;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
 import tw.niels.beverage_api_project.modules.inventory.entity.InventoryItem;
 
@@ -8,6 +10,8 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 @Entity
+@Getter
+@Setter
 @Table(name = "recipes")
 @AttributeOverride(name = "id", column = @Column(name = "recipe_id"))
 public class Recipe extends BaseTsidEntity {
@@ -33,22 +37,4 @@ public class Recipe extends BaseTsidEntity {
     @Column(name = "created_at", updatable = false)
     private Instant createdAt = Instant.now();
 
-    // Getters & Setters
-    public Long getRecipeId() { return getId(); }
-    public void setRecipeId(Long id) { setId(id); }
-
-    public ProductVariant getVariant() { return variant; }
-    public void setVariant(ProductVariant variant) { this.variant = variant; }
-
-    public ProductOption getOption() { return option; }
-    public void setOption(ProductOption option) { this.option = option; }
-
-    public InventoryItem getInventoryItem() { return inventoryItem; }
-    public void setInventoryItem(InventoryItem inventoryItem) { this.inventoryItem = inventoryItem; }
-
-    public BigDecimal getQuantity() { return quantity; }
-    public void setQuantity(BigDecimal quantity) { this.quantity = quantity; }
-
-    public Instant getCreatedAt() { return createdAt; }
-    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
 }

@@ -3,6 +3,8 @@ package tw.niels.beverage_api_project.modules.user.entity;
 import java.util.Date;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -12,6 +14,8 @@ import tw.niels.beverage_api_project.modules.user.entity.profile.MemberProfile;
 import tw.niels.beverage_api_project.modules.user.entity.profile.StaffProfile;
 
 @Entity
+@Getter
+@Setter
 @Table(name = "users")
 @AttributeOverride(name = "id", column = @Column(name = "user_id"))
 public class User extends BaseTsidEntity {
@@ -58,67 +62,12 @@ public class User extends BaseTsidEntity {
         setId(userId);
     }
 
-    public Brand getBrand() {
-        return brand;
-    }
-
-    public void setBrand(Brand brand) {
-        this.brand = brand;
-    }
-
-    public String getPrimaryPhone() {
-        return primaryPhone;
-    }
-
-    public void setPrimaryPhone(String primaryPhone) {
-        this.primaryPhone = primaryPhone;
-    }
-
-    public String getPasswordHash() {
-        return passwordHash;
-    }
-
-    public void setPasswordHash(String passwordHash) {
-        this.passwordHash = passwordHash;
-    }
-
-    public Boolean getActive() {
-        return isActive;
-    }
-
-    public void setActive(Boolean active) {
-        isActive = active;
-    }
-
-    public Date getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(Date createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public Date getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(Date updatedAt) {
-        this.updatedAt = updatedAt;
-    }
-
-    public StaffProfile getStaffProfile() {
-        return staffProfile;
-    }
 
     public void setStaffProfile(StaffProfile staffProfile) {
         this.staffProfile = staffProfile;
         if (staffProfile != null) {
             staffProfile.setUser(this);
         }
-    }
-
-    public MemberProfile getMemberProfile() {
-        return memberProfile;
     }
 
     public void setMemberProfile(MemberProfile memberProfile) {

@@ -6,9 +6,13 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import lombok.Getter;
+import lombok.Setter;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
 
 @Schema(description = "建立訂單請求")
+@Getter
+@Setter
 public class CreateOrderRequestDto {
 
     @NotNull(message = "訂單狀態不可為空")
@@ -20,25 +24,6 @@ public class CreateOrderRequestDto {
     private List<@Valid OrderItemDto> items;
 
     public CreateOrderRequestDto() {
-    }
-
-    // getter and setter
-
-    public List<OrderItemDto> getItems() {
-        return items;
-    }
-
-    public void setItems(List<OrderItemDto> items) {
-        this.items = items;
-    }
-
-
-    public OrderStatus getStatus() {
-        return status;
-    }
-
-    public void setStatus(OrderStatus status) {
-        this.status = status;
     }
 
 }

@@ -44,7 +44,7 @@ public abstract class AbstractPrePaymentState extends AbstractOrderState {
 
     @Override
     public void update(Order order, CreateOrderRequestDto dto) {
-        Long brandId = order.getBrand().getBrandId();
+        Long brandId = order.getBrand().getId();
         OrderItemProcessorService.ProcessResult result =
                 orderItemProcessorService.processOrderItems(order, dto.getItems(), brandId);
         order.getItems().clear();
@@ -70,7 +70,7 @@ public abstract class AbstractPrePaymentState extends AbstractOrderState {
         Long pointsToUse = 0L;
 
         if (requestDto.getMemberId() != null) {
-            member = userRepository.findByBrand_IdAndId(order.getBrand().getBrandId(), requestDto.getMemberId())
+            member = userRepository.findByBrand_IdAndId(order.getBrand().getId(), requestDto.getMemberId())
                     .filter(user -> user.getMemberProfile() != null)
                     .orElseThrow(() -> new ResourceNotFoundException("找不到會員，ID：" + requestDto.getMemberId()));
             order.setMember(member);

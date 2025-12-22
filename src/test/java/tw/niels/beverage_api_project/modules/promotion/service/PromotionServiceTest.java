@@ -49,7 +49,7 @@ class PromotionServiceTest {
         // Arrange
         Long brandId = 1L;
         Brand brand = new Brand();
-        brand.setBrandId(brandId);
+        brand.setId(brandId);
 
         Order order = new Order();
         order.setBrand(brand);

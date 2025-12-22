@@ -51,7 +51,7 @@ class InventoryServiceTest {
         mockItem.setTotalQuantity(new BigDecimal("100.0")); // 總量足夠
 
         InventoryBatch mockBatch = new InventoryBatch();
-        mockBatch.setBatchId(555L);
+        mockBatch.setId(555L);
         mockBatch.setCurrentQuantity(new BigDecimal("10.0")); // 批次足夠
         mockBatch.setExpiryDate(LocalDate.now().plusDays(10));
 
@@ -88,13 +88,13 @@ class InventoryServiceTest {
 
         // 批次 A: 剩 10 (過期日較早)
         InventoryBatch batchA = new InventoryBatch();
-        batchA.setBatchId(1L);
+        batchA.setId(1L);
         batchA.setCurrentQuantity(new BigDecimal("10.0"));
         batchA.setExpiryDate(LocalDate.now().plusDays(1));
 
         // 批次 B: 剩 20 (過期日較晚)
         InventoryBatch batchB = new InventoryBatch();
-        batchB.setBatchId(2L);
+        batchB.setId(2L);
         batchB.setCurrentQuantity(new BigDecimal("20.0"));
         batchB.setExpiryDate(LocalDate.now().plusDays(5));
 

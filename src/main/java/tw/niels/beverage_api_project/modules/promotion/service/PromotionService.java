@@ -66,7 +66,7 @@ public class PromotionService {
     public BigDecimal calculateBestDiscount(Order order) {
         if (order.getBrand() == null) return BigDecimal.ZERO;
 
-        Long brandId = order.getBrand().getBrandId();
+        Long brandId = order.getBrand().getId();
 
         // 透過 self 代理物件呼叫，觸發 @Cacheable 機制
         List<Promotion> activePromotions = self.getActivePromotions(brandId);
@@ -111,7 +111,7 @@ public class PromotionService {
         promotion.setMinSpend(request.getMinSpend());
         promotion.setStartDate(request.getStartDate());
         promotion.setEndDate(request.getEndDate());
-        promotion.setActive(true);
+        promotion.setIsActive(true);
 
         if (request.getApplicableProductIds() != null && !request.getApplicableProductIds().isEmpty()) {
             Set<Product> products = new HashSet<>();
@@ -144,7 +144,7 @@ public class PromotionService {
         Promotion promotion = promotionRepository.findByBrand_IdAndId(brandId, promotionId)
                 .orElseThrow(() -> new ResourceNotFoundException("找不到促銷活動 ID: " + promotionId));
 
-        promotion.setActive(false);
+        promotion.setIsActive(false);
         promotionRepository.save(promotion);
     }
 }

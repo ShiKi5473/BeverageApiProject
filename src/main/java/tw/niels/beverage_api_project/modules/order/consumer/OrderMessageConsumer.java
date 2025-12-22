@@ -66,7 +66,7 @@ public class OrderMessageConsumer {
                 OrderNotification notification = new OrderNotification(
                         "ORDER_CREATED",
                         task.getRequestId(),
-                        createdOrder.getOrderId(),
+                        createdOrder.getId(),
                         createdOrder.getOrderNumber(),
                         "訂單建立成功！"
                 );

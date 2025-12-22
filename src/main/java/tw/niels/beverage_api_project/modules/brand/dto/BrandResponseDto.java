@@ -31,10 +31,10 @@ public class BrandResponseDto {
     public static BrandResponseDto fromEntity(Brand brand) {
         if (brand == null) return null;
         BrandResponseDto dto = new BrandResponseDto();
-        dto.setBrandId(brand.getBrandId());
+        dto.setBrandId(brand.getId());
         dto.setName(brand.getName());
         dto.setContactPerson(brand.getContactPerson());
-        dto.setIsActive(brand.getActive());
+        dto.setIsActive(brand.getIsActive());
         dto.setCreatedAt(brand.getCreatedAt());
         dto.setUpdatedAt(brand.getUpdatedAt());
         return dto;

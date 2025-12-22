@@ -51,7 +51,7 @@ public class DataSeeder implements CommandLineRunner {
     private final OptionGroupRepository optionGroupRepository;
     private final ProductOptionRepository productOptionRepository;
     private final PasswordEncoder passwordEncoder;
-    private final InventoryItemRepository inventoryItemRepository;;
+    private final InventoryItemRepository inventoryItemRepository;
     private final InventoryBatchRepository inventoryBatchRepository;
     private final PurchaseShipmentRepository purchaseShipmentRepository;
 
@@ -99,14 +99,14 @@ public class DataSeeder implements CommandLineRunner {
                 b.setId(1L); // 強制指定 ID 為 1
                 b.setName("品茶軒");
                 b.setContactPerson("測試員");
-                b.setActive(true);
+                b.setIsActive(true);
                 return brandRepository.save(b);
             });
         });
         // ==========================================
         // 2. 建立分店 (修正：增加防呆，避免重複建立)
         // ==========================================
-        Store store = storeRepository.findByBrand_IdAndId(brand.getBrandId(), 1L).orElseGet(() -> {
+        Store store = storeRepository.findByBrand_IdAndId(brand.getId(), 1L).orElseGet(() -> {
             // 這裡也可以額外檢查是否已有同名分店，但通常分店ID綁定比較固定，暫時維持 ID 檢查
             Store s = new Store();
             s.setId(1L);
@@ -118,13 +118,13 @@ public class DataSeeder implements CommandLineRunner {
         });
 
         // 3. 建立或更新店員帳號
-        User staffUser = userRepository.findByPrimaryPhoneAndBrandId("0911111111", brand.getBrandId())
+        User staffUser = userRepository.findByPrimaryPhoneAndBrandId("0911111111", brand.getId())
                 .orElseGet(() -> {
                     User user = new User();
                     user.setBrand(brand);
                     user.setPrimaryPhone("0911111111");
                     user.setPasswordHash(passwordEncoder.encode("password123"));
-                    user.setActive(true);
+                    user.setIsActive(true);
 
                     StaffProfile profile = new StaffProfile();
                     profile.setFullName("K6 測試員");
@@ -147,8 +147,8 @@ public class DataSeeder implements CommandLineRunner {
         // ==========================================
 
         // --- 4.1 甜度 ---
-        OptionGroup sugarGroup = optionGroupRepository.findByBrand_IdAndName(brand.getBrandId(), "甜度")
-                .orElseGet(() -> optionGroupRepository.findByBrand_IdAndId(brand.getBrandId(), 10L)
+        OptionGroup sugarGroup = optionGroupRepository.findByBrand_IdAndName(brand.getId(), "甜度")
+                .orElseGet(() -> optionGroupRepository.findByBrand_IdAndId(brand.getId(), 10L)
                         .map(existing -> {
                             existing.setName("甜度");
                             return optionGroupRepository.save(existing);
@@ -164,7 +164,7 @@ public class DataSeeder implements CommandLineRunner {
                         }));
 
         // 建立 "半糖" 選項 (檢查邏輯不變，因為 Option 沒有 Unique Name Constraint)
-        if (productOptionRepository.findByOptionGroup_Brand_IdAndId(brand.getBrandId(), 11L).isEmpty()) {
+        if (productOptionRepository.findByOptionGroup_Brand_IdAndId(brand.getId(), 11L).isEmpty()) {
             ProductOption opt = new ProductOption();
             opt.setId(11L);
             opt.setOptionGroup(sugarGroup);
@@ -175,8 +175,8 @@ public class DataSeeder implements CommandLineRunner {
         }
 
         // --- 4.2 冰塊 ---
-        OptionGroup iceGroup = optionGroupRepository.findByBrand_IdAndName(brand.getBrandId(), "冰塊")
-                .orElseGet(() -> optionGroupRepository.findByBrand_IdAndId(brand.getBrandId(), 20L)
+        OptionGroup iceGroup = optionGroupRepository.findByBrand_IdAndName(brand.getId(), "冰塊")
+                .orElseGet(() -> optionGroupRepository.findByBrand_IdAndId(brand.getId(), 20L)
                         .map(existing -> {
                             existing.setName("冰塊");
                             return optionGroupRepository.save(existing);
@@ -192,7 +192,7 @@ public class DataSeeder implements CommandLineRunner {
                         }));
 
         // 建立 "少冰" 選項
-        if (productOptionRepository.findByOptionGroup_Brand_IdAndId(brand.getBrandId(), 21L).isEmpty()) {
+        if (productOptionRepository.findByOptionGroup_Brand_IdAndId(brand.getId(), 21L).isEmpty()) {
             ProductOption opt = new ProductOption();
             opt.setId(21L);
             opt.setOptionGroup(iceGroup);
@@ -205,8 +205,8 @@ public class DataSeeder implements CommandLineRunner {
         // ==========================================
         // 5. 建立商品 (【本次修正重點】)
         // ==========================================
-        Product product = productRepository.findByBrand_IdAndName(brand.getBrandId(), "招牌紅茶")
-                .orElseGet(() -> productRepository.findByBrand_IdAndId(brand.getBrandId(), 1L)
+        Product product = productRepository.findByBrand_IdAndName(brand.getId(), "招牌紅茶")
+                .orElseGet(() -> productRepository.findByBrand_IdAndId(brand.getId(), 1L)
                         .map(existing -> {
                             existing.setName("招牌紅茶");
                             return productRepository.save(existing);
@@ -237,15 +237,15 @@ public class DataSeeder implements CommandLineRunner {
         // ==========================================
 
         // 6-1. 原物料
-        InventoryItem item = inventoryItemRepository.findByBrand_IdAndName(brand.getBrandId(), "測試用茶葉")
-                .orElseGet(() -> inventoryItemRepository.findByBrand_IdAndId(brand.getBrandId(), 1L)
+        InventoryItem item = inventoryItemRepository.findByBrand_IdAndName(brand.getId(), "測試用茶葉")
+                .orElseGet(() -> inventoryItemRepository.findByBrand_IdAndId(brand.getId(), 1L)
                         .map(existing -> {
                             existing.setName("測試用茶葉");
                             return inventoryItemRepository.save(existing);
                         })
                         .orElseGet(() -> {
                             InventoryItem i = new InventoryItem();
-                            i.setInventoryItemId(1L);
+                            i.setId(1L);
                             i.setBrand(brand);
                             i.setName("測試用茶葉");
                             i.setUnit("g");
@@ -254,10 +254,10 @@ public class DataSeeder implements CommandLineRunner {
                         }));
 
         // 6-2. 進貨單 (Shipment 通常不檢查名稱，維持原樣)
-        PurchaseShipment shipment = purchaseShipmentRepository.findByStore_Brand_IdAndId(brand.getBrandId(), 1L).orElseGet(() -> {
+        PurchaseShipment shipment = purchaseShipmentRepository.findByStore_Brand_IdAndId(brand.getId(), 1L).orElseGet(() -> {
             // ... 維持原樣 ...
             PurchaseShipment s = new PurchaseShipment();
-            s.setShipmentId(1L);
+            s.setId(1L);
             s.setStore(store);
             s.setStaff(staffUser);
             s.setShipmentDate(LocalDateTime.now());
@@ -267,9 +267,9 @@ public class DataSeeder implements CommandLineRunner {
 
         // 6-3. 庫存批次 (Batch 維持原樣，但需注意 V9 新增了 store_id)
         // 如果您的 Batch Entity 已經更新了 V9 的 store 欄位，這裡需要補上 s.setStore(store);
-        inventoryBatchRepository.findByShipment_Store_Brand_IdAndId(brand.getBrandId(), 1L).orElseGet(() -> {
+        inventoryBatchRepository.findByShipment_Store_Brand_IdAndId(brand.getId(), 1L).orElseGet(() -> {
             InventoryBatch b = new InventoryBatch();
-            b.setBatchId(1L);
+            b.setId(1L);
             b.setShipment(shipment);
             b.setInventoryItem(item);
             b.setStore(store);

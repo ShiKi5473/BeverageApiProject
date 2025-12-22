@@ -2,6 +2,8 @@ package tw.niels.beverage_api_project.modules.user.entity.profile;
 
 import java.util.Date;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -21,11 +23,13 @@ import tw.niels.beverage_api_project.modules.user.entity.User;
 import tw.niels.beverage_api_project.modules.user.enums.StaffRole;
 
 @Entity
+@Getter
+@Setter
 @Table(name = "staff_profiles")
 public class StaffProfile {
 
     public StaffProfile() {
-    };
+    }
 
     @Id
     @Column(name = "user_id")
@@ -54,60 +58,5 @@ public class StaffProfile {
     @Column(name = "hire_date")
     private Date hireDate;
 
-    // Getters and Setters
-    public Long getUserId() {
-        return userId;
-    }
 
-    public void setUserId(Long userId) {
-        this.userId = userId;
-    }
-
-    public User getUser() {
-        return user;
-    }
-
-    public void setUser(User user) {
-        this.user = user;
-    }
-
-    public Store getStore() {
-        return store;
-    }
-
-    public void setStore(Store store) {
-        this.store = store;
-    }
-
-    public String getEmployeeNumber() {
-        return employeeNumber;
-    }
-
-    public void setEmployeeNumber(String employeeNumber) {
-        this.employeeNumber = employeeNumber;
-    }
-
-    public String getFullName() {
-        return fullName;
-    }
-
-    public void setFullName(String fullName) {
-        this.fullName = fullName;
-    }
-
-    public StaffRole getRole() {
-        return role;
-    }
-
-    public void setRole(StaffRole role) {
-        this.role = role;
-    }
-
-    public Date getHireDate() {
-        return hireDate;
-    }
-
-    public void setHireDate(Date hireDate) {
-        this.hireDate = hireDate;
-    }
 }

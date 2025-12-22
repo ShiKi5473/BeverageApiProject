@@ -27,7 +27,7 @@ public class StoreResponseDto {
         if (store == null) return null;
 
         StoreResponseDto dto = new StoreResponseDto();
-        dto.setStoreId(store.getStoreId());
+        dto.setStoreId(store.getId());
         dto.setName(store.getName());
         dto.setAddress(store.getAddress());
         dto.setPhoneNumber(store.getPhoneNumber());

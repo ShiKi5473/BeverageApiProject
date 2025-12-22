@@ -1,6 +1,7 @@
 // 建議放在：tw/niels/beverage_api_project/modules/order/event/
 package tw.niels.beverage_api_project.modules.order.event;
 
+import lombok.Getter;
 import tw.niels.beverage_api_project.modules.order.entity.Order;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
 
@@ -8,6 +9,7 @@ import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
  * 訂單狀態變更事件
  * (繼承 ApplicationEvent 是一種做法，但直接當 POJO 也可以)
  */
+@Getter
 public class OrderStateChangedEvent {
     private final Order order;
     private final OrderStatus oldStatus; // 變更前的狀態 (可選)
@@ -18,9 +20,5 @@ public class OrderStateChangedEvent {
         this.oldStatus = oldStatus;
         this.newStatus = newStatus;
     }
-
-    // Getters
-    public Order getOrder() { return order; }
-    public OrderStatus getOldStatus() { return oldStatus; }
-    public OrderStatus getNewStatus() { return newStatus; }
+    
 }

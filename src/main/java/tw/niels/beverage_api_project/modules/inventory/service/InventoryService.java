@@ -144,7 +144,7 @@ public class InventoryService {
             trx.setBalanceAfter(newQuantity);
             trx.setReasonType("RESTOCK");
             trx.setOperator(staff);
-            trx.setNote("進貨單號: " + shipment.getShipmentId());
+            trx.setNote("進貨單號: " + shipment.getId());
             transactionsToSave.add(trx);
         }
 
@@ -211,7 +211,7 @@ public class InventoryService {
             }
 
             // 將 ID 與 新數量 加入列表
-            batchUpdates.add(new tw.niels.beverage_api_project.modules.inventory.dao.InventoryBatchDAO.BatchUpdateTuple(batch.getBatchId(), newQty));
+            batchUpdates.add(new tw.niels.beverage_api_project.modules.inventory.dao.InventoryBatchDAO.BatchUpdateTuple(batch.getId(), newQty));
         }
 
         // 5. 呼叫 DAO 執行 JDBC 批次更新
@@ -296,7 +296,7 @@ public class InventoryService {
 
             // 2. 如果有單項備註，則附加在後 (Item Level Note)
             if (itemDto.getItemNote() != null && !itemDto.getItemNote().isEmpty()) {
-                if (noteBuilder.length() > 0) {
+                if (!noteBuilder.isEmpty()) {
                     noteBuilder.append(" | "); // 使用分隔符號區隔
                 }
                 noteBuilder.append(itemDto.getItemNote());
@@ -337,6 +337,6 @@ public class InventoryService {
     public void deductInventory(Long storeId, Long itemId, BigDecimal quantity) {
         Store store = storeRepository.findByIdSystem(storeId)
                 .orElseThrow(() -> new ResourceNotFoundException("error.resource.not_found", "Store ID: " + storeId));
-        deductInventory(store.getBrand().getBrandId(), storeId, itemId, quantity);
+        deductInventory(store.getBrand().getId(), storeId, itemId, quantity);
     }
 }

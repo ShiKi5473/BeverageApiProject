@@ -1,6 +1,8 @@
 package tw.niels.beverage_api_project.modules.inventory.entity;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
 import tw.niels.beverage_api_project.modules.store.entity.Store;
 
@@ -12,6 +14,8 @@ import java.time.Instant;
         @UniqueConstraint(columnNames = {"store_id", "inventory_item_id"})
 })
 @AttributeOverride(name = "id", column = @Column(name = "snapshot_id"))
+@Getter
+@Setter
 public class InventorySnapshot extends BaseTsidEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -28,19 +32,4 @@ public class InventorySnapshot extends BaseTsidEntity {
     @Column(name = "last_checked_at")
     private Instant lastCheckedAt;
 
-    // Getters & Setters
-    public Long getSnapshotId() { return getId(); }
-    public void setSnapshotId(Long id) { setId(id); }
-
-    public InventoryItem getInventoryItem() { return inventoryItem; }
-    public void setInventoryItem(InventoryItem inventoryItem) { this.inventoryItem = inventoryItem; }
-
-    public Store getStore() { return store; }
-    public void setStore(Store store) { this.store = store; }
-
-    public BigDecimal getQuantity() { return quantity; }
-    public void setQuantity(BigDecimal quantity) { this.quantity = quantity; }
-
-    public Instant getLastCheckedAt() { return lastCheckedAt; }
-    public void setLastCheckedAt(Instant lastCheckedAt) { this.lastCheckedAt = lastCheckedAt; }
 }

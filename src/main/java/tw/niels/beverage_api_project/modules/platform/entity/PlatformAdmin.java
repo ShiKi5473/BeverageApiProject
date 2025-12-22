@@ -1,12 +1,16 @@
 package tw.niels.beverage_api_project.modules.platform.entity;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
 
 import java.util.Date;
 
 @Entity
+@Getter
+@Setter
 @Table(name = "platform_admins")
 @AttributeOverride(name = "id", column = @Column(name = "admin_id"))
 public class PlatformAdmin extends BaseTsidEntity {
@@ -30,12 +34,5 @@ public class PlatformAdmin extends BaseTsidEntity {
     public void setAdminId(Long adminId) {
         setId(adminId);
     }
-    public String getUsername() { return username; }
-    public void setUsername(String username) { this.username = username; }
-    public String getPasswordHash() { return passwordHash; }
-    public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
-    public String getRole() { return role; }
-    public void setRole(String role) { this.role = role; }
-    public Date getCreatedAt() { return createdAt; }
-    public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
+
 }

@@ -4,11 +4,15 @@ import java.util.HashSet;
 import java.util.Set;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
 import tw.niels.beverage_api_project.modules.brand.entity.Brand;
 import tw.niels.beverage_api_project.modules.product.enums.SelectionType;
 
 @Entity
+@Getter
+@Setter
 @Table(name = "option_groups", uniqueConstraints = {
         @UniqueConstraint(columnNames = { "brand_id", "name" })
 })
@@ -16,7 +20,7 @@ import tw.niels.beverage_api_project.modules.product.enums.SelectionType;
 public class OptionGroup extends BaseTsidEntity {
 
     public OptionGroup() {
-    };
+    }
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "brand_id", nullable = false)
@@ -34,51 +38,5 @@ public class OptionGroup extends BaseTsidEntity {
 
     @OneToMany(mappedBy = "optionGroup", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private Set<ProductOption> options = new HashSet<>();
-
-    // getter and setter
-
-    public Long getGroupId() { return getId(); }
-
-    public void setGroupId(Long groupId) { setId(groupId); }
-
-    public Brand getBrand() {
-        return brand;
-    }
-
-    public void setBrand(Brand brand) {
-        this.brand = brand;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public SelectionType getSelectionType() {
-        return selectionType;
-    }
-
-    public void setSelectionType(SelectionType selectionType) {
-        this.selectionType = selectionType;
-    }
-
-    public Integer getSortOrder() {
-        return sortOrder;
-    }
-
-    public void setSortOrder(Integer sortOrder) {
-        this.sortOrder = sortOrder;
-    }
-
-    public Set<ProductOption> getOptions() {
-        return options;
-    }
-
-    public void setOptions(Set<ProductOption> options) {
-        this.options = options;
-    }
 
 }

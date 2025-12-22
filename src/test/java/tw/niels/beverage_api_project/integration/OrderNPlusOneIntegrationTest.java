@@ -109,7 +109,7 @@ public class OrderNPlusOneIntegrationTest extends AbstractIntegrationTest {
         System.out.println("========== 測試開始：執行查詢 ==========");
 
         // 1. 執行業務邏輯
-        List<Order> orders = orderService.getOrders(brandId, storeId, Optional.empty());
+        List<Order> orders = orderService.getOrders(brandId, storeId, null);
 
         // 2. 觸發 Lazy Loading (存取關聯物件)
         // 驗證是否因為存取 product 而產生額外查詢

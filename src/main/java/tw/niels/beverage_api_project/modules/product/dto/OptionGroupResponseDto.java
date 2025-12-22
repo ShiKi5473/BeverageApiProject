@@ -31,7 +31,7 @@ public class OptionGroupResponseDto {
         if (entity == null) return null;
 
         OptionGroupResponseDto dto = new OptionGroupResponseDto();
-        dto.setGroupId(entity.getGroupId());
+        dto.setGroupId(entity.getId());
         dto.setName(entity.getName());
         dto.setSelectionType(entity.getSelectionType());
         dto.setSortOrder(entity.getSortOrder());

@@ -40,7 +40,7 @@ public class ProductResponseDto {
     public static ProductResponseDto fromEntity(Product product) {
         if (product == null) return null;
         ProductResponseDto dto = new ProductResponseDto();
-        dto.setProductId(product.getProductId());
+        dto.setProductId(product.getId());
         dto.setName(product.getName());
         dto.setDescription(product.getDescription());
         dto.setBasePrice(product.getBasePrice());

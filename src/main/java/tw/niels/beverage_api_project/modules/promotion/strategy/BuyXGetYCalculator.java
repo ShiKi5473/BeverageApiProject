@@ -34,7 +34,7 @@ public class BuyXGetYCalculator implements PromotionCalculator {
 
         // 2. 找出適用此活動的所有訂單品項
         Set<Long> applicableProductIds = promotion.getApplicableProducts().stream()
-                .map(Product::getProductId)
+                .map(Product::getId)
                 .collect(Collectors.toSet());
 
         List<BigDecimal> eligibleItemPrices = new ArrayList<>();
@@ -42,7 +42,7 @@ public class BuyXGetYCalculator implements PromotionCalculator {
         for (OrderItem item : order.getItems()) {
             // 如果活動沒指定商品 (全館適用) 或者 商品在適用列表中
             boolean isApplicable = applicableProductIds.isEmpty() ||
-                    applicableProductIds.contains(item.getProduct().getProductId());
+                    applicableProductIds.contains(item.getProduct().getId());
 
             if (isApplicable) {
                 // 將每個單品 (考慮數量) 的單價加入列表

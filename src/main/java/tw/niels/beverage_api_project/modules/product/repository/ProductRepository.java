@@ -25,7 +25,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
      * 但在 POS 菜單場景下 (通常幾百筆商品)，這是最快且最乾淨的解法。
      */
     @Query("""
-        SELECT DISTINCT p 
+        SELECT DISTINCT p
         FROM Product p 
         LEFT JOIN FETCH p.categories 
         LEFT JOIN FETCH p.optionGroups og 

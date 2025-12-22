@@ -1,6 +1,8 @@
 package tw.niels.beverage_api_project.modules.inventory.entity;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
 import tw.niels.beverage_api_project.modules.store.entity.Store;
 import tw.niels.beverage_api_project.modules.user.entity.User;
@@ -11,6 +13,8 @@ import java.time.Instant;
 @Entity
 @Table(name = "inventory_transactions")
 @AttributeOverride(name = "id", column = @Column(name = "transaction_id"))
+@Getter
+@Setter
 public class InventoryTransaction extends BaseTsidEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -41,31 +45,5 @@ public class InventoryTransaction extends BaseTsidEntity {
     @Column(name = "balance_after", precision = 12, scale = 2)
     private BigDecimal balanceAfter; // V10 新增
 
-    // Getters & Setters
-    public Long getTransactionId() { return getId(); }
-    public void setTransactionId(Long id) { setId(id); }
 
-    public InventoryItem getInventoryItem() { return inventoryItem; }
-    public void setInventoryItem(InventoryItem inventoryItem) { this.inventoryItem = inventoryItem; }
-
-    public Store getStore() { return store; }
-    public void setStore(Store store) { this.store = store; }
-
-    public BigDecimal getChangeAmount() { return changeAmount; }
-    public void setChangeAmount(BigDecimal changeAmount) { this.changeAmount = changeAmount; }
-
-    public String getReasonType() { return reasonType; }
-    public void setReasonType(String reasonType) { this.reasonType = reasonType; }
-
-    public User getOperator() { return operator; }
-    public void setOperator(User operator) { this.operator = operator; }
-
-    public String getNote() { return note; }
-    public void setNote(String note) { this.note = note; }
-
-    public Instant getCreatedAt() { return createdAt; }
-    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
-
-    public BigDecimal getBalanceAfter() { return balanceAfter; }
-    public void setBalanceAfter(BigDecimal balanceAfter) { this.balanceAfter = balanceAfter; }
 }

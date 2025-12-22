@@ -39,14 +39,14 @@ public class OrderService {
     }
 
     /**
-     * 【重構後】初始化一個空的訂單實體 (包含流水號生成)
+     * 初始化一個空的訂單實體 (包含流水號生成)
      */
     public Order initOrder(User staff, Store store) {
         Order order = new Order();
         order.setBrand(staff.getBrand());
         order.setStore(store);
         order.setStaff(staff);
-        order.setOrderNumber(generateOrderNumber(store.getStoreId()));
+        order.setOrderNumber(generateOrderNumber(store.getId()));
 
         // 初始化預設值
         order.setPointsUsed(0L);
@@ -64,7 +64,7 @@ public class OrderService {
     }
 
     /**
-     * 【重構後】單純的儲存操作
+     * 單純的儲存操作
      */
     @Transactional
     public Order saveOrder(Order order) {
@@ -96,9 +96,9 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
-    public List<Order> getOrders(Long brandId, Long storeId, Optional<OrderStatus> status) {
-        if (status.isPresent()) {
-            return orderRepository.findAllByBrand_IdAndStore_IdAndStatus(brandId, storeId, status.get());
+    public List<Order> getOrders(Long brandId, Long storeId, OrderStatus status) {
+        if (status != null) {
+            return orderRepository.findAllByBrand_IdAndStore_IdAndStatus(brandId, storeId, status);
         } else {
             return orderRepository.findAllByBrand_IdAndStore_Id(brandId, storeId);
         }

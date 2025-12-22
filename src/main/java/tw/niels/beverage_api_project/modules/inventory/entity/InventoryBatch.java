@@ -1,6 +1,8 @@
 package tw.niels.beverage_api_project.modules.inventory.entity;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
 import tw.niels.beverage_api_project.modules.store.entity.Store;
 
@@ -13,6 +15,8 @@ import java.time.LocalDate;
         @Index(name = "idx_batches_store_item", columnList = "store_id, inventory_item_id") // V9 新索引
 })
 @AttributeOverride(name = "id", column = @Column(name = "batch_id"))
+@Getter
+@Setter
 public class InventoryBatch extends BaseTsidEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -40,28 +44,5 @@ public class InventoryBatch extends BaseTsidEntity {
     @Column(name = "expiry_date", nullable = false)
     private LocalDate expiryDate;
 
-    // Getters & Setters
-    public Long getBatchId() { return getId(); }
-    public void setBatchId(Long batchId) { setId(batchId); }
 
-    public PurchaseShipment getShipment() { return shipment; }
-    public void setShipment(PurchaseShipment shipment) { this.shipment = shipment; }
-
-    public InventoryItem getInventoryItem() { return inventoryItem; }
-    public void setInventoryItem(InventoryItem inventoryItem) { this.inventoryItem = inventoryItem; }
-
-    public Store getStore() { return store; }
-    public void setStore(Store store) { this.store = store; }
-
-    public BigDecimal getQuantityReceived() { return quantityReceived; }
-    public void setQuantityReceived(BigDecimal quantityReceived) { this.quantityReceived = quantityReceived; }
-
-    public BigDecimal getCurrentQuantity() { return currentQuantity; }
-    public void setCurrentQuantity(BigDecimal currentQuantity) { this.currentQuantity = currentQuantity; }
-
-    public LocalDate getProductionDate() { return productionDate; }
-    public void setProductionDate(LocalDate productionDate) { this.productionDate = productionDate; }
-
-    public LocalDate getExpiryDate() { return expiryDate; }
-    public void setExpiryDate(LocalDate expiryDate) { this.expiryDate = expiryDate; }
 }

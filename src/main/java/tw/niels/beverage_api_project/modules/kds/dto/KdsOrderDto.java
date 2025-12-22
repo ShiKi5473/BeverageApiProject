@@ -29,7 +29,7 @@ public class KdsOrderDto {
 
     // 保留自定義建構子 (供 Service 層轉換實體使用)
     public KdsOrderDto(Order order) {
-        this.orderId = order.getOrderId();
+        this.orderId = order.getId();
         this.orderNumber = order.getOrderNumber();
         this.status = order.getStatus();
         this.orderTime = order.getOrderTime();
@@ -57,7 +57,7 @@ public class KdsOrderDto {
         private List<KdsOrderOptionDto> options;
 
         public KdsOrderItemDto(OrderItem item) {
-            this.orderItemId = item.getOrderItemId();
+            this.orderItemId = item.getId();
             this.productName = item.getProduct().getName();
             this.quantity = item.getQuantity();
             this.notes = item.getNotes();

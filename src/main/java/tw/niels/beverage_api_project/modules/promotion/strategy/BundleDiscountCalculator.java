@@ -24,7 +24,7 @@ public class BundleDiscountCalculator implements PromotionCalculator {
     @Override
     public BigDecimal calculateDiscount(Order order, Promotion promotion) {
         Set<Long> requiredProductIds = promotion.getApplicableProducts().stream()
-                .map(Product::getProductId)
+                .map(Product::getId)
                 .collect(Collectors.toSet());
 
         if (requiredProductIds.isEmpty()) return BigDecimal.ZERO;
@@ -34,7 +34,7 @@ public class BundleDiscountCalculator implements PromotionCalculator {
         Map<Long, BigDecimal> cartPrices = new HashMap<>();
 
         for (OrderItem item : order.getItems()) {
-            Long pid = item.getProduct().getProductId();
+            Long pid = item.getProduct().getId();
             cartCounts.put(pid, cartCounts.getOrDefault(pid, 0) + item.getQuantity());
             // 簡化：假設同商品單價相同 (忽略選項差異，或者取第一個)
             cartPrices.putIfAbsent(pid, item.getUnitPrice());
@@ -52,8 +52,6 @@ public class BundleDiscountCalculator implements PromotionCalculator {
             // 累加原價
             originalBundlePrice = originalBundlePrice.add(cartPrices.get(pid));
         }
-
-        if (possibleSets == 0) return BigDecimal.ZERO;
 
         // 計算折扣
         // 優惠價 (value) 是「整組」的價格

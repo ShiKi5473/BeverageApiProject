@@ -47,7 +47,7 @@ public class AppUserDetails implements UserDetails {
             authorities.add(new SimpleGrantedAuthority("ROLE_" + staffProfile.getRole().name()));
 
             if (staffProfile.getStore() != null) {
-                storeId = staffProfile.getStore().getStoreId();
+                storeId = staffProfile.getStore().getId();
             }
         } else {
             // 如果沒有員工資料，預設給予會員角色
@@ -56,11 +56,11 @@ public class AppUserDetails implements UserDetails {
 
         return new AppUserDetails(
                 user.getUserId(),
-                user.getBrand().getBrandId(),
+                user.getBrand().getId(),
                 storeId,
                 user.getPrimaryPhone(),
                 user.getPasswordHash(),
-                user.getActive(),
+                user.getIsActive(),
                 authorities);
     }
 

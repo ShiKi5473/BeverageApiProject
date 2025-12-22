@@ -1,5 +1,7 @@
 package tw.niels.beverage_api_project.modules.kds.service;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -50,7 +52,7 @@ public class KdsService {
     public void handleOrderStateChange(OrderStateChangedEvent event) {
         Order order = event.getOrder();
         OrderStatus newStatus = event.getNewStatus();
-        Long storeId = order.getStore().getStoreId();
+        Long storeId = order.getStore().getId();
 
         KdsEventStrategy strategy = strategyMap.get(newStatus);
         if (strategy != null) {
@@ -123,6 +125,8 @@ public class KdsService {
     }
 
     // DTO 類別 (需實作 Serializable 以便安全傳輸，雖然 JSON Converter 主要看 Getter)
+    @Getter
+    @Setter
     public static class KdsMessage implements Serializable {
         private String action;
         private KdsOrderDto payload;
@@ -133,14 +137,10 @@ public class KdsService {
             this.action = action;
             this.payload = payload;
         }
-
-        public String getAction() { return action; }
-        public KdsOrderDto getPayload() { return payload; }
-        // Setters are needed for Jackson deserialization if no constructor matches perfectly or for flexibility
-        public void setAction(String action) { this.action = action; }
-        public void setPayload(KdsOrderDto payload) { this.payload = payload; }
     }
 
+    @Getter
+    @Setter
     public static class KdsBroadcastMessage implements Serializable {
         private Long storeId;
         private KdsMessage kdsMessage;
@@ -151,10 +151,6 @@ public class KdsService {
             this.storeId = storeId;
             this.kdsMessage = kdsMessage;
         }
-        public Long getStoreId() { return storeId; }
-        public KdsMessage getKdsMessage() { return kdsMessage; }
 
-        public void setStoreId(Long storeId) { this.storeId = storeId; }
-        public void setKdsMessage(KdsMessage kdsMessage) { this.kdsMessage = kdsMessage; }
     }
 }

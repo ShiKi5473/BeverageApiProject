@@ -32,7 +32,7 @@ public class PromotionResponseDto {
         if (entity == null) return null; // 防呆
 
         PromotionResponseDto dto = new PromotionResponseDto();
-        dto.setPromotionId(entity.getPromotionId());
+        dto.setPromotionId(entity.getId());
         dto.setName(entity.getName());
         dto.setDescription(entity.getDescription());
         dto.setType(entity.getType());
@@ -40,12 +40,12 @@ public class PromotionResponseDto {
         dto.setMinSpend(entity.getMinSpend());
         dto.setStartDate(entity.getStartDate());
         dto.setEndDate(entity.getEndDate());
-        dto.setActive(entity.getActive());
+        dto.setActive(entity.getIsActive());
 
         // 【修正 2】改用明確的 Lambda 表達式，並確保 null check
         if (entity.getApplicableProducts() != null) {
             Set<ProductSummaryDto> products = entity.getApplicableProducts().stream()
-                    .map(product -> ProductSummaryDto.fromEntity(product)) // 明確 Lambda
+                    .map(ProductSummaryDto::fromEntity) // 明確 Lambda
                     .collect(Collectors.toSet());
             dto.setApplicableProducts(products);
         }

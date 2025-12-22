@@ -1,5 +1,6 @@
 package tw.niels.beverage_api_project.common.service; // 建議放在 common 套件下
 
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
@@ -23,13 +24,12 @@ public class ControllerHelperService {
      * @return AppUserDetails 物件
      */
     public AppUserDetails getCurrentUserDetails() {
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-        if (principal instanceof AppUserDetails) {
-            return (AppUserDetails) principal;
+        if (authentication != null && authentication.getPrincipal() instanceof AppUserDetails) {
+            return (AppUserDetails) authentication.getPrincipal();
         }
 
-        // 如果 principal 不是 AppUserDetails (例如匿名使用者)，則拋出例外
         throw new ResourceNotFoundException("無法獲取當前使用者認證資訊");
     }
 

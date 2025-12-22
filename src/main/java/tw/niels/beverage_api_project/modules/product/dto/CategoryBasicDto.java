@@ -17,7 +17,7 @@ public class CategoryBasicDto {
     public static CategoryBasicDto fromEntity(Category category) {
         if (category == null) return null;
         CategoryBasicDto dto = new CategoryBasicDto();
-        dto.setCategoryId(category.getCategoryId());
+        dto.setCategoryId(category.getId());
         dto.setName(category.getName());
         return dto;
     }

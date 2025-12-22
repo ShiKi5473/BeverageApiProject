@@ -31,7 +31,7 @@ public class ProductPosDto {
     public static ProductPosDto fromEntity(Product product) {
         if (product == null) return null;
         ProductPosDto dto = new ProductPosDto();
-        dto.setId(product.getProductId());
+        dto.setId(product.getId());
         dto.setName(product.getName());
         dto.setBasePrice(product.getBasePrice());
         if (product.getOptionGroups() != null) {

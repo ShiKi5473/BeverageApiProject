@@ -24,12 +24,12 @@ public class CategoryResponseDto {
         if (category == null) return null;
 
         CategoryResponseDto dto = new CategoryResponseDto();
-        dto.setCategoryId(category.getCategoryId());
+        dto.setCategoryId(category.getId());
         dto.setName(category.getName());
         dto.setSortOrder(category.getSortOrder());
 
         if (category.getBrand() != null) {
-            dto.setBrandId(category.getBrand().getBrandId());
+            dto.setBrandId(category.getBrand().getId());
         }
         return dto;
     }

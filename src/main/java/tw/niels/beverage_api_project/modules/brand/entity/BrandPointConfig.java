@@ -3,9 +3,14 @@ package tw.niels.beverage_api_project.modules.brand.entity;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.Instant;
+
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
+@Getter
+@Setter
 @Table(name = "brand_point_configs")
 public class BrandPointConfig {
 
@@ -42,51 +47,5 @@ public class BrandPointConfig {
         this.brand = brand;
     }
 
-    public Long getBrandId() {
-        return brandId;
-    }
 
-    public void setBrandId(Long brandId) {
-        this.brandId = brandId;
-    }
-
-    public Brand getBrand() {
-        return brand;
-    }
-
-    public void setBrand(Brand brand) {
-        this.brand = brand;
-    }
-
-    public BigDecimal getRedeemRate() {
-        return redeemRate;
-    }
-
-    public void setRedeemRate(BigDecimal redeemRate) {
-        this.redeemRate = redeemRate;
-    }
-
-    public BigDecimal getEarnRate() {
-        return earnRate;
-    }
-
-    public void setEarnRate(BigDecimal earnRate) {
-        this.earnRate = earnRate;
-    }
-
-    public Integer getExpiryDays() {
-        return expiryDays;
-    }
-
-    public void setExpiryDays(Integer expiryDays) {
-        this.expiryDays = expiryDays;
-    }
-
-    public Instant getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(Instant updatedAt) {
-        this.updatedAt = updatedAt;
-    }
 }

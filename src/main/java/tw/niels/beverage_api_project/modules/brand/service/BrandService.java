@@ -38,7 +38,7 @@ public class BrandService {
         Brand brand = new Brand();
         brand.setName(requestDto.getName());
         brand.setContactPerson(requestDto.getContactPerson());
-        brand.setActive(true); // 預設為啟用
+        brand.setIsActive(true); // 預設為啟用
 
         return brandRepository.save(brand);
     }

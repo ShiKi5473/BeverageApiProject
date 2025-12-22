@@ -108,8 +108,9 @@ public class OrderController {
             @RequestParam(required = false) OrderStatus status) {
         Long brandId = helperService.getCurrentBrandId();
         helperService.validateStoreAccess(storeId);
-        Optional<OrderStatus> statusOptional = Optional.ofNullable(status);
-        List<Order> orders = orderService.getOrders(brandId, storeId, statusOptional);
+
+        List<Order> orders = orderService.getOrders(brandId, storeId, status);
+
         List<OrderResponseDto> dtos = orders.stream()
                 .map(OrderResponseDto::fromEntity)
                 .collect(Collectors.toList());

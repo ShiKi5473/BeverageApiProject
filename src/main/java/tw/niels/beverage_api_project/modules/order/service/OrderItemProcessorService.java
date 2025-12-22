@@ -113,7 +113,7 @@ public class OrderItemProcessorService {
                     .orElse("Uncategorized");
 
             ProductSnapshot snapshot = new ProductSnapshot(
-                    product.getProductId(),
+                    product.getId(),
                     product.getName(),
                     product.getBasePrice(),
                     categoryName

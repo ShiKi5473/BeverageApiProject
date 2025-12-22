@@ -21,7 +21,7 @@ public interface ProductOptionRepository extends JpaRepository<ProductOption, Lo
      * 使用 JOIN FETCH 確保不會因為存取關聯而觸發額外 SQL
      */
     @Query("""
-        SELECT po 
+        SELECT po
         FROM ProductOption po 
         JOIN FETCH po.optionGroup og 
         WHERE og.brand.id = :brandId 

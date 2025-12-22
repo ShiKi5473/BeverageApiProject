@@ -26,7 +26,7 @@ public class ProductOptionResponseDto {
         if (entity == null) return null;
 
         ProductOptionResponseDto dto = new ProductOptionResponseDto();
-        dto.setOptionId(entity.getOptionId());
+        dto.setOptionId(entity.getId());
         dto.setOptionName(entity.getOptionName());
         dto.setPriceAdjustment(entity.getPriceAdjustment());
         dto.setDefault(entity.isDefault());

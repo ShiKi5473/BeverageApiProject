@@ -41,7 +41,6 @@ public interface StaffProfileRepository extends JpaRepository<StaffProfile, Long
 
     @Deprecated
     @Override
-    @NonNull
     default void deleteById(@NonNull Long id) {
         throw new UnsupportedOperationException("禁止使用 deleteById()");
 

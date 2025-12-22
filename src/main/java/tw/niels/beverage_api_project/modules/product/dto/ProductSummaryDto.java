@@ -32,7 +32,7 @@ public class ProductSummaryDto {
     public static ProductSummaryDto fromEntity(Product product) {
         if (product == null) return null;
         return new ProductSummaryDto(
-                product.getProductId(),
+                product.getId(),
                 product.getName(),
                 product.getBasePrice(),
                 product.getImageUrl(),

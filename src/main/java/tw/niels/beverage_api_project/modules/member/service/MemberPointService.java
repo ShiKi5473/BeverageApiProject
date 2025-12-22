@@ -46,8 +46,11 @@ public class MemberPointService {
         // 取得規則
         BigDecimal rate = DEFAULT_REDEEM_RATE;
         if (order.getBrand() != null) {
-            BrandPointConfig config = brandPointConfigRepository.findById(order.getBrand().getBrandId())
-                    .orElse(null);
+            BrandPointConfig config = null;
+            if (order.getBrand().getId() != null) {
+                config = brandPointConfigRepository.findById(order.getBrand().getId())
+                        .orElse(null);
+            }
 
             if (config != null) {
                 rate = config.getRedeemRate();
@@ -68,8 +71,11 @@ public class MemberPointService {
         // 取得規則
         BigDecimal rate = DEFAULT_EARN_RATE;
         if (order.getBrand() != null) {
-            BrandPointConfig config = brandPointConfigRepository.findById(order.getBrand().getBrandId())
-                    .orElse(null);
+            BrandPointConfig config = null;
+            if (order.getBrand().getId() != null) {
+                config = brandPointConfigRepository.findById(order.getBrand().getId())
+                        .orElse(null);
+            }
 
             if (config != null) {
                 rate = config.getEarnRate();

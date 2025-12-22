@@ -5,9 +5,12 @@ import jakarta.persistence.MappedSuperclass;
 import jakarta.persistence.PostLoad;
 import jakarta.persistence.PostPersist;
 import jakarta.persistence.Transient;
+import lombok.Getter;
+import lombok.Setter;
 import org.springframework.data.domain.Persistable;
 import tw.niels.beverage_api_project.common.util.TsidUtil;
 
+import javax.annotation.processing.Generated;
 import java.io.Serializable;
 import java.util.Objects;
 

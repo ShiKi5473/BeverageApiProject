@@ -15,6 +15,7 @@ import tw.niels.beverage_api_project.security.AppUserDetails;
 
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Objects;
 
 @Aspect
 @Component
@@ -75,7 +76,7 @@ public class AuditAspect {
 
         // 取得 Zipkin Trace ID
         if (tracer.currentSpan() != null) {
-            log.setTraceId(tracer.currentSpan().context().traceId());
+            log.setTraceId(Objects.requireNonNull(tracer.currentSpan()).context().traceId());
         }
 
         // 紀錄參數 (簡化處理，實際專案可能需要過濾敏感資訊如密碼)

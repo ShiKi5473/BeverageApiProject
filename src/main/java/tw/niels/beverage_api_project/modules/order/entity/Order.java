@@ -5,6 +5,8 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.Set;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -30,6 +32,8 @@ import tw.niels.beverage_api_project.modules.user.entity.User;
 @Entity
 @Table(name = "orders")
 @AttributeOverride(name = "id", column = @Column(name = "order_id"))
+@Getter
+@Setter
 public class Order extends BaseTsidEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -93,152 +97,6 @@ public class Order extends BaseTsidEntity {
     private MemberSnapshot memberSnapshot;
 
     public Order() {
-    }
-
-    // getter setter
-
-    public Long getOrderId() {
-        return getId();
-    }
-
-    public void setOrderId(Long orderId) {
-        setId(orderId);
-    }
-
-    public Brand getBrand() {
-        return brand;
-    }
-
-    public void setBrand(Brand brand) {
-        this.brand = brand;
-    }
-
-    public Store getStore() {
-        return store;
-    }
-
-    public void setStore(Store store) {
-        this.store = store;
-    }
-
-    public User getMember() {
-        return member;
-    }
-
-    public void setMember(User member) {
-        this.member = member;
-    }
-
-    public User getStaff() {
-        return staff;
-    }
-
-    public void setStaff(User staff) {
-        this.staff = staff;
-    }
-
-    public String getOrderNumber() {
-        return orderNumber;
-    }
-
-    public void setOrderNumber(String orderNumber) {
-        this.orderNumber = orderNumber;
-    }
-
-    public OrderStatus getStatus() {
-        return status;
-    }
-
-    public void setStatus(OrderStatus status) {
-        this.status = status;
-    }
-
-    public BigDecimal getTotalAmount() {
-        return totalAmount;
-    }
-
-    public void setTotalAmount(BigDecimal totalAmount) {
-        this.totalAmount = totalAmount;
-    }
-
-    public BigDecimal getDiscountAmount() {
-        return discountAmount;
-    }
-
-    public void setDiscountAmount(BigDecimal discountAmount) {
-        this.discountAmount = discountAmount;
-    }
-
-    public BigDecimal getFinalAmount() {
-        return finalAmount;
-    }
-
-    public void setFinalAmount(BigDecimal finalAmount) {
-        this.finalAmount = finalAmount;
-    }
-
-    public Long getPointsUsed() {
-        return pointsUsed;
-    }
-
-    public void setPointsUsed(Long pointsUsed) {
-        this.pointsUsed = pointsUsed;
-    }
-
-    public Long getPointsEarned() {
-        return pointsEarned;
-    }
-
-    public void setPointsEarned(Long pointsEarned) {
-        this.pointsEarned = pointsEarned;
-    }
-
-    public String getCustomerNote() {
-        return customerNote;
-    }
-
-    public void setCustomerNote(String customerNote) {
-        this.customerNote = customerNote;
-    }
-
-    public Date getOrderTime() {
-        return orderTime;
-    }
-
-    public void setOrderTime(Date orderTime) {
-        this.orderTime = orderTime;
-    }
-
-    public Date getCompletedTime() {
-        return completedTime;
-    }
-
-    public void setCompletedTime(Date completedTime) {
-        this.completedTime = completedTime;
-    }
-
-    public Set<OrderItem> getItems() {
-        return items;
-    }
-
-    public void setItems(Set<OrderItem> items) {
-        this.items = items;
-    }
-
-    public PaymentMethodEntity getPaymentMethod() {
-        return paymentMethod;
-    }
-
-    public void setPaymentMethod(PaymentMethodEntity paymentMethod) {
-        this.paymentMethod = paymentMethod;
-    }
-
-    public MemberSnapshot getMemberSnapshot() {
-        return memberSnapshot;
-    }
-
-    public void setMemberSnapshot(MemberSnapshot memberSnapshot) {
-        this.memberSnapshot = memberSnapshot;
     }
 
 }

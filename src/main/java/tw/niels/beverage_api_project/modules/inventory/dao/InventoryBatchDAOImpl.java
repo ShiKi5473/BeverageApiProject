@@ -1,5 +1,6 @@
 package tw.niels.beverage_api_project.modules.inventory.dao;
 
+import org.jetbrains.annotations.NotNull;
 import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -31,7 +32,7 @@ public class InventoryBatchDAOImpl implements tw.niels.beverage_api_project.modu
 
         jdbcTemplate.batchUpdate(sql, new BatchPreparedStatementSetter() {
             @Override
-            public void setValues(PreparedStatement ps, int i) throws SQLException {
+            public void setValues(@NotNull PreparedStatement ps, int i) throws SQLException {
                 BatchUpdateTuple tuple = updates.get(i);
                 ps.setBigDecimal(1, tuple.newQuantity());
                 ps.setLong(2, tuple.batchId());

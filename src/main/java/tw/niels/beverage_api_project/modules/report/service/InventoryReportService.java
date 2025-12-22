@@ -58,11 +58,11 @@ public class InventoryReportService {
         // 2. 準備配方對照表 (Cache Recipes)
         // Map<VariantId, List<Recipe>>
         Map<Long, List<Recipe>> variantRecipeMap = recipeRepository.findAllVariantRecipes().stream()
-                .collect(Collectors.groupingBy(r -> r.getVariant().getVariantId()));
+                .collect(Collectors.groupingBy(r -> r.getVariant().getId()));
 
         // Map<OptionId, List<Recipe>>
         Map<Long, List<Recipe>> optionRecipeMap = recipeRepository.findAllOptionRecipes().stream()
-                .collect(Collectors.groupingBy(r -> r.getOption().getOptionId()));
+                .collect(Collectors.groupingBy(r -> r.getOption().getId()));
 
         // 3. 計算理論消耗 (Theoretical Usage)
         // 撈出區間內該店所有已完成訂單
@@ -71,14 +71,14 @@ public class InventoryReportService {
         orders = orders.stream()
                 .filter(o -> !o.getCompletedTime().toInstant().isBefore(startInstant) &&
                         !o.getCompletedTime().toInstant().isAfter(endInstant))
-                .collect(Collectors.toList());
+                .toList();
 
         // Map<ItemId, TheoreticalUsage>
         Map<Long, BigDecimal> theoreticalUsageMap = new HashMap<>();
 
         for (Order order : orders) {
             for (OrderItem orderItem : order.getItems()) {
-                Long productId = orderItem.getProduct().getProductId();
+                Long productId = orderItem.getProduct().getId();
                 int qty = orderItem.getQuantity();
 
                 // A. 飲品本體配方
@@ -86,10 +86,10 @@ public class InventoryReportService {
                 // 正確做法應在 OrderItem 記錄 variantId (Phase 5 優化)
                 List<ProductVariant> variants = productVariantRepository.findByProduct_Brand_IdAndProduct_Id(brandId, productId);
                 if (!variants.isEmpty()) {
-                    Long variantId = variants.get(0).getVariantId(); // 取第一個
+                    Long variantId = variants.getFirst().getId(); // 取第一個
                     List<Recipe> recipes = variantRecipeMap.getOrDefault(variantId, Collections.emptyList());
                     for (Recipe r : recipes) {
-                        Long itemId = r.getInventoryItem().getInventoryItemId();
+                        Long itemId = r.getInventoryItem().getId();
                         BigDecimal usage = r.getQuantity().multiply(BigDecimal.valueOf(qty));
                         theoreticalUsageMap.merge(itemId, usage, BigDecimal::add);
                     }
@@ -97,9 +97,9 @@ public class InventoryReportService {
 
                 // B. 加料選項配方
                 for (ProductOption opt : orderItem.getOptions()) {
-                    List<Recipe> optRecipes = optionRecipeMap.getOrDefault(opt.getOptionId(), Collections.emptyList());
+                    List<Recipe> optRecipes = optionRecipeMap.getOrDefault(opt.getId(), Collections.emptyList());
                     for (Recipe r : optRecipes) {
-                        Long itemId = r.getInventoryItem().getInventoryItemId();
+                        Long itemId = r.getInventoryItem().getId();
                         // 加料通常一份就是一份配方量，也可能隨飲料杯數增加 (視業務邏輯，這裡假設 1 OrderItem = 1 份加料 * quantity)
                         BigDecimal usage = r.getQuantity().multiply(BigDecimal.valueOf(qty));
                         theoreticalUsageMap.merge(itemId, usage, BigDecimal::add);
@@ -112,7 +112,7 @@ public class InventoryReportService {
         List<InventoryVarianceReportDto> report = new ArrayList<>();
 
         for (InventoryItem item : items) {
-            Long itemId = item.getInventoryItemId();
+            Long itemId = item.getId();
 
             // A. 期初 (Start)
             InventoryTransaction startTx = transactionRepository

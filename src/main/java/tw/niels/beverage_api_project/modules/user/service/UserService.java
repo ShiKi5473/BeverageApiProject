@@ -70,7 +70,7 @@ public class UserService {
         user.setBrand(brand);
         user.setPrimaryPhone(requestDto.getPrimaryPhone());
         user.setPasswordHash(passwordEncoder.encode(requestDto.getPassword()));
-        user.setActive(true);
+        user.setIsActive(true);
 
         // 4. 根據請求，建立對應的 Profile
         // 建立員工 Profile
@@ -84,7 +84,7 @@ public class UserService {
 
             if (staffDto.getStoreId() != null) {
                 // 修改：改拋出 ResourceNotFoundException
-                Store store = storeRepository.findByBrand_IdAndId(brand.getBrandId(), staffDto.getStoreId())
+                Store store = storeRepository.findByBrand_IdAndId(brand.getId(), staffDto.getStoreId())
                         .orElseThrow(() -> new ResourceNotFoundException("Error: Store not found with ID: " + staffDto.getStoreId()));
                 staffProfile.setStore(store);
             }
@@ -169,7 +169,7 @@ public class UserService {
                 throw new IllegalStateException("權限不足：店長無法指派品牌管理員角色");
             }
             // C. 禁止跨店操作 (雖然 Controller 層有檢查，這裡做雙重保險)
-            Long targetStoreId = targetProfile.getStore() != null ? targetProfile.getStore().getStoreId() : null;
+            Long targetStoreId = targetProfile.getStore() != null ? targetProfile.getStore().getId() : null;
             Long currentStoreId = currentUser.getStoreId();
             if (targetStoreId != null && !targetStoreId.equals(currentStoreId)) {
                 throw new IllegalStateException("權限不足：無法修改非本店員工資料");
@@ -198,7 +198,7 @@ public class UserService {
 
         // 5. 更新帳號啟用狀態 (停權)
         if (dto.getIsActive() != null) {
-            targetUser.setActive(dto.getIsActive());
+            targetUser.setIsActive(dto.getIsActive());
         }
 
         staffProfileRepository.save(targetProfile);

@@ -3,6 +3,8 @@ package tw.niels.beverage_api_project.modules.member.entity; // 建議新路徑
 import java.time.Instant;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 
 import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
@@ -12,6 +14,7 @@ import tw.niels.beverage_api_project.modules.user.entity.User;
 @Entity
 @Table(name = "member_points_log")
 @AttributeOverride(name = "id", column = @Column(name = "log_id"))
+@Getter
 public class MemberPointLog extends BaseTsidEntity {
 
 
@@ -47,33 +50,6 @@ public class MemberPointLog extends BaseTsidEntity {
         this.pointsChange = pointsChange;
         this.balanceAfter = balanceAfter;
         this.reason = reason;
-    }
-
-    // --- Getters ---
-    public Long getLogId() { return getId(); }
-
-    public User getMember() {
-        return member;
-    }
-
-    public Order getOrder() {
-        return order;
-    }
-
-    public Long getPointsChange() {
-        return pointsChange;
-    }
-
-    public Long getBalanceAfter() {
-        return balanceAfter;
-    }
-
-    public String getReason() {
-        return reason;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
     }
 
 }

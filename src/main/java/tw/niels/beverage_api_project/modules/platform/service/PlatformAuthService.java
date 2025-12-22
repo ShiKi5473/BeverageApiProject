@@ -1,5 +1,6 @@
 package tw.niels.beverage_api_project.modules.platform.service;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -11,13 +12,11 @@ import tw.niels.beverage_api_project.modules.platform.dto.PlatformLoginRequestDt
 import tw.niels.beverage_api_project.security.jwt.JwtTokenProvider;
 
 @Service
+@RequiredArgsConstructor
 public class PlatformAuthService {
 
-    @Autowired
-    private AuthenticationManager authenticationManager;
-
-    @Autowired
-    private JwtTokenProvider tokenProvider;
+    private final AuthenticationManager authenticationManager;
+    private final JwtTokenProvider tokenProvider;
 
     //【注意】
     // 我們不需要直接注入 PlatformAdminDetailsService，

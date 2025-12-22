@@ -1,5 +1,7 @@
 package tw.niels.beverage_api_project.security.jwt;
 
+import com.mongodb.lang.NonNullApi;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -32,7 +34,7 @@ public class JwtAuthChannelInterceptor implements ChannelInterceptor {
     }
 
     @Override
-    public Message<?> preSend(Message<?> message, MessageChannel channel) {
+    public Message<?> preSend(@NotNull Message<?> message, @NotNull MessageChannel channel) {
         StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
 
         // 1. 只在 "CONNECT" (連線) 階段進行驗證

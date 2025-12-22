@@ -128,9 +128,9 @@ public class OrderResponseDto {
 
     public static OrderResponseDto fromEntity(Order order) {
         OrderResponseDto dto = new OrderResponseDto();
-        dto.setOrderId(order.getOrderId());
+        dto.setOrderId(order.getId());
         dto.setOrderNumber(order.getOrderNumber());
-        dto.setStoreId(order.getStore().getStoreId());
+        dto.setStoreId(order.getStore().getId());
         if (order.getMember() != null) {
             dto.setMemberId(order.getMember().getUserId());
         }
@@ -150,8 +150,8 @@ public class OrderResponseDto {
 
         List<OrderItemResponseDto> itemsDtos = order.getItems().stream().map(item -> {
             OrderItemResponseDto itemDto = new OrderItemResponseDto();
-            itemDto.setOrderItemId(item.getOrderItemId());
-            itemDto.setProductId(item.getProduct().getProductId());
+            itemDto.setOrderItemId(item.getId());
+            itemDto.setProductId(item.getProduct().getId());
             itemDto.setProductName(item.getProduct().getName());
             itemDto.setQuantity(item.getQuantity());
             itemDto.setUnitPrice(item.getUnitPrice());
@@ -160,7 +160,7 @@ public class OrderResponseDto {
 
             List<OptionResponseDto> optionDtos = item.getOptions().stream().map(option -> {
                 OptionResponseDto optionDto = new OptionResponseDto();
-                optionDto.setOptionId(option.getOptionId());
+                optionDto.setOptionId(option.getId());
                 optionDto.setOptionName(option.getOptionName());
                 optionDto.setPriceAdjustment(option.getPriceAdjustment());
                 return optionDto;

@@ -5,6 +5,8 @@ import java.util.HashSet;
 import java.util.Set;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
@@ -15,6 +17,8 @@ import tw.niels.beverage_api_project.modules.product.entity.ProductOption;
 @Entity
 @Table(name = "order_items")
 @AttributeOverride(name = "id", column = @Column(name = "order_item_id"))
+@Getter
+@Setter
 public class OrderItem extends BaseTsidEntity {
 
     public OrderItem() {
@@ -51,73 +55,5 @@ public class OrderItem extends BaseTsidEntity {
     @Column(name = "product_snapshot")
     private ProductSnapshot productSnapshot;
 
-    // getter setter
-    public Long getOrderItemId() { return getId(); }
-
-    public void setOrderItemId(Long orderItemId) { setId(orderItemId); }
-
-    public Order getOrder() {
-        return order;
-    }
-
-    public void setOrder(Order order) {
-        this.order = order;
-    }
-
-    public Product getProduct() {
-        return product;
-    }
-
-    public void setProduct(Product product) {
-        this.product = product;
-    }
-
-    public Integer getQuantity() {
-        return quantity;
-    }
-
-    public void setQuantity(Integer quantity) {
-        this.quantity = quantity;
-    }
-
-    public BigDecimal getUnitPrice() {
-        return unitPrice;
-    }
-
-    public void setUnitPrice(BigDecimal unitPrice) {
-        this.unitPrice = unitPrice;
-    }
-
-    public BigDecimal getSubtotal() {
-        return subtotal;
-    }
-
-    public void setSubtotal(BigDecimal subtotal) {
-        this.subtotal = subtotal;
-    }
-
-    public String getNotes() {
-        return notes;
-    }
-
-    public void setNotes(String notes) {
-        this.notes = notes;
-    }
-
-    public Set<ProductOption> getOptions() {
-        return options;
-    }
-
-    public void setOptions(Set<ProductOption> options) {
-        this.options = options;
-    }
-
-    public ProductSnapshot getProductSnapshot() {
-        return productSnapshot;
-    }
-
-    public void setProductSnapshot(ProductSnapshot productSnapshot) {
-        this.productSnapshot = productSnapshot;
-    }
 
 }

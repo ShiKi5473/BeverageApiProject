@@ -101,7 +101,7 @@ public class ProductController {
         Long brandId = this.helperService.getCurrentBrandId();
         List<Category> categories = categoryService.getCategoriesByBrand(brandId);
         List<CategoryResponseDto> dtos = categories.stream()
-                .map(dto -> CategoryResponseDto.fromEntity(dto))
+                .map(CategoryResponseDto::fromEntity)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(dtos);
     }
