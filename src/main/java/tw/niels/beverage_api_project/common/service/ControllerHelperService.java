@@ -39,7 +39,7 @@ public class ControllerHelperService {
      * @return 品牌 ID (Long)
      */
     public Long getCurrentBrandId() {
-        return getCurrentUserDetails().getBrandId();
+        return getCurrentUserDetails().brandId();
     }
 
     /**
@@ -48,7 +48,7 @@ public class ControllerHelperService {
      * @return 使用者 ID (Long)
      */
     public Long getCurrentUserId() {
-        return getCurrentUserDetails().getUserId();
+        return getCurrentUserDetails().userId();
     }
 
     /**
@@ -56,13 +56,13 @@ public class ControllerHelperService {
      * * @return 店家 ID (Long)，可能為 null
      */
     public Long getCurrentStoreId() {
-        return getCurrentUserDetails().getStoreId();
+        return getCurrentUserDetails().storeId();
     }
 
     public void validateStoreAccess(Long targetStoreId) {
         AppUserDetails userDetails = getCurrentUserDetails();
-        Long currentUserStoreId = userDetails.getStoreId();
-        Long currentBrandId = userDetails.getBrandId();
+        Long currentUserStoreId = userDetails.storeId();
+        Long currentBrandId = userDetails.brandId();
 
         // 情況 1: 如果是「已綁定店家」的員工 (STAFF, MANAGER)
         if (currentUserStoreId != null) {

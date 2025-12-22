@@ -23,8 +23,8 @@ public interface ProductOptionRepository extends JpaRepository<ProductOption, Lo
     @Query("""
         SELECT po
         FROM ProductOption po
-        JOIN FETCH po.optionGroup og 
-        WHERE og.brand.id = :brandId 
+        JOIN FETCH po.optionGroup og
+        WHERE og.brand.id = :brandId
         AND po.id IN :optionIds
     """)
     Set<ProductOption> findByOptionGroup_Brand_IdAndIdIn(

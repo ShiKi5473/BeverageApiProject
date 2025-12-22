@@ -170,7 +170,7 @@ public class UserService {
             }
             // C. 禁止跨店操作 (雖然 Controller 層有檢查，這裡做雙重保險)
             Long targetStoreId = targetProfile.getStore() != null ? targetProfile.getStore().getId() : null;
-            Long currentStoreId = currentUser.getStoreId();
+            Long currentStoreId = currentUser.storeId();
             if (targetStoreId != null && !targetStoreId.equals(currentStoreId)) {
                 throw new IllegalStateException("權限不足：無法修改非本店員工資料");
             }

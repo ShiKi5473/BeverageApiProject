@@ -31,7 +31,7 @@ public class MemberPointLog extends BaseTsidEntity {
     @Column(name = "balance_after", nullable = false)
     private Long balanceAfter;
 
-    @Column(name = "reason", length = 255)
+    @Column(name = "reason")
     private String reason;
 
     @CreationTimestamp

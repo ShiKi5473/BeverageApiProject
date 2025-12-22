@@ -38,7 +38,7 @@ public class AuditAspect {
         long start = System.currentTimeMillis();
         boolean success = true;
         String errorMsg = null;
-        Object result = null;
+        Object result;
 
         // 1. 執行目標方法
         try {
@@ -68,7 +68,7 @@ public class AuditAspect {
         // 取得當前使用者資訊
         try {
             AppUserDetails user = helperService.getCurrentUserDetails();
-            log.setOperatorId(user.getUserId());
+            log.setOperatorId(user.userId());
             log.setOperatorName(user.getUsername());
         } catch (Exception e) {
             log.setOperatorName("Anonymous/System");

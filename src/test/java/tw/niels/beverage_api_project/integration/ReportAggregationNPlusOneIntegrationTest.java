@@ -27,6 +27,7 @@ import tw.niels.beverage_api_project.modules.product.repository.ProductRepositor
 import tw.niels.beverage_api_project.modules.report.schedule.ReportRecoveryRunner;
 import tw.niels.beverage_api_project.modules.report.schedule.ReportScheduler;
 import tw.niels.beverage_api_project.modules.report.service.ReportAggregationService;
+import tw.niels.beverage_api_project.modules.report.service.StoreSettlementService;
 import tw.niels.beverage_api_project.modules.store.entity.Store;
 import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
 
@@ -47,6 +48,7 @@ public class ReportAggregationNPlusOneIntegrationTest extends AbstractIntegratio
     @MockitoBean private ControllerHelperService helperService;
 
     @Autowired private ReportAggregationService reportAggregationService;
+    @Autowired private StoreSettlementService storeSettlementService;
     @Autowired private BrandRepository brandRepository;
     @Autowired private StoreRepository storeRepository;
     @Autowired private ProductRepository productRepository;
@@ -120,7 +122,7 @@ public class ReportAggregationNPlusOneIntegrationTest extends AbstractIntegratio
         SQLStatementCountValidator.reset();
 
         // 執行單店結算
-        reportAggregationService.processStoreStats(storeId, brandId, targetDate, start, end);
+        storeSettlementService.processStoreStats(storeId, brandId, targetDate, start, end);
 
         // 斷言分析：
         // 目前程式碼 (ReportAggregationService.java:202) 在迴圈內呼叫 findByBrand_IdAndId

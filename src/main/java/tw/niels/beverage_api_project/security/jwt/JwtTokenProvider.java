@@ -76,7 +76,7 @@ public class JwtTokenProvider {
             Object principal = authentication.getPrincipal();
             if (principal instanceof AppUserDetails userDetails) {
                 // 如果是品牌員工，存入 brandId
-                tokenBuilder.claim("brandId", userDetails.getBrandId());
+                tokenBuilder.claim("brandId", userDetails.brandId());
                 tokenBuilder.claim("type", "TENANT"); // 新增一個 "type" 標記
             } else if (principal instanceof PlatformAdminDetails) {
                 // 如果是平台管理員，不存 brandId

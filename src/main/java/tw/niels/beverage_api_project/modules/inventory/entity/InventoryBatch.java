@@ -20,7 +20,7 @@ import java.time.LocalDate;
 public class InventoryBatch extends BaseTsidEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "shipment_id", nullable = true) // 允許為 null (支援非採購來源)
+    @JoinColumn(name = "shipment_id") // 允許為 null (支援非採購來源)
     private PurchaseShipment shipment;
 
     @ManyToOne(fetch = FetchType.LAZY)

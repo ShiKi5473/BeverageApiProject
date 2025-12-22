@@ -287,23 +287,10 @@ public class InventoryService {
             trx.setOperator(operator);
 
             // 目標：將「主單備註」與「單項備註」合併，例如："月底盤點 | 破損報廢"
-            StringBuilder noteBuilder = new StringBuilder();
-
-            // 1. 優先放入主單備註 (Request Level Note)
-            if (request.getNote() != null && !request.getNote().isEmpty()) {
-                noteBuilder.append(request.getNote());
-            }
-
-            // 2. 如果有單項備註，則附加在後 (Item Level Note)
-            if (itemDto.getItemNote() != null && !itemDto.getItemNote().isEmpty()) {
-                if (!noteBuilder.isEmpty()) {
-                    noteBuilder.append(" | "); // 使用分隔符號區隔
-                }
-                noteBuilder.append(itemDto.getItemNote());
-            }
+            String combinedNote = buildAuditNote(request.getNote(), itemDto.getItemNote());
 
             // 3. 設定回 Transaction 實體
-            trx.setNote(noteBuilder.toString());
+            trx.setNote(combinedNote);
 
             transactionsToSave.add(trx);
 
@@ -338,5 +325,32 @@ public class InventoryService {
         Store store = storeRepository.findByIdSystem(storeId)
                 .orElseThrow(() -> new ResourceNotFoundException("error.resource.not_found", "Store ID: " + storeId));
         deductInventory(store.getBrand().getId(), storeId, itemId, quantity);
+    }
+
+    /**
+     * 合併主單備註與單項備註
+     * 格式範例: "月底盤點 | 破損報廢"
+     *
+     * @param mainNote 主單備註 (Request Level)
+     * @param itemNote 單項備註 (Item Level)
+     * @return 合併後的備註字串
+     */
+    private String buildAuditNote(String mainNote, String itemNote) {
+        StringBuilder noteBuilder = new StringBuilder();
+
+        // 1. 處理主單備註
+        if (mainNote != null && !mainNote.isEmpty()) {
+            noteBuilder.append(mainNote);
+        }
+
+        // 2. 處理單項備註
+        if (itemNote != null && !itemNote.isEmpty()) {
+            if (!noteBuilder.isEmpty()) {
+                noteBuilder.append(" | "); // 如果前面已有內容，加上分隔符號
+            }
+            noteBuilder.append(itemNote);
+        }
+
+        return noteBuilder.toString();
     }
 }

@@ -36,8 +36,6 @@ public class OrderProcessFacade {
     private final MemberPointService memberPointService;
     private final PromotionService promotionService;
     private final OrderItemProcessorService orderItemProcessorService;
-    private final InventoryService inventoryService; // 預留給庫存扣減
-
     // Repositories 用於查驗基礎資料
     private final StoreRepository storeRepository;
     private final UserRepository userRepository;
@@ -48,7 +46,6 @@ public class OrderProcessFacade {
                               MemberPointService memberPointService,
                               PromotionService promotionService,
                               OrderItemProcessorService orderItemProcessorService,
-                              InventoryService inventoryService,
                               StoreRepository storeRepository,
                               UserRepository userRepository,
                               PaymentMethodRepository paymentMethodRepository,
@@ -57,7 +54,6 @@ public class OrderProcessFacade {
         this.memberPointService = memberPointService;
         this.promotionService = promotionService;
         this.orderItemProcessorService = orderItemProcessorService;
-        this.inventoryService = inventoryService;
         this.storeRepository = storeRepository;
         this.userRepository = userRepository;
         this.paymentMethodRepository = paymentMethodRepository;

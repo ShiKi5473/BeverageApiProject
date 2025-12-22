@@ -55,12 +55,20 @@ public class InventoryReportService {
         List<InventoryItem> items = itemRepository.findByBrand_Id(brandId);
 
         // 2. 準備配方對照表 (Cache Recipes)
-        // Map<VariantId, List<Recipe>>
-        Map<Long, List<Recipe>> variantRecipeMap = recipeRepository.findAllVariantRecipes().stream()
+        // --- 處理 Variant Recipes ---
+        List<Recipe> variantRecipes = recipeRepository.findAllVariantRecipes();
+        Map<Long, List<Recipe>> variantRecipeMap = Optional.ofNullable(variantRecipes) // 1. 防止 List 本身為 null
+                .orElse(Collections.emptyList())
+                .stream()
+                .filter(r -> r.getVariant() != null) // 2. 防止 r.getVariant() 為 null 導致 getId() 報錯
                 .collect(Collectors.groupingBy(r -> r.getVariant().getId()));
 
-        // Map<OptionId, List<Recipe>>
-        Map<Long, List<Recipe>> optionRecipeMap = recipeRepository.findAllOptionRecipes().stream()
+        // --- 處理 Option Recipes ---
+        List<Recipe> optionRecipes = recipeRepository.findAllOptionRecipes();
+        Map<Long, List<Recipe>> optionRecipeMap = Optional.ofNullable(optionRecipes) // 1. 防止 List 本身為 null
+                .orElse(Collections.emptyList())
+                .stream()
+                .filter(r -> r.getOption() != null) // 2. 防止 r.getOption() 為 null
                 .collect(Collectors.groupingBy(r -> r.getOption().getId()));
 
         // 3. 計算理論消耗 (Theoretical Usage)

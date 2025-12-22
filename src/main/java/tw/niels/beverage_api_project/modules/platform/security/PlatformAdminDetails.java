@@ -1,5 +1,6 @@
 package tw.niels.beverage_api_project.modules.platform.security;
 
+import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -10,6 +11,7 @@ import java.util.Collections;
 
 public class PlatformAdminDetails implements UserDetails {
 
+    @Getter
     private final Long adminId;
     private final String username;
     private final String password;
@@ -30,8 +32,6 @@ public class PlatformAdminDetails implements UserDetails {
                 admin.getRole()
         );
     }
-
-    public Long getAdminId() { return adminId; }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {

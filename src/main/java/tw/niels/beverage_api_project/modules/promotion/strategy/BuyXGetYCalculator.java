@@ -53,26 +53,37 @@ public class BuyXGetYCalculator implements PromotionCalculator {
             }
         }
 
-        // 3. 計算折扣
-        // 排序：由低到高 (因為通常是送最低價的)
-        eligibleItemPrices.sort(Comparator.naturalOrder());
+        // 3. 呼叫提取出的計算方法
+        return calculateGroupDiscount(eligibleItemPrices, groupSize, freeCount);
+
+    }
+
+    /**
+     * 計算分組優惠折扣 (買 X 送 Y 核心邏輯)
+     * * @param prices    符合資格的商品價格列表
+     * @param groupSize 每組大小 (X + Y)
+     * @param freeCount 每組贈送數量 (Y)
+     * @return 總折扣金額
+     */
+    private BigDecimal calculateGroupDiscount(List<BigDecimal> prices, int groupSize, int freeCount) {
+        if (prices.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+
+        // 1. 排序：由低到高 (因為通常是送最低價的)
+        prices.sort(Comparator.naturalOrder());
 
         BigDecimal totalDiscount = BigDecimal.ZERO;
-        int totalItems = eligibleItemPrices.size();
+        int totalItems = prices.size();
 
-        // 每湊滿 groupSize 個，最便宜的前 freeCount 個就是贈品
-        // 例如：買2送1 (組=3)，有 5 個商品 [10, 20, 30, 40, 50]
-        // 第一組 (取最大的3個? 不，通常是不分組，總數中便宜的免費)
-        // 邏輯修正：每買 X+Y 個，就可以減免 Y 個最低價的金額。
-        // 例如買2送1，買了3個，最便宜的1個免費。買了6個，最便宜的2個免費。
-
+        // 2. 計算可以湊成幾組 (每買 X+Y 個，就可以減免 Y 個最低價的金額)
         int sets = totalItems / groupSize;
 
-        // 取前 (sets * freeCount) 個最低價的商品總和作為折扣
+        // 3. 取前 (sets * freeCount) 個最低價的商品總和作為折扣
         int freeItemsCount = sets * freeCount;
 
         for (int i = 0; i < freeItemsCount; i++) {
-            totalDiscount = totalDiscount.add(eligibleItemPrices.get(i));
+            totalDiscount = totalDiscount.add(prices.get(i));
         }
 
         return totalDiscount;

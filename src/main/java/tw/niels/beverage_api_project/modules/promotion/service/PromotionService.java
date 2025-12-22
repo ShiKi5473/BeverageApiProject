@@ -29,24 +29,22 @@ import java.util.Set;
 @Service
 public class PromotionService {
 
-    // 自我注入 (Self-Injection) 以解決 AOP 失效問題
-    @Autowired
-    @Lazy
-    private PromotionService self;
-
     private final PromotionRepository promotionRepository;
     private final PromotionStrategyFactory strategyFactory;
     private final BrandRepository brandRepository;
     private final ProductRepository productRepository;
+    private final PromotionCacheService promotionCacheService;
 
     public PromotionService(PromotionRepository promotionRepository,
                             PromotionStrategyFactory strategyFactory,
                             BrandRepository brandRepository,
-                            ProductRepository productRepository) {
+                            ProductRepository productRepository,
+                            PromotionCacheService promotionCacheService) {
         this.promotionRepository = promotionRepository;
         this.strategyFactory = strategyFactory;
         this.brandRepository = brandRepository;
         this.productRepository = productRepository;
+        this.promotionCacheService = promotionCacheService;
     }
 
     /**
@@ -68,8 +66,8 @@ public class PromotionService {
 
         Long brandId = order.getBrand().getId();
 
-        // 透過 self 代理物件呼叫，觸發 @Cacheable 機制
-        List<Promotion> activePromotions = self.getActivePromotions(brandId);
+        // 改為呼叫外部 Cache Service，無需 Self-Injection
+        List<Promotion> activePromotions = promotionCacheService.getActivePromotions(brandId);
 
         BigDecimal maxDiscount = BigDecimal.ZERO;
 

@@ -30,7 +30,7 @@ public abstract class BaseController {
      * * @return 品牌 ID (Long)
      */
     protected Long getCurrentBrandId() {
-        return getCurrentUserDetails().getBrandId();
+        return getCurrentUserDetails().brandId();
     }
 
     /**
@@ -38,6 +38,6 @@ public abstract class BaseController {
      * * @return 使用者 ID (Long)
      */
     protected Long getCurrentUserId() {
-        return getCurrentUserDetails().getUserId();
+        return getCurrentUserDetails().userId();
     }
 }

@@ -27,7 +27,7 @@ public class PurchaseShipment extends BaseTsidEntity {
     @Column(name = "shipment_date", nullable = false)
     private LocalDateTime shipmentDate;
 
-    @Column(length = 255)
+    @Column()
     private String supplier;
 
     @Lob

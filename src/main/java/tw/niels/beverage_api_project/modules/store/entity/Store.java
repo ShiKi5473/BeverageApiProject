@@ -30,7 +30,7 @@ public class Store extends BaseTsidEntity {
     @Column(name = "name", nullable = false, length = 100)
     private String name;
 
-    @Column(name = "address", length = 255)
+    @Column(name = "address")
     private String address;
 
     @Column(name = "phone", length = 20)

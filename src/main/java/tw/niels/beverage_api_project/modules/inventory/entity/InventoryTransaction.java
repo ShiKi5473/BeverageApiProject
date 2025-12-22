@@ -36,7 +36,7 @@ public class InventoryTransaction extends BaseTsidEntity {
     @JoinColumn(name = "operator_id")
     private User operator;
 
-    @Column(length = 255)
+    @Column()
     private String note;
 
     @Column(name = "created_at", nullable = false, updatable = false)

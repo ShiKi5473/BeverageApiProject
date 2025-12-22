@@ -50,8 +50,8 @@ public class KdsService {
      */
     @EventListener
     public void handleOrderStateChange(OrderStateChangedEvent event) {
-        Order order = event.getOrder();
-        OrderStatus newStatus = event.getNewStatus();
+        Order order = event.order();
+        OrderStatus newStatus = event.newStatus();
         Long storeId = order.getStore().getId();
 
         KdsEventStrategy strategy = strategyMap.get(newStatus);

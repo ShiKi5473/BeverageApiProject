@@ -63,7 +63,7 @@ public abstract class AbstractPrePaymentState extends AbstractOrderState {
         PaymentMethodEntity paymentMethodEntity = paymentMethodRepository.findByCode(requestDto.getPaymentMethod())
                 .orElseThrow(() -> new BadRequestException("無效的支付方式代碼：" + requestDto.getPaymentMethod()));
         order.setPaymentMethod(paymentMethodEntity);
-        User member = null;
+        User member;
 
         // 1. 計算會員點數折抵
         BigDecimal pointsDiscount = BigDecimal.ZERO;

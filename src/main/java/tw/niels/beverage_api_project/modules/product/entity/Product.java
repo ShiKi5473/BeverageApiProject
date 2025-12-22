@@ -36,7 +36,7 @@ public class Product extends BaseTsidEntity {
     @Column(name = "base_price", nullable = false, precision = 10, scale = 2)
     private BigDecimal basePrice;
 
-    @Column(name = "image_url", length = 255)
+    @Column(name = "image_url")
     private String imageUrl;
 
     @Column(name = "status_code")

@@ -1,42 +1,30 @@
 package tw.niels.beverage_api_project.security;
 
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Set;
-
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
-
 import tw.niels.beverage_api_project.modules.user.entity.User;
 import tw.niels.beverage_api_project.modules.user.entity.profile.StaffProfile;
 
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
+
 /**
- * 實作 Spring Security 的 UserDetails 介面。
- * 這個類別用於將我們的 Staff 實體轉換成 Spring Security 可理解的使用者詳細資訊物件。
+ * 實作 Spring Security 的 UserDetails 介面 (Record 版本)。
  */
+public record AppUserDetails(
+        Long userId,
+        Long brandId,
+        Long storeId,
+        String username,
+        String password,
+        boolean isActive,
+        Collection<? extends GrantedAuthority> authorities
+) implements UserDetails {
 
-public class AppUserDetails implements UserDetails {
-
-    private final Long userId;
-    private final Long brandId;
-    private final String username; // 使用手機號碼作為 username
-    private final String password;
-    private final Long storeId;
-    private final boolean isActive;
-    private final Collection<? extends GrantedAuthority> authorities;
-
-    public AppUserDetails(Long userId, Long brandId, Long storeId, String username, String password, boolean isActive,
-                          Collection<? extends GrantedAuthority> authorities) {
-        this.userId = userId;
-        this.brandId = brandId;
-        this.username = username;
-        this.password = password;
-        this.storeId = storeId;
-        this.isActive = isActive;
-        this.authorities = authorities;
-    }
-
+    // --- 靜態建構方法 (Factory Method) ---
     public static AppUserDetails build(User user) {
         Set<GrantedAuthority> authorities = new HashSet<>();
         Long storeId = null;
@@ -61,54 +49,42 @@ public class AppUserDetails implements UserDetails {
                 user.getPrimaryPhone(),
                 user.getPasswordHash(),
                 user.getIsActive(),
-                authorities);
+                Collections.unmodifiableSet(authorities)
+        );
     }
+
+    // --- UserDetails 介面實作 ---
+    // Record 自動產生了 username(), password(), authorities()
+    // 但介面要求 getUsername(), getPassword()，所以需要轉接
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return authorities;
-    }
-
-    public Long getUserId() {
-        return userId;
-    }
-
-    public Long getBrandId() {
-        return brandId;
+        return authorities();
     }
 
     @Override
     public String getPassword() {
-        return password;
+        return password();
     }
 
     @Override
     public String getUsername() {
-        return username;
-    }
-
-    public Long getStoreId() {
-        return storeId;
-    }
-
-    @Override
-    public boolean isAccountNonExpired() {
-        return true;
-    }
-
-    @Override
-    public boolean isAccountNonLocked() {
-        return true;
-    }
-
-    @Override
-    public boolean isCredentialsNonExpired() {
-        return true;
+        return username();
     }
 
     @Override
     public boolean isEnabled() {
-        return isActive;
+        return isActive();
     }
+
+    // 這些是預設 true，直接回傳即可
+    @Override public boolean isAccountNonExpired() { return true; }
+    @Override public boolean isAccountNonLocked() { return true; }
+    @Override public boolean isCredentialsNonExpired() { return true; }
+
+    // --- 相容性 Getter (Optional) ---
+    // 如果您的專案中大量使用了 .getUserId(), .getBrandId()
+    // 您可以保留以下方法以免去大幅重構。
+    // 如果願意重構，可以刪除這些，改用 record 原生的 .userId()
 
 }
