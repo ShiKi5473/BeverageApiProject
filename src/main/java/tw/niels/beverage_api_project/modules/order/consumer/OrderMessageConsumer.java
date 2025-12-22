@@ -15,7 +15,6 @@ import tw.niels.beverage_api_project.modules.order.entity.Order;
 import tw.niels.beverage_api_project.modules.order.facade.OrderProcessFacade;
 import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
 
-import java.io.IOException;
 import java.io.Serializable;
 
 @Component
@@ -38,7 +37,7 @@ public class OrderMessageConsumer {
     @RabbitListener(queues = RabbitConfig.ONLINE_ORDER_QUEUE)
     public void handleOrderMessage(AsyncOrderTaskDto task,
                                    Channel channel,
-                                   @Header(AmqpHeaders.DELIVERY_TAG) long tag) throws IOException {
+                                   @Header(AmqpHeaders.DELIVERY_TAG) long tag) throws Exception {
 
         logger.info("【Consumer】收到訂單任務，RequestId: {}", task.getRequestId());
 

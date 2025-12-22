@@ -18,13 +18,11 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -69,8 +67,8 @@ class InventoryServiceTest {
         // 2. 驗證 DAO 被呼叫，且更新值正確 (10 - 5 = 5)
         verify(inventoryBatchDAO).batchUpdateQuantities(argThat(list ->
                 list.size() == 1 &&
-                        list.get(0).batchId().equals(555L) &&
-                        list.get(0).newQuantity().compareTo(new BigDecimal("5.0")) == 0
+                        list.getFirst().batchId().equals(555L) &&
+                        list.getFirst().newQuantity().compareTo(new BigDecimal("5.0")) == 0
         ));
     }
 

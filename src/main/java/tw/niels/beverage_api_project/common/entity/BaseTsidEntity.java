@@ -5,12 +5,10 @@ import jakarta.persistence.MappedSuperclass;
 import jakarta.persistence.PostLoad;
 import jakarta.persistence.PostPersist;
 import jakarta.persistence.Transient;
-import lombok.Getter;
 import lombok.Setter;
 import org.springframework.data.domain.Persistable;
 import tw.niels.beverage_api_project.common.util.TsidUtil;
 
-import javax.annotation.processing.Generated;
 import java.io.Serializable;
 import java.util.Objects;
 
@@ -24,7 +22,9 @@ import java.util.Objects;
 @MappedSuperclass
 public abstract class BaseTsidEntity implements Persistable<Long>, Serializable {
 
+    // 提供 setter 以便在某些特殊情況下 (如資料匯入) 手動設定 ID
     // 移除 @GeneratedValue，改為手動指派
+    @Setter
     @Id
     private Long id;
 
@@ -40,11 +40,6 @@ public abstract class BaseTsidEntity implements Persistable<Long>, Serializable 
     @Override
     public Long getId() {
         return id;
-    }
-
-    // 提供 setter 以便在某些特殊情況下 (如資料匯入) 手動設定 ID
-    public void setId(Long id) {
-        this.id = id;
     }
 
     @Override

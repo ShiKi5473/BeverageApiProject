@@ -1,6 +1,6 @@
 package tw.niels.beverage_api_project.security.jwt;
 
-import com.mongodb.lang.NonNullApi;
+import io.jsonwebtoken.MalformedJwtException;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,7 +18,6 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import tw.niels.beverage_api_project.security.BrandContextHolder;
-import io.jsonwebtoken.MalformedJwtException;
 
 @Component
 public class JwtAuthChannelInterceptor implements ChannelInterceptor {

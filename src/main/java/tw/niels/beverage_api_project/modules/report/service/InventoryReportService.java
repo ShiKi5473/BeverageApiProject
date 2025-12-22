@@ -2,7 +2,6 @@ package tw.niels.beverage_api_project.modules.report.service;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
 import tw.niels.beverage_api_project.modules.inventory.entity.InventoryItem;
 import tw.niels.beverage_api_project.modules.inventory.entity.InventoryTransaction;
 import tw.niels.beverage_api_project.modules.inventory.repository.InventoryItemRepository;

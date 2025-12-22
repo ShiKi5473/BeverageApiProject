@@ -16,7 +16,6 @@ import tw.niels.beverage_api_project.modules.inventory.entity.PurchaseShipment;
 import tw.niels.beverage_api_project.modules.inventory.repository.InventoryBatchRepository;
 import tw.niels.beverage_api_project.modules.inventory.repository.InventoryItemRepository;
 import tw.niels.beverage_api_project.modules.inventory.repository.PurchaseShipmentRepository;
-import tw.niels.beverage_api_project.modules.inventory.service.InventoryService;
 import tw.niels.beverage_api_project.modules.product.entity.OptionGroup;
 import tw.niels.beverage_api_project.modules.product.entity.Product;
 import tw.niels.beverage_api_project.modules.product.entity.ProductOption;
@@ -35,7 +34,6 @@ import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Optional;
 import java.util.Set;
 
 @Component

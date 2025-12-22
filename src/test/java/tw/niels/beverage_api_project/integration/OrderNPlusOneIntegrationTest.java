@@ -27,7 +27,6 @@ import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

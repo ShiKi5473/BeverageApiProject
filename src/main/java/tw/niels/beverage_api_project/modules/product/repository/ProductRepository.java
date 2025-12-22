@@ -26,7 +26,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
      */
     @Query("""
         SELECT DISTINCT p
-        FROM Product p 
+        FROM Product p
         LEFT JOIN FETCH p.categories 
         LEFT JOIN FETCH p.optionGroups og 
         LEFT JOIN FETCH og.options 
