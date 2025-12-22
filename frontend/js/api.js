@@ -313,13 +313,8 @@ export async function getInventoryItems() {
  * 對應後端: POST /api/v1/inventory/audit (自動識別 Store)
  */
 export function submitInventoryAudit(data) {
-    const token = localStorage.getItem('accessToken');
-    return fetch('/api/v1/inventory/audit', {  // 這裡要 return fetch 的結果
+    return fetchWithAuth('/api/v1/inventory/audit', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
         body: JSON.stringify(data)
     });
 }
