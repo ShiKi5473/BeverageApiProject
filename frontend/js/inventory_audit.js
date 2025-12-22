@@ -1,8 +1,6 @@
 import { createNavbar } from './components/Navbar.js';
 import { getInventoryItems, submitInventoryAudit } from './api.js';
 
-let currentStoreId = null; // 全域變數儲存 storeId
-
 // 初始化
 document.addEventListener('DOMContentLoaded', async () => {
     // 1. 掛載導覽列
@@ -225,19 +223,5 @@ async function submitAudit() {
         btn.disabled = false;
         btn.textContent = '提交盤點報告 (Submit)';
     }
-}
 
-// --- 模擬資料函式 (Mock) ---
-function mockFetchInventory() {
-    return new Promise(resolve => {
-        setTimeout(() => {
-            resolve([
-                { id: 101, name: "錫蘭紅茶 (茶葉)", quantity: 1500, unit: "g" },
-                { id: 102, name: "光泉鮮乳", quantity: 5000, unit: "ml" },
-                { id: 103, name: "波霸珍珠", quantity: 200, unit: "g" },
-                { id: 104, name: "二號砂糖", quantity: 3000, unit: "g" },
-                { id: 105, name: "紙杯 (L)", quantity: 450, unit: "個" }
-            ]);
-        }, 600);
-    });
 }
