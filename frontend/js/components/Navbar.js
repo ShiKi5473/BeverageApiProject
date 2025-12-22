@@ -1,4 +1,3 @@
-// 【修改】移除 top-app-bar.js，因為它不存在
 import '@material/web/iconbutton/icon-button.js';
 import '@material/web/icon/icon.js';
 

@@ -286,3 +286,39 @@ export async function getStoreRanking(startDate, endDate) {
     if (!response.ok) throw new Error("取得分店排行失敗");
     return response.json();
 }
+
+// ==========================================
+// 📦 庫存管理相關 API (Inventory)
+// ==========================================
+
+/**
+ * 取得當前所有庫存項目的快照 (用於盤點)
+ * 對應後端: GET /api/v1/inventory/items (假設路徑)
+ */
+export async function getInventoryItems() {
+    const response = await fetchWithAuth("/api/v1/inventory/items", {
+        method: "GET",
+    });
+    if (!response.ok) {
+        throw new Error("無法取得庫存列表");
+    }
+    return response.json();
+}
+
+/**
+ * 提交盤點結果
+ * 對應後端: POST /api/v1/inventory/audit
+ * @param {object} auditData - 包含 items 的盤點資料物件
+ */
+export async function submitInventoryAudit(auditData) {
+    const response = await fetchWithAuth("/api/v1/inventory/audit", {
+        method: "POST",
+        body: JSON.stringify(auditData),
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`提交盤點失敗: ${errorText}`);
+    }
+    return response.json();
+}

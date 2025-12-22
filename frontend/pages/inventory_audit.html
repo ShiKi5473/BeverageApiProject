@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>庫存盤點作業 | Beverage POS</title>
+
+    <link rel="stylesheet" href="../css/base.css">
+    <link rel="stylesheet" href="../css/components/navbar.css">
+    <link rel="stylesheet" href="../css/pages/inventory_audit.css">
+</head>
+<body>
+<div id="navbar-root"></div>
+
+<main class="audit-container">
+
+    <header class="audit-header">
+        <div class="batch-info">
+            <h2>📅 日常盤點作業</h2>
+            <p>
+                <span id="audit-date">2025-01-01</span> |
+                經手人: <span id="staff-name" class="loading-text">讀取中...</span>
+            </p>
+        </div>
+        <div class="status-badge">進行中</div>
+    </header>
+
+    <div id="loading-indicator" class="loading-spinner" style="display: none;">
+        資料讀取中...
+    </div>
+
+    <div id="audit-list" class="audit-list">
+    </div>
+
+    <div id="empty-state" style="display: none; text-align: center; color: #888; margin-top: 2rem;">
+        沒有需要盤點的項目。
+    </div>
+
+</main>
+
+<footer class="action-bar">
+    <div class="progress-info">
+        <span>已盤點: </span>
+        <strong id="progress-count">0 / 0</strong>
+    </div>
+    <button id="btn-submit" class="btn btn-primary" disabled>
+        提交盤點報告 (Submit)
+    </button>
+</footer>
+
+<script type="module" src="../js/inventory_audit.js"></script>
+</body>
+</html>
