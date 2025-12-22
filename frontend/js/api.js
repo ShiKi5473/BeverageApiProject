@@ -312,15 +312,14 @@ export async function getInventoryItems() {
  * 提交盤點結果
  * 對應後端: POST /api/v1/inventory/audit (自動識別 Store)
  */
-export async function submitInventoryAudit(auditData) {
-    const response = await fetchWithAuth(`/api/v1/inventory/audit`, {
-        method: "POST",
-        body: JSON.stringify(auditData),
+export function submitInventoryAudit(data) {
+    const token = localStorage.getItem('accessToken');
+    return fetch('/api/v1/inventory/audit', {  // 這裡要 return fetch 的結果
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(data)
     });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`提交盤點失敗: ${errorText}`);
-    }
-    return response.json();
 }

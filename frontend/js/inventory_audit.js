@@ -210,9 +210,12 @@ async function submitAudit() {
         };
 
         // 呼叫後端 API
-        await submitInventoryAudit(requestPayload);
-        if (!response.ok) throw new Error(await response.text());
-
+        const response = await submitInventoryAudit(requestPayload);
+        if (!response.ok) {
+            // 如果後端回傳錯誤狀態碼 (4xx, 5xx)，拋出錯誤
+            const errorText = await response.text();
+            throw new Error(errorText || '伺服器回應錯誤');
+        }
         alert('✅ 盤點完成！庫存已更新。');
         window.location.reload(); // 重新整理
 
