@@ -27,6 +27,9 @@ public class PurchaseShipment extends BaseTsidEntity {
     @Column(name = "shipment_date", nullable = false)
     private LocalDateTime shipmentDate;
 
+    @Column(name = "invoice_no", length = 50)
+    private String invoiceNo;
+
     @Column()
     private String supplier;
 

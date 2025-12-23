@@ -79,6 +79,7 @@ public class InventoryService {
         shipment.setStaff(staff);
         shipment.setShipmentDate(LocalDateTime.now());
         shipment.setSupplier(request.getSupplier());
+        shipment.setInvoiceNo(request.getInvoiceNo());
         shipment.setNotes(request.getNotes());
         shipment = shipmentRepository.save(shipment);
 

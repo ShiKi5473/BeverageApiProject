@@ -18,6 +18,9 @@ public class AddShipmentRequestDto {
     @Schema(description = "供應商名稱", example = "光泉")
     private String supplier;
 
+    @Schema(description = "廠商單據/發票號碼", example = "INV-20231225-001")
+    private String invoiceNo;
+
     @Schema(description = "備註", example = "進貨 10 箱")
     private String notes;
 
