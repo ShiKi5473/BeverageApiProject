@@ -9,9 +9,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import tw.niels.beverage_api_project.modules.brand.entity.Brand;
+import tw.niels.beverage_api_project.modules.brand.repository.BrandRepository;
 import tw.niels.beverage_api_project.modules.order.entity.Order;
+import tw.niels.beverage_api_project.modules.product.repository.ProductRepository;
 import tw.niels.beverage_api_project.modules.promotion.entity.Promotion;
 import tw.niels.beverage_api_project.modules.promotion.enums.PromotionType;
+import tw.niels.beverage_api_project.modules.promotion.repository.PromotionRepository;
 import tw.niels.beverage_api_project.modules.promotion.strategy.FixedAmountCalculator;
 import tw.niels.beverage_api_project.modules.promotion.strategy.PercentageCalculator;
 import tw.niels.beverage_api_project.modules.promotion.strategy.PromotionCalculator;
@@ -28,19 +31,18 @@ class PromotionServiceTest {
 
     @Mock private PromotionStrategyFactory strategyFactory;
 
-    // 我們在這個測試中不 mock Repository，而是 mock "self" 代理物件的方法回傳值
-    // 或者直接測試 calculateBestDiscount 邏輯。
-    // 由於 calculateBestDiscount 呼叫了 self.getActivePromotions，我們需要 Mock self
-    @Mock private PromotionService selfProxy;
+    // 新增 PromotionCacheService 的 Mock
+    @Mock private PromotionCacheService promotionCacheService;
+
+    // 為了讓 @InjectMocks 順利透過建構子注入，建議也 Mock 其他 Repository
+    // 即使在這個測試案例中沒有直接使用到它們
+    @Mock private PromotionRepository promotionRepository;
+    @Mock private BrandRepository brandRepository;
+    @Mock private ProductRepository productRepository;
 
     @InjectMocks
     private PromotionService promotionService;
 
-    @BeforeEach
-    void setup() {
-        // 手動注入 self 代理，模擬 Spring 的行為
-        ReflectionTestUtils.setField(promotionService, "self", selfProxy);
-    }
 
     @Test
     @DisplayName("計算最佳折扣 - 比較多個活動取最優")
@@ -65,8 +67,8 @@ class PromotionServiceTest {
         promoB.setType(PromotionType.PERCENTAGE);
         promoB.setValue(new BigDecimal("0.8")); // 8折
 
-        // Mock self.getActivePromotions
-        when(selfProxy.getActivePromotions(brandId)).thenReturn(Arrays.asList(promoA, promoB));
+        // 修改為 Mock promotionCacheService.getActivePromotions
+        when(promotionCacheService.getActivePromotions(brandId)).thenReturn(Arrays.asList(promoA, promoB));
 
         // Mock Strategy Factory
         PromotionCalculator fixedCalc = new FixedAmountCalculator();
