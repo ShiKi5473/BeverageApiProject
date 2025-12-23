@@ -68,6 +68,17 @@
         <span class="close-modal">&times;</span>
         <h3>🚚 新增進貨單</h3>
         <form id="shipment-form">
+            <div class="form-row">
+                <div class="form-group half">
+                    <label for="shipment-supplier">供應商</label>
+                    <input type="text" id="shipment-supplier" class="form-control" placeholder="例如: 光泉">
+                </div>
+                <div class="form-group half">
+                    <label for="shipment-invoice">進貨單號</label>
+                    <input type="text" id="shipment-invoice" class="form-control" placeholder="例如: INV-001">
+                </div>
+            </div>
+
             <div class="form-group">
                 <label for="shipment-item">進貨品項</label>
                 <select id="shipment-item" class="form-control" required>

@@ -321,9 +321,18 @@ export function submitInventoryAudit(data) {
 
 /**
  * 提交進貨單
- * @param {Object} payload - { inventoryItemId, quantity, cost, expiryDate }
+ * 對應後端: POST /api/v1/inventory/shipments
+ * DTO: AddShipmentRequestDto
  */
-export const submitShipment = (payload) => {
-    // 假設 api 是 axios instance
-    return api.post('/inventory/shipment', payload);
-};
+export async function submitShipment(data) {
+    const response = await fetchWithAuth('/api/v1/inventory/shipments', {
+        method: 'POST',
+        body: JSON.stringify(data)
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "進貨提交失敗");
+    }
+    return response.json();
+}

@@ -379,6 +379,8 @@ async function handleShipmentSubmit(e) {
     const btn = e.target.querySelector('button[type="submit"]');
 
     // 收集資料
+    const supplier = document.getElementById('shipment-supplier').value;
+    const invoiceNo = document.getElementById('shipment-invoice').value;
     const itemId = document.getElementById('shipment-item').value;
     const quantity = parseInt(document.getElementById('shipment-quantity').value);
     const cost = parseFloat(document.getElementById('shipment-cost').value) || 0;
@@ -390,11 +392,17 @@ async function handleShipmentSubmit(e) {
     }
 
     const payload = {
-        inventoryItemId: itemId,
-        quantity: quantity,
-        cost: cost,
-        expiryDate: expiryDate ? expiryDate : null, // 若沒填送 null
-        supplier: null // 目前 UI 沒欄位
+        supplier: supplier,   // String
+        invoiceNo: invoiceNo, // String
+        notes: "Web 進貨",    // 可選
+        items: [              // List<BatchItemDto>
+            {
+                inventoryItemId: itemId,
+                quantity: quantity,
+                // cost: cost, // 注意：目前的後端 DTO 似乎沒有接收 cost 欄位，但可保留在前端
+                expiryDate: expiryDate ? expiryDate : null
+            }
+        ]
     };
 
     try {
