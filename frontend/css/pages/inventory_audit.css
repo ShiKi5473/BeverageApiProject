@@ -1,4 +1,4 @@
-/* @import "../base.css"; */
+ /*@import "../base.css"; */
 /* 容器與版面設定 */
 .audit-container {
     max-width: 800px;
@@ -139,4 +139,30 @@
 
     .col-label { display: block; } /* 顯示標籤 */
     .audit-container { margin-top: 70px; padding-bottom: 80px; }
+}
+
+
+/* 盤盈效期輸入框 */
+.audit-expiry-input {
+    display: none; /* 預設隱藏 */
+    width: 100%;
+    margin-top: 8px;
+    padding: 4px;
+    font-size: 0.85rem;
+    border: 1px dashed #ffa726; /* 使用虛線表示"選填"或"特殊情況" */
+    border-radius: 4px;
+    background-color: #fff8e1;
+    color: #ef6c00;
+}
+
+.audit-expiry-input:focus {
+    outline: none;
+    border-color: #ef6c00;
+    box-shadow: 0 0 0 2px rgba(239, 108, 0, 0.2);
+}
+
+/* 調整一下警示文字的位置，讓它不要跟日期框擠在一起 */
+.warning-msg {
+    /* ... 保留原有樣式 ... */
+    margin-top: 8px;
 }

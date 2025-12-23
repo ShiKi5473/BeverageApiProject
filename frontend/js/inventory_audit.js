@@ -131,7 +131,12 @@ function createAuditRow(item) {
             <input type="number" class="audit-input" 
                    value="${item.quantity}" 
                    onfocus="this.select()"
-                   inputmode="numeric">
+                   inputmode="decimal">
+            
+            <input type="date" class="audit-expiry-input" 
+                   title="若知曉效期請填寫，以利系統建立批次">
+
+            <div class="warning-msg" style="display:none;"></div>
         </div>
 
         <div class="data-col">
@@ -142,20 +147,48 @@ function createAuditRow(item) {
 
     // 綁定輸入事件: 計算差異
     const input = div.querySelector('.audit-input');
+    const expiryInput = div.querySelector('.audit-expiry-input');
     const varianceDisplay = div.querySelector('.variance-display');
+    const warningMsg = div.querySelector('.warning-msg');
 
     input.addEventListener('input', () => {
         const actual = parseFloat(input.value) || 0;
         const system = parseFloat(item.quantity);
+        if (isNaN(actual)) {
+            varianceDisplay.textContent = '-';
+            warningMsg.style.display = 'none';
+            expiryInput.style.display = 'none';
+            return;
+        }
         const diff = actual - system;
 
         // 更新差異數字與顏色
         varianceDisplay.textContent = diff > 0 ? `+${diff}` : diff;
+        varianceDisplay.className = 'variance-display';
+        warningMsg.style.display = 'none';
+        expiryInput.style.display = 'none';
+        if (diff > 0) {
+            // --- 🔥 盤盈 (變多) ---
+            varianceDisplay.classList.add('variance-positive');
 
-        varianceDisplay.className = 'variance-display'; // 重置 class
-        if (diff > 0) varianceDisplay.classList.add('variance-positive');
-        else if (diff < 0) varianceDisplay.classList.add('variance-negative');
-        else varianceDisplay.classList.add('variance-zero');
+            // 1. 顯示效期輸入框
+            expiryInput.style.display = 'block';
+
+            // 2. 顯示警示/提示訊息
+            warningMsg.style.display = 'block';
+            if (diff > 5) {
+                warningMsg.textContent = "⚠️ 數量增加較多，請確認是否為進貨？(選填效期)";
+            } else {
+                warningMsg.textContent = "ℹ️ 庫存回補：建議填寫效期，若不填則由系統推斷。";
+            }
+
+        } else if (diff < 0) {
+            // --- 💧 盤損 (變少) ---
+            varianceDisplay.classList.add('variance-negative');
+            // 盤損不需要填效期 (FIFO 自動扣)
+        } else {
+            varianceDisplay.classList.add('variance-zero');
+        }
 
         updateProgress();
     });
@@ -185,16 +218,32 @@ async function submitAudit() {
     rows.forEach(row => {
         const id = row.dataset.id;
         const systemQty = parseFloat(row.dataset.systemQty);
-        const actualQty = parseFloat(row.querySelector('.audit-input').value) || 0;
 
-        // 只提交有差異的項目？或是全部提交建立快照？
-        // Phase 4 藍圖建議全部提交以建立完整 Snapshot
-        auditData.push({
+        const inputVal = row.querySelector('.audit-input').value;
+        const actualQty = parseFloat(inputVal);
+
+        // 取得效期輸入框的值
+        const expiryVal = row.querySelector('.audit-expiry-input').value;
+
+        if (isNaN(actualQty)) return;
+
+        const diff = actualQty - systemQty;
+
+        // 構建 DTO Item
+        const itemPayload = {
             inventoryItemId: id,
-            actualQuantity: actualQty, // DTO 欄位名稱要對應後端 InventoryAuditRequestDto
-            itemNote: "" // 暫時留空
-        });
+            actualQuantity: actualQty,
+            itemNote: ""
+        };
+
+        if (diff > 0 && expiryVal) {
+            itemPayload.gainedItemExpiryDate = expiryVal;
+        }
+
+        auditData.push(itemPayload);
+
     });
+    if (auditData.length === 0) return;
 
     if (!confirm(`確認提交共 ${auditData.length} 筆盤點資料？`)) return;
 

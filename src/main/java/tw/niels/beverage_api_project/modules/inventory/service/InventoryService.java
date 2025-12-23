@@ -19,6 +19,7 @@ import tw.niels.beverage_api_project.modules.inventory.dao.InventoryBatchDAO;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -299,6 +300,21 @@ public class InventoryService {
             snapshot.setQuantity(actualQty);
             snapshot.setLastCheckedAt(Instant.now());
             snapshotsToSave.add(snapshot);
+
+            // 2. 處理差異造成的批次問題
+            if (diff.compareTo(BigDecimal.ZERO) > 0) {
+                // ==========================================
+                // 🔥 處理盤盈 (Strategy B: Create Batch)
+                // ==========================================
+                handleInventoryGain(store, snapshot.getInventoryItem(), diff, itemDto.getGainedItemExpiryDate());
+
+            } else if (diff.compareTo(BigDecimal.ZERO) < 0) {
+                // ==========================================
+                // 💧 處理盤損 (Standard FIFO Deduct)
+                // ==========================================
+                // 從最舊的批次開始扣掉 diff 的絕對值
+                this.deductInventory(brandId, storeId, itemDto.getInventoryItemId(), diff.abs());
+            }
         }
 
         // 6. 【優化】批次寫入 (使用 saveAll)
@@ -384,5 +400,37 @@ public class InventoryService {
         }
 
         return noteBuilder.toString();
+    }
+
+    /**
+     * 專門處理盤盈的私有方法
+     */
+    private void handleInventoryGain(Store store, InventoryItem item, BigDecimal quantityToGain, LocalDate manualExpiryDate) {
+        InventoryBatch newBatch = new InventoryBatch();
+
+
+        newBatch.setStore(store);
+        newBatch.setInventoryItem(item);
+        newBatch.setQuantityReceived(quantityToGain); // 這是補進來的量
+        newBatch.setCurrentQuantity(quantityToGain);  // 當前剩餘量
+        newBatch.setShipment(null); // 這不是正常進貨，沒有 shipment
+        newBatch.setProductionDate(LocalDate.now()); // 假設是今天發現的
+
+        // --- 決定效期 ---
+        if (manualExpiryDate != null) {
+            // [情況 A] 店員有看著瓶子輸入日期 -> 最準確
+            newBatch.setExpiryDate(manualExpiryDate);
+        } else {
+            // [情況 B] 店員沒填 -> 智慧推斷
+            // 策略：查詢該商品在該店「最近一次進貨 (或現有批次)」的效期
+            LocalDate estimatedExpiry = batchRepository
+                    .findTopByStore_IdAndInventoryItem_IdOrderByExpiryDateDesc(store.getId(), item.getId())
+                    .map(InventoryBatch::getExpiryDate)
+                    .orElse(LocalDate.now().plusDays(7)); // 如果完全查不到，給個保守值 (7天)
+
+            newBatch.setExpiryDate(estimatedExpiry);
+        }
+
+        batchRepository.save(newBatch);
     }
 }

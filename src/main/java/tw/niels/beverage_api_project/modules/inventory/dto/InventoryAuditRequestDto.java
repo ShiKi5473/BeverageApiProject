@@ -8,6 +8,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 @Data
@@ -34,5 +35,9 @@ public class InventoryAuditRequestDto {
 
         @Schema(description = "單項備註 (選填)", example = "破損報廢 2 個")
         private String itemNote;
+
+        // 僅在盤盈時使用，允許為 null
+        @Schema(description = "盤盈商品的效期 (選填)，若不填則由系統推斷")
+        private LocalDate gainedItemExpiryDate;
     }
 }

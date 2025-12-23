@@ -44,6 +44,9 @@ public interface InventoryBatchRepository extends JpaRepository<InventoryBatch, 
             "AND b.inventoryItem.id = :itemId")
     Optional<BigDecimal> sumQuantityByStoreAndItem(@Param("storeId") Long storeId,
                                                    @Param("itemId") Long itemId);
+
+    Optional<InventoryBatch> findTopByStore_IdAndInventoryItem_IdOrderByExpiryDateDesc(Long storeId, Long itemId);
+    
     @Deprecated
     @Override
     @NonNull

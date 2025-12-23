@@ -136,7 +136,7 @@
 ### 8.1 智慧庫存作業 (Smart Inventory UI) - 🔥 最高優先 (Priority)
 * **對應後端**：Phase 4 (Inventory Audit) & Phase 5 (Waste Analysis)
 * **執行計畫**：
-    - [ ] **盤點作業 App (Mobile-first)**：
+    - [X] **盤點作業 App (Mobile-first)**：
         - 開發 `inventory_audit.html`。
         - 實作「理論庫存 vs 實際盤點」輸入介面。
         - 整合 `InventoryService.performAudit` API，支援批次提交盤點數據。
