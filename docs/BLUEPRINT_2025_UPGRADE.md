@@ -140,7 +140,7 @@
         - 開發 `inventory_audit.html`。
         - 實作「理論庫存 vs 實際盤點」輸入介面。
         - 整合 `InventoryService.performAudit` API，支援批次提交盤點數據。
-    - [ ] **進貨驗收 (Restock)**：
+    - [X] **進貨驗收 (Restock)**：
         - 開發 `inventory_restock.html`。
         - 實作進貨單輸入表單，建立 `InventoryBatch` (紀錄效期與成本)。
 
