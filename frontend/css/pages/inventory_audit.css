@@ -1,8 +1,7 @@
- /*@import "../base.css"; */
 /* 容器與版面設定 */
 .audit-container {
     max-width: 800px;
-    margin: 80px auto 100px; /* 上方避開 Navbar，下方避開 Footer */
+    margin: 20px auto 100px; /* 調整上方邊距，適應 Navbar */
     padding: 0 1rem;
 }
 
@@ -11,24 +10,25 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1.5rem;
+    margin-bottom: 1rem;
     background: white;
     padding: 1.25rem;
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-sm);
+    border-radius: var(--radius-md, 8px); /* 加入預設值避免變數未定義 */
+    box-shadow: var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.1));
 }
 
-.batch-info h2 { margin: 0 0 0.5rem 0; color: var(--primary-color); font-size: 1.5rem; }
+.batch-info h2 { margin: 0 0 0.5rem 0; color: var(--primary-color, #007bff); font-size: 1.5rem; }
 .batch-info p { margin: 0; color: #666; font-size: 0.95rem; }
 .loading-text { font-style: italic; color: #999; }
 
-.status-badge {
-    background: #e3f2fd;
-    color: #1565c0;
-    padding: 6px 12px;
-    border-radius: 20px;
-    font-size: 0.85rem;
-    font-weight: 600;
+/* 上方操作工具列 */
+.inventory-toolbar {
+    display: flex;
+    justify-content: flex-end; /* 按鈕靠右 */
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #eee;
 }
 
 /* 盤點列表 */
@@ -41,19 +41,19 @@
 .audit-item {
     background: white;
     padding: 1rem;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md, 8px);
     display: grid;
     /* RWD Grid: 品名(自動) | 系統量 | 輸入框 | 差異值 */
     grid-template-columns: 2fr 1fr 1.2fr 0.8fr;
     align-items: center;
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.1));
     gap: 1rem;
     transition: transform 0.1s ease;
 }
 
-.audit-item:focus-within {
-    border: 1px solid var(--primary-color);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+/* 瀏覽模式下的樣式調整 */
+.view-mode-item {
+    grid-template-columns: 2fr 1fr 1fr; /* 瀏覽模式只需要3欄 */
 }
 
 .item-name { font-weight: bold; font-size: 1.1rem; display: block;}
@@ -82,7 +82,6 @@
     font-size: 1.2rem;
     text-align: center;
     font-weight: bold;
-    /* 移除 input type number 的上下箭頭 */
     -moz-appearance: textfield;
 }
 .audit-input::-webkit-outer-spin-button,
@@ -91,9 +90,9 @@
     margin: 0;
 }
 .audit-input:focus {
-    border-color: var(--primary-color);
+    border-color: var(--primary-color, #007bff);
     outline: none;
-    background-color: #fffde7; /* 聚焦時微黃背景 */
+    background-color: #fffde7;
 }
 
 /* 差異視覺化 */
@@ -102,11 +101,102 @@
     text-align: center;
     font-size: 1.1rem;
 }
-.variance-positive { color: var(--success-color); } /* 盤盈 (多) */
-.variance-negative { color: var(--error-color); }   /* 盤損 (少) */
+.variance-positive { color: var(--success-color, #28a745); }
+.variance-negative { color: var(--error-color, #dc3545); }
 .variance-zero { color: #ccc; }
 
-/* 底部動作列 */
+/* 盤盈效期輸入框 */
+.audit-expiry-input {
+    display: none;
+    width: 100%;
+    margin-top: 8px;
+    padding: 4px;
+    font-size: 0.85rem;
+    border: 1px dashed #ffa726;
+    border-radius: 4px;
+    background-color: #fff8e1;
+    color: #ef6c00;
+}
+.warning-msg { margin-top: 8px; font-size: 0.8rem; color: #ef6c00;}
+
+/* 通用按鈕樣式 */
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+.btn-primary { background-color: #007bff; color: white; }
+.btn-secondary { background-color: #6c757d; color: white; }
+.btn:hover { opacity: 0.9; }
+.btn:disabled { background-color: #ccc; cursor: not-allowed; }
+
+/* =========================================
+   [新增/修正] Modal 視窗樣式
+   (如果原本 css/components/modal.css 沒載入，這段會讓它正常運作)
+   =========================================
+*/
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5); /* 半透明黑色背景 */
+    z-index: 1000;
+
+    /* 讓內容置中 */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+    position: relative;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+
+.close-modal {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #aaa;
+}
+.close-modal:hover { color: #000; }
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+/* Modal 內的表單排版 */
+.form-row {
+    display: flex;
+    gap: 15px;
+}
+.form-group.half {
+    flex: 1;
+}
+
+/* =========================================
+   [修正] 底部 Action Bar (Footer)
+   =========================================
+*/
 .action-bar {
     position: fixed;
     bottom: 0;
@@ -115,54 +205,36 @@
     background: white;
     padding: 1rem 1.5rem;
     box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
-    display: flex;
+    display: flex; /* Flex 佈局 */
     justify-content: space-between;
     align-items: center;
     z-index: 100;
 }
 
-/* 手機版響應式 (Mobile) */
+/* 讓底部兩個按鈕並排且有間距 */
+.footer-actions {
+    display: flex;
+    gap: 10px;
+}
+
+/* 手機版響應式 */
 @media (max-width: 600px) {
     .audit-item {
-        /* 改為兩欄佈局 */
         grid-template-columns: 1fr 1fr;
         gap: 0.8rem;
         padding-bottom: 1.2rem;
     }
+    .view-mode-item {
+        grid-template-columns: 1fr 1fr; /* 手機版瀏覽模式 */
+    }
 
     .item-info {
-        grid-column: 1 / -1; /* 佔滿整行 */
+        grid-column: 1 / -1;
         border-bottom: 1px solid #eee;
         padding-bottom: 0.5rem;
         margin-bottom: 0.2rem;
     }
 
-    .col-label { display: block; } /* 顯示標籤 */
+    .col-label { display: block; }
     .audit-container { margin-top: 70px; padding-bottom: 80px; }
-}
-
-
-/* 盤盈效期輸入框 */
-.audit-expiry-input {
-    display: none; /* 預設隱藏 */
-    width: 100%;
-    margin-top: 8px;
-    padding: 4px;
-    font-size: 0.85rem;
-    border: 1px dashed #ffa726; /* 使用虛線表示"選填"或"特殊情況" */
-    border-radius: 4px;
-    background-color: #fff8e1;
-    color: #ef6c00;
-}
-
-.audit-expiry-input:focus {
-    outline: none;
-    border-color: #ef6c00;
-    box-shadow: 0 0 0 2px rgba(239, 108, 0, 0.2);
-}
-
-/* 調整一下警示文字的位置，讓它不要跟日期框擠在一起 */
-.warning-msg {
-    /* ... 保留原有樣式 ... */
-    margin-top: 8px;
 }

@@ -59,3 +59,8 @@ button[type="submit"]:hover {
     border-color: #007bff;
     font-weight: bold;
 }
+
+/* --- 全域工具類別 --- */
+.hidden {
+    display: none !important;
+}

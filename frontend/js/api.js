@@ -318,3 +318,12 @@ export function submitInventoryAudit(data) {
         body: JSON.stringify(data)
     });
 }
+
+/**
+ * 提交進貨單
+ * @param {Object} payload - { inventoryItemId, quantity, cost, expiryDate }
+ */
+export const submitShipment = (payload) => {
+    // 假設 api 是 axios instance
+    return api.post('/inventory/shipment', payload);
+};

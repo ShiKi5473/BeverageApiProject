@@ -1,110 +1,132 @@
-import { createNavbar } from './components/Navbar.js';
-import { getInventoryItems, submitInventoryAudit } from './api.js';
+import {createNavbar} from './components/Navbar.js';
+import { getInventoryItems, submitInventoryAudit, submitShipment } from './api.js';
 
-// 初始化
+// --- 全域變數 ---
+let currentInventoryItems = []; // 暫存庫存資料，避免重複 Fetch
+let isAuditMode = false;        // 標記當前模式
+
+// --- 初始化 ---
 document.addEventListener('DOMContentLoaded', async () => {
-    // 1. 掛載導覽列
     initNavbar();
-
-    // 2. 顯示當前經手人與日期
     initStaffInfo();
 
-    // 3. 載入盤點資料
-    await loadInventoryItems();
+    // 1. 初始載入 (預設為瀏覽模式)
+    await loadInventoryData();
 
-    // 4. 綁定提交按鈕
-    document.getElementById('btn-submit').addEventListener('click', submitAudit);
+    // 2. 綁定按鈕事件
+    bindEvents();
 });
 
-/**
- * 初始化並掛載導覽列
- */
-function initNavbar() {
-    const navbarRoot = document.getElementById('navbar-root');
-    if (!navbarRoot) return;
+function bindEvents() {
+    // --- Toolbar 按鈕 ---
+    const btnShipment = document.getElementById('btn-open-shipment');
+    const btnStartAudit = document.getElementById('btn-start-audit');
 
-    // 定義登出邏輯
-    const handleLogout = () => {
-        if (confirm("確定要登出嗎？")) {
-            localStorage.removeItem('accessToken');
-            localStorage.removeItem('brandId');
-            window.location.href = 'login.html';
-        }
-    };
+    if (btnShipment) btnShipment.addEventListener('click', openShipmentModal);
+    if (btnStartAudit) btnStartAudit.addEventListener('click', startAuditMode);
 
-    // 呼叫 createNavbar 函式 (不需要 new)
-    // 參數 1: 標題
-    // 參數 2: 登出回呼函式
-    const headerElement = createNavbar("庫存盤點作業", handleLogout);
+    // --- 進貨 Modal 相關 ---
+    const modal = document.getElementById('shipment-modal');
+    const closeBtns = document.querySelectorAll('.close-modal, .close-modal-btn');
+    const shipmentForm = document.getElementById('shipment-form');
 
-    // 清空掛載點並加入新的 Header
-    navbarRoot.innerHTML = '';
-    navbarRoot.appendChild(headerElement);
+    closeBtns.forEach(btn => {
+        btn.addEventListener('click', () => modal.classList.add('hidden'));
+    });
+
+    // 點擊 Modal 外部關閉
+    window.addEventListener('click', (e) => {
+        if (e.target === modal) modal.classList.add('hidden');
+    });
+
+    // 提交進貨表單
+    if (shipmentForm) shipmentForm.addEventListener('submit', handleShipmentSubmit);
+
+    // --- 盤點 Footer 按鈕 ---
+    const btnSubmitAudit = document.getElementById('btn-submit');
+    // 綁定退出按鈕
+    const btnCancelAudit = document.getElementById('btn-cancel-audit');
+
+    if (btnSubmitAudit) btnSubmitAudit.addEventListener('click', submitAudit);
+    if (btnCancelAudit) btnCancelAudit.addEventListener('click', exitAuditMode);
 }
 
 /**
- * 初始化員工資訊 (從 Token 解析)
+ * 載入庫存資料 (Fetch Data)
  */
-function initStaffInfo() {
-    // 設定日期
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('audit-date').textContent = today;
-
-    // 解析 Token 取得員工名稱
-    const token = localStorage.getItem('accessToken');
-    if (token) {
-        try {
-            const payload = JSON.parse(atob(token.split('.')[1])); // 簡單解碼 JWT Payload
-            // 優先顯示 name，如果沒有則顯示 sub (通常是帳號)
-            const staffName = payload.name || payload.sub || '店員';
-            document.getElementById('staff-name').textContent = staffName;
-            document.getElementById('staff-name').classList.remove('loading-text');
-        } catch (e) {
-            console.error('Token 解析失敗', e);
-            document.getElementById('staff-name').textContent = '未知使用者';
-        }
-    } else {
-        window.location.href = 'login.html';
-    }
-}
-
-/**
- * 載入需盤點的庫存項目
- */
-async function loadInventoryItems() {
-    const listContainer = document.getElementById('audit-list');
+async function loadInventoryData() {
     const loadingIndicator = document.getElementById('loading-indicator');
+    const listContainer = document.getElementById('audit-list');
 
-    if(loadingIndicator) loadingIndicator.style.display = 'block';
-    if(listContainer) listContainer.innerHTML = '';
+    if (loadingIndicator) loadingIndicator.style.display = 'block';
+    if (listContainer) listContainer.innerHTML = '';
 
     try {
-        const items = await getInventoryItems();
+        // 呼叫 API 取得最新庫存
+        currentInventoryItems = await getInventoryItems();
 
-        if (!items || items.length === 0) {
+        if (!currentInventoryItems || currentInventoryItems.length === 0) {
             document.getElementById('empty-state').style.display = 'block';
             return;
+        } else {
+            document.getElementById('empty-state').style.display = 'none';
         }
 
-        items.forEach(item => {
-            const row = createAuditRow(item);
-            listContainer.appendChild(row);
-        });
-
-        updateProgress();
-        document.getElementById('btn-submit').disabled = false;
+        // 根據目前模式渲染畫面
+        renderInventoryList();
 
     } catch (error) {
         console.error('載入庫存失敗:', error);
-        alert(`無法載入庫存列表: ${error.message}`);
-        // 如果錯誤是因為 "User not found" 或 "不屬於任何分店"，可能要導回登入頁
-        if (error.message.includes("不屬於任何分店")) {
-            window.location.href = 'login.html';
-        }
+        alert('無法讀取庫存列表，請檢查網路或重新登入。');
     } finally {
-        if(loadingIndicator) loadingIndicator.style.display = 'none';
+        if (loadingIndicator) loadingIndicator.style.display = 'none';
     }
 }
+
+/**
+ * 渲染列表 (View Mode vs Audit Mode)
+ */
+function renderInventoryList() {
+    const listContainer = document.getElementById('audit-list');
+    listContainer.innerHTML = ''; // 清空
+
+    currentInventoryItems.forEach(item => {
+        let row;
+        if (isAuditMode) {
+            // 盤點模式：顯示輸入框
+            row = createAuditRow(item);
+        } else {
+            // 瀏覽模式：顯示純文字卡片
+            row = createViewRow(item);
+        }
+        listContainer.appendChild(row);
+    });
+
+    // 如果是盤點模式，更新進度條
+    if (isAuditMode) updateProgress();
+}
+
+/**
+ * [UI] 建立瀏覽模式的單行 (唯讀)
+ */
+function createViewRow(item) {
+    const div = document.createElement('div');
+    div.className = 'audit-item view-mode-item';
+    div.innerHTML = `
+        <div class="item-info">
+            <span class="item-name">${item.name}</span>
+            <span class="item-unit">${item.unit}</span>
+        </div>
+        <div class="data-col right-align">
+            <span class="col-label">目前數量</span>
+            <div class="system-stock large-text">${item.quantity}</div>
+        </div>
+        <div class="data-col mobile-hide">
+            </div>
+    `;
+    return div;
+}
+
 
 /**
  * 建立單一盤點列 (DOM 操作)
@@ -196,14 +218,59 @@ function createAuditRow(item) {
     return div;
 }
 
+
+// ==========================================
+// 邏輯控制 - 盤點模式
+// ==========================================
+
+function startAuditMode() {
+    if (!confirm("確定要開始盤點嗎？\n這將進入盤點模式，您可以調整所有品項的數量。")) return;
+
+    isAuditMode = true;
+
+    // 1. 隱藏上方 Toolbar
+    const toolbar = document.querySelector('.inventory-toolbar');
+    if (toolbar) toolbar.style.display = 'none';
+
+    // 2. 顯示底部 Footer
+    const footer = document.getElementById('audit-footer');
+    if (footer) {
+        footer.style.display = 'flex';
+        footer.classList.remove('hidden');
+    }
+
+    // 3. 啟用提交按鈕
+    document.getElementById('btn-submit').disabled = false;
+
+    // 4. 重新渲染列表為輸入框
+    renderInventoryList();
+
+    // 5. 滾動到頂部
+    window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
 /**
- * 更新底部進度資訊
+ * 退出盤點模式
  */
-function updateProgress() {
-    const total = document.querySelectorAll('.audit-item').length;
-    // 這裡簡單定義：只要輸入框有值就算已盤點 (其實預設都有值，可以改成偵測是否有修改)
-    // 但實務上，盤點通常需要確認每一項，這裡顯示總數即可
-    document.getElementById('progress-count').textContent = `${total} 項`;
+function exitAuditMode() {
+    // 為了防止誤觸，加入確認對話框
+    if (!confirm("確定要退出盤點模式嗎？\n未提交的盤點數據將會遺失。")) return;
+
+    isAuditMode = false;
+
+    // 1. 顯示 Toolbar
+    const toolbar = document.querySelector('.inventory-toolbar');
+    if (toolbar) toolbar.style.display = 'flex'; // 或 block，視你的 CSS 而定
+
+    // 2. 隱藏 Footer
+    const footer = document.getElementById('audit-footer');
+    if (footer) {
+        footer.classList.add('hidden');
+        footer.style.display = 'none';
+    }
+
+    // 3. 重新渲染回瀏覽模式 (會讀取原本的 currentInventoryItems，所以輸入的數字會被重置)
+    renderInventoryList();
 }
 
 /**
@@ -272,5 +339,121 @@ async function submitAudit() {
         btn.disabled = false;
         btn.textContent = '提交盤點報告 (Submit)';
     }
+}
 
+// ==========================================
+// 邏輯控制 - 進貨模式 (新增功能)
+// ==========================================
+
+async function openShipmentModal() {
+    const modal = document.getElementById('shipment-modal');
+    const select = document.getElementById('shipment-item');
+
+    // 清空舊表單
+    document.getElementById('shipment-form').reset();
+
+    // 顯示 Modal
+    modal.classList.remove('hidden');
+
+    // 填充下拉選單 (如果還沒填過)
+    if (select.options.length <= 1) {
+        // 如果 currentInventoryItems 已經有資料，直接用，不用再 call API
+        if (!currentInventoryItems || currentInventoryItems.length === 0) {
+            currentInventoryItems = await getInventoryItems();
+        }
+
+        // 重新填充
+        select.innerHTML = '<option value="">請選擇品項...</option>';
+        currentInventoryItems.forEach(item => {
+            const option = document.createElement('option');
+            option.value = item.id;
+            // 顯示 名稱 + (目前庫存) 方便參考
+            option.textContent = `${item.name} (庫存: ${item.quantity} ${item.unit})`;
+            select.appendChild(option);
+        });
+    }
+}
+
+async function handleShipmentSubmit(e) {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+
+    // 收集資料
+    const itemId = document.getElementById('shipment-item').value;
+    const quantity = parseInt(document.getElementById('shipment-quantity').value);
+    const cost = parseFloat(document.getElementById('shipment-cost').value) || 0;
+    const expiryDate = document.getElementById('shipment-expiry').value;
+
+    if (!itemId || quantity <= 0) {
+        alert("請選擇品項並輸入正確數量");
+        return;
+    }
+
+    const payload = {
+        inventoryItemId: itemId,
+        quantity: quantity,
+        cost: cost,
+        expiryDate: expiryDate ? expiryDate : null, // 若沒填送 null
+        supplier: null // 目前 UI 沒欄位
+    };
+
+    try {
+        btn.disabled = true;
+        btn.textContent = '處理中...';
+
+        // Change 2: 這裡改用封裝後的函式，不再直接依賴 api.post
+        await submitShipment(payload);
+
+        alert('🚚 進貨成功！');
+        document.getElementById('shipment-modal').classList.add('hidden');
+
+        // 重新載入庫存列表 (View Mode)
+        await loadInventoryData();
+
+    } catch (error) {
+        console.error(error);
+        alert('進貨失敗: ' + (error.message || '未知錯誤'));
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '確認進貨';
+    }
+}
+
+// ==========================================
+// 輔助函式
+// ==========================================
+
+function initNavbar() {
+    const navbarRoot = document.getElementById('navbar-root');
+    if (!navbarRoot) return;
+    const handleLogout = () => {
+        if (confirm("確定要登出嗎？")) {
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('brandId');
+            window.location.href = 'login.html';
+        }
+    };
+    const headerElement = createNavbar("庫存管理系統", handleLogout);
+    navbarRoot.innerHTML = '';
+    navbarRoot.appendChild(headerElement);
+}
+
+function initStaffInfo() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('audit-date').textContent = today;
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+        try {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            document.getElementById('staff-name').textContent = payload.name || payload.sub || '店員';
+        } catch (e) { /* ignore */
+        }
+    }
+}
+
+function updateProgress() {
+    // 只有在 Audit Mode 下才需要更新進度條
+    if (!isAuditMode) return;
+    const total = document.querySelectorAll('.audit-item').length;
+    document.getElementById('progress-count').textContent = `${total} 項`;
 }
