@@ -17,19 +17,16 @@ import java.util.Optional;
 public interface InventoryBatchRepository extends JpaRepository<InventoryBatch, Long> {
 
 
-    Optional<InventoryBatch> findByShipment_Store_Brand_IdAndId(Long brandId, Long id);
+    Optional<InventoryBatch> findByStore_Brand_IdAndId(Long brandId, Long id);
+
+    List<InventoryBatch> findByStore_Id(Long storeId);
 
     /**
      * FIFO 核心查詢：
-     * 1. 找出特定店家 (透過 shipment 關聯)
-     * 2. 特定商品 (inventoryItem)
-     * 3. 還有剩餘數量 (currentQuantity > 0)
-     * 4. 依照效期由舊到新排序 (ORDER BY expiryDate ASC)
-     * 5. 加悲觀鎖 (PESSIMISTIC_WRITE) 防止併發超賣
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT b FROM InventoryBatch b " +
-            "WHERE b.shipment.store.id = :storeId " +
+            "WHERE b.store.id = :storeId " +  // <-- 關鍵修正
             "AND b.inventoryItem.id = :itemId " +
             "AND b.currentQuantity > 0 " +
             "ORDER BY b.expiryDate ASC")
@@ -37,14 +34,15 @@ public interface InventoryBatchRepository extends JpaRepository<InventoryBatch, 
                                                        @Param("itemId") Long itemId);
 
     /**
-     * 查詢某店某商品的總庫存量 (不加鎖，僅供查詢)
+     * 查詢某店某商品的總庫存量
      */
     @Query("SELECT SUM(b.currentQuantity) FROM InventoryBatch b " +
-            "WHERE b.shipment.store.id = :storeId " +
+            "WHERE b.store.id = :storeId " + // <-- 關鍵修正
             "AND b.inventoryItem.id = :itemId")
     Optional<BigDecimal> sumQuantityByStoreAndItem(@Param("storeId") Long storeId,
                                                    @Param("itemId") Long itemId);
 
+    // 此方法已經是正確的 (V9 已修正)
     Optional<InventoryBatch> findTopByStore_IdAndInventoryItem_IdOrderByExpiryDateDesc(Long storeId, Long itemId);
     
     @Deprecated

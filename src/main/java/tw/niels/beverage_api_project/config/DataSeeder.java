@@ -265,7 +265,7 @@ public class DataSeeder implements CommandLineRunner {
 
         // 6-3. 庫存批次 (Batch 維持原樣，但需注意 V9 新增了 store_id)
         // 如果您的 Batch Entity 已經更新了 V9 的 store 欄位，這裡需要補上 s.setStore(store);
-        inventoryBatchRepository.findByShipment_Store_Brand_IdAndId(brand.getId(), 1L).orElseGet(() -> {
+        inventoryBatchRepository.findByStore_Brand_IdAndId(brand.getId(), 1L).orElseGet(() -> {
             InventoryBatch b = new InventoryBatch();
             b.setId(1L);
             b.setShipment(shipment);
