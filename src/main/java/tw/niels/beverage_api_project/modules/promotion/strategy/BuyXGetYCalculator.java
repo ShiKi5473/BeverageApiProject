@@ -25,42 +25,54 @@ public class BuyXGetYCalculator implements PromotionCalculator {
     @Override
     public BigDecimal calculateDiscount(Order order, Promotion promotion) {
         // 1. 解析 X (需購買數) 和 Y (贈送數)
-        // 假設 minSpend 存 X (例如 2), value 存 Y (例如 1)
         int buyCount = promotion.getMinSpend() != null ? promotion.getMinSpend().intValue() : 1;
         int freeCount = promotion.getValue() != null ? promotion.getValue().intValue() : 1;
         int groupSize = buyCount + freeCount;
 
         if (groupSize <= 0) return BigDecimal.ZERO;
 
-        // 2. 找出適用此活動的所有訂單品項
+        // 2. 取得符合資格的商品單價列表 (已抽離方法)
+        List<BigDecimal> eligibleItemPrices = collectEligibleItemPrices(order, promotion);
+
+        // 3. 計算折扣
+        return calculateGroupDiscount(eligibleItemPrices, groupSize, freeCount);
+    }
+
+    /**
+     * 從訂單中篩選出適用於此活動的商品，並將每個數量展開為獨立的單價
+     * @param order     訂單
+     * @param promotion 促銷活動設定
+     * @return 符合資格的單價列表 (未排序)
+     */
+    private List<BigDecimal> collectEligibleItemPrices(Order order, Promotion promotion) {
+        // 找出適用此活動的 Product IDs
         Set<Long> applicableProductIds = promotion.getApplicableProducts().stream()
                 .map(Product::getId)
                 .collect(Collectors.toSet());
 
-        List<BigDecimal> eligibleItemPrices = new ArrayList<>();
+        List<BigDecimal> prices = new ArrayList<>();
 
         for (OrderItem item : order.getItems()) {
             // 如果活動沒指定商品 (全館適用) 或者 商品在適用列表中
+            // 注意：這裡假設活動是綁定 Product 層級，若是綁定 Variant 層級需修改此處邏輯
             boolean isApplicable = applicableProductIds.isEmpty() ||
                     applicableProductIds.contains(item.getProduct().getId());
 
             if (isApplicable) {
                 // 將每個單品 (考慮數量) 的單價加入列表
                 // 例如：珍珠奶茶 x 3 (單價 50)，則加入 [50, 50, 50]
+                // 這裡的 getUnitPrice() 應該已經包含了 Variant 的價格邏輯
                 for (int i = 0; i < item.getQuantity(); i++) {
-                    eligibleItemPrices.add(item.getUnitPrice());
+                    prices.add(item.getUnitPrice());
                 }
             }
         }
-
-        // 3. 呼叫提取出的計算方法
-        return calculateGroupDiscount(eligibleItemPrices, groupSize, freeCount);
-
+        return prices;
     }
 
     /**
      * 計算分組優惠折扣 (買 X 送 Y 核心邏輯)
-     * * @param prices    符合資格的商品價格列表
+     * @param prices    符合資格的商品價格列表
      * @param groupSize 每組大小 (X + Y)
      * @param freeCount 每組贈送數量 (Y)
      * @return 總折扣金額
@@ -76,7 +88,7 @@ public class BuyXGetYCalculator implements PromotionCalculator {
         BigDecimal totalDiscount = BigDecimal.ZERO;
         int totalItems = prices.size();
 
-        // 2. 計算可以湊成幾組 (每買 X+Y 個，就可以減免 Y 個最低價的金額)
+        // 2. 計算可以湊成幾組
         int sets = totalItems / groupSize;
 
         // 3. 取前 (sets * freeCount) 個最低價的商品總和作為折扣

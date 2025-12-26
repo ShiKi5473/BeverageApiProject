@@ -2,6 +2,7 @@ package tw.niels.beverage_api_project.modules.report.service;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
 import tw.niels.beverage_api_project.modules.inventory.entity.InventoryItem;
 import tw.niels.beverage_api_project.modules.inventory.entity.InventoryTransaction;
 import tw.niels.beverage_api_project.modules.inventory.repository.InventoryItemRepository;
@@ -32,18 +33,15 @@ public class InventoryReportService {
     private final InventoryTransactionRepository transactionRepository;
     private final OrderRepository orderRepository;
     private final RecipeRepository recipeRepository;
-    private final ProductVariantRepository productVariantRepository;
 
     public InventoryReportService(InventoryItemRepository itemRepository,
                                   InventoryTransactionRepository transactionRepository,
                                   OrderRepository orderRepository,
-                                  RecipeRepository recipeRepository,
-                                  ProductVariantRepository productVariantRepository) {
+                                  RecipeRepository recipeRepository) {
         this.itemRepository = itemRepository;
         this.transactionRepository = transactionRepository;
         this.orderRepository = orderRepository;
         this.recipeRepository = recipeRepository;
-        this.productVariantRepository = productVariantRepository;
     }
 
     @Transactional(readOnly = true)
@@ -57,24 +55,26 @@ public class InventoryReportService {
         // 2. 準備配方對照表 (Cache Recipes)
         // --- 處理 Variant Recipes ---
         List<Recipe> variantRecipes = recipeRepository.findAllVariantRecipes();
-        Map<Long, List<Recipe>> variantRecipeMap = Optional.ofNullable(variantRecipes) // 1. 防止 List 本身為 null
+        Map<Long, List<Recipe>> variantRecipeMap = Optional.ofNullable(variantRecipes)
                 .orElse(Collections.emptyList())
                 .stream()
-                .filter(r -> r.getVariant() != null) // 2. 防止 r.getVariant() 為 null 導致 getId() 報錯
+                // 【修正】增加 ID 非空檢查，解決 groupingBy 不允許 null key 的問題
+                .filter(r -> r.getVariant() != null && r.getVariant().getId() != null)
                 .collect(Collectors.groupingBy(r -> r.getVariant().getId()));
 
         // --- 處理 Option Recipes ---
         List<Recipe> optionRecipes = recipeRepository.findAllOptionRecipes();
-        Map<Long, List<Recipe>> optionRecipeMap = Optional.ofNullable(optionRecipes) // 1. 防止 List 本身為 null
+        Map<Long, List<Recipe>> optionRecipeMap = Optional.ofNullable(optionRecipes)
                 .orElse(Collections.emptyList())
                 .stream()
-                .filter(r -> r.getOption() != null) // 2. 防止 r.getOption() 為 null
+                // 【修正】增加 ID 非空檢查
+                .filter(r -> r.getOption() != null && r.getOption().getId() != null)
                 .collect(Collectors.groupingBy(r -> r.getOption().getId()));
 
         // 3. 計算理論消耗 (Theoretical Usage)
         // 撈出區間內該店所有已完成訂單
         List<Order> orders = orderRepository.findAllByBrand_IdAndStore_IdAndStatus(brandId, storeId, OrderStatus.CLOSED);
-        // 過濾時間 (若 Repository 有支援 between 可直接用，這裡簡單用 stream 過濾)
+
         orders = orders.stream()
                 .filter(o -> !o.getCompletedTime().toInstant().isBefore(startInstant) &&
                         !o.getCompletedTime().toInstant().isAfter(endInstant))
@@ -85,31 +85,45 @@ public class InventoryReportService {
 
         for (Order order : orders) {
             for (OrderItem orderItem : order.getItems()) {
-                Long productId = orderItem.getProduct().getId();
                 int qty = orderItem.getQuantity();
 
-                // A. 飲品本體配方
-                // 暫時解法：假設 Product 只有一個 "Default Variant"
-                // 正確做法應在 OrderItem 記錄 variantId (Phase 5 優化)
-                List<ProductVariant> variants = productVariantRepository.findByProduct_Brand_IdAndProduct_IdAndIsDeletedFalse(brandId, productId);
-                if (!variants.isEmpty()) {
-                    Long variantId = variants.getFirst().getId(); // 取第一個
+                // A. 飲品本體配方 (已修正：支援規格)
+                // 從 OrderItem 直接取得 ProductVariant，不再猜測
+                ProductVariant variant = orderItem.getProductVariant();
+
+                if (variant != null && variant.getId() != null) {
+                    Long variantId = variant.getId();
+                    // 根據規格 ID 抓取對應配方 (例如：大杯配方)
                     List<Recipe> recipes = variantRecipeMap.getOrDefault(variantId, Collections.emptyList());
+
                     for (Recipe r : recipes) {
-                        Long itemId = r.getInventoryItem().getId();
-                        BigDecimal usage = r.getQuantity().multiply(BigDecimal.valueOf(qty));
-                        theoreticalUsageMap.merge(itemId, usage, BigDecimal::add);
+                        if (r.getInventoryItem() != null) {
+                            Long itemId = r.getInventoryItem().getId();
+                            BigDecimal usage = r.getQuantity().multiply(BigDecimal.valueOf(qty));
+                            theoreticalUsageMap.merge(itemId, usage, BigDecimal::add);
+                        }
                     }
+                } else {
+                    // 當訂單已完成卻沒有規格資訊，視為資料嚴重異常，拋出 Exception 中斷報表
+                    throw new ResourceNotFoundException(String.format(
+                            "庫存報表生成失敗：訂單號碼 %s 的品項 (ID: %d, 商品: %s) 缺少規格(Variant)資訊，無法計算配方消耗。",
+                            order.getOrderNumber(),
+                            orderItem.getId(),
+                            orderItem.getProduct() != null ? orderItem.getProduct().getName() : "Unknown"
+                    ));
                 }
 
                 // B. 加料選項配方
-                for (ProductOption opt : orderItem.getOptions()) {
-                    List<Recipe> optRecipes = optionRecipeMap.getOrDefault(opt.getId(), Collections.emptyList());
-                    for (Recipe r : optRecipes) {
-                        Long itemId = r.getInventoryItem().getId();
-                        // 加料通常一份就是一份配方量，也可能隨飲料杯數增加 (視業務邏輯，這裡假設 1 OrderItem = 1 份加料 * quantity)
-                        BigDecimal usage = r.getQuantity().multiply(BigDecimal.valueOf(qty));
-                        theoreticalUsageMap.merge(itemId, usage, BigDecimal::add);
+                if (orderItem.getOptions() != null) {
+                    for (ProductOption opt : orderItem.getOptions()) {
+                        List<Recipe> optRecipes = optionRecipeMap.getOrDefault(opt.getId(), Collections.emptyList());
+                        for (Recipe r : optRecipes) {
+                            if (r.getInventoryItem() != null) {
+                                Long itemId = r.getInventoryItem().getId();
+                                BigDecimal usage = r.getQuantity().multiply(BigDecimal.valueOf(qty));
+                                theoreticalUsageMap.merge(itemId, usage, BigDecimal::add);
+                            }
+                        }
                     }
                 }
             }
