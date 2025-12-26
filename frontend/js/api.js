@@ -1,64 +1,83 @@
+import { getAccessToken, logout } from './auth.js';
 
+// ==========================================
+// 🔐 認證相關 API
+// ==========================================
 
 /**
- * 處理 API 請求的主函式
- * @param {string} endpoint - API 路徑 (例如 /api/v1/orders)
- * @param {object} options - fetch API 的設定 (method, body 等)
- * @returns {Promise<Response>} - 回傳 fetch 的原始 Response 物件
+ * 員工/會員登入
+ * @param {object} credentials - { username, password, brandId }
+ */
+export async function login(credentials) {
+    const response = await fetch("http://localhost:8080/api/v1/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(credentials),
+    });
+
+    if (!response.ok) {
+        // 嘗試讀取錯誤訊息
+        const errorText = await response.text();
+        throw new Error(errorText || "登入失敗");
+    }
+    return response.json();
+}
+
+/**
+ * 訪客快速登入
+ * @param {string} displayName
+ */
+export async function guestLogin(displayName) {
+    const response = await fetch("http://localhost:8080/api/v1/auth/guest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ displayName }),
+    });
+
+    if (!response.ok) {
+        throw new Error("訪客登入失敗");
+    }
+    return response.json();
+}
+
+
+// ==========================================
+// 🛠️ 通用 Fetch 工具
+// ==========================================
+
+/**
+ * 自動帶入 Token 的 Fetch 封裝
  */
 async function fetchWithAuth(endpoint, options = {}) {
-  // 1. 從 localStorage 取得 Token
-  const token = localStorage.getItem("accessToken");
-  // const brandId = localStorage.getItem("brandId"); // <-- 【移除】不再需要從 localStorage 讀取 brandId
+    const token = getAccessToken(); // 從 auth.js 取得
 
-  // 2. 如果沒有 Token，立即導向回登入頁
-  if (!token) {
-    console.error("沒有找到 accessToken，導向至登入頁");
-    redirectToLogin();
-    return; // 中斷執行
-  }
+    const headers = {
+        "Content-Type": "application/json",
+        ...options.headers,
+    };
 
-  // 3. 設定預設的 headers
-  const headers = {
-    "Content-Type": "application/json",
-    ...options.headers, // 保留傳入的 headers
-    Authorization: `Bearer ${token}`, // 附加 Bearer Token [cite: shiki5473/beverageapiproject/BeverageApiProject-frontendPosView/src/main/java/tw/niels/beverage_api_project/security/jwt/JwtAuthenticationFilter.java]
-  };
-
-  // 4.
-  try {
-    // 5. 發送請求
-    const response = await fetch(endpoint, { ...options, headers });
-
-    // 6. 檢查 401 (未授權) 錯誤
-    if (response.status === 401) {
-      console.error("Token 失效或未授權 (401)，清除 Token 並導向至登入頁");
-      redirectToLogin();
-      return; // 中斷執行
+    if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
     }
 
-    return response; // 回傳 response 供呼叫者處理
-  } catch (error) {
-    // 捕捉網路層級的錯誤
-    console.error(`API 請求失敗 (${endpoint}):`, error);
-    throw error; // 將錯誤丟出，讓呼叫者知道
-  }
-}
+    // 處理完整 URL (若 endpoint 不是以 http 開頭，補上 localhost)
+    const url = endpoint.startsWith("http") ? endpoint : `http://localhost:8080${endpoint}`;
 
-/**
- * 導向回登入頁並清除認證資料
- */
-function redirectToLogin() {
-  localStorage.removeItem("accessToken");
-  localStorage.removeItem("brandId"); // 【保留】登入時仍需 brandId，登出時一併清除
-  // 確保我們不會在 index.html 頁面還一直重複導向
-    if (!window.location.pathname.endsWith("/login.html")) {
-        window.location.href = "login.html";  }
-}
+    try {
+        const response = await fetch(url, { ...options, headers });
 
-// --------------------------------------------------
-// 匯出 (export) 我們的函式，讓其他 JS 檔案可以使用
-// --------------------------------------------------
+        if (response.status === 401) {
+            console.error("Token 失效 (401)，自動登出");
+            logout(); // 呼叫 auth.js 的登出
+            return;
+        }
+
+        return response;
+    } catch (error) {
+        console.error("API 請求失敗:", error);
+        throw error;
+    }
+}
 
 /**
  * 取得 POS 商品列表

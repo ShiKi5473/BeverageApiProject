@@ -12,12 +12,16 @@ import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import tw.niels.beverage_api_project.security.BrandContextHolder;
+
+import java.util.Collections;
 
 @Component
 public class JwtAuthChannelInterceptor implements ChannelInterceptor {
@@ -71,6 +75,22 @@ public class JwtAuthChannelInterceptor implements ChannelInterceptor {
                         accessor.setUser(authentication); // 附加到 STOMP Session
 
                         BrandContextHolder.clear();
+                    } else if ("GUEST".equals(userType)) {
+                        // 【新增】訪客邏輯
+                        // 1. 建立一個簡單的權限
+                        SimpleGrantedAuthority authority = new SimpleGrantedAuthority("ROLE_GUEST");
+
+                        // 2. 建立 Spring Security 的 User 物件 (不查資料庫)
+                        // username 這裡是 "GUEST:UUID"
+                        User guestUser = new User(username, "", Collections.singletonList(authority));
+
+                        // 3. 建立 Authentication Token
+                        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                                guestUser, null, guestUser.getAuthorities());
+
+                        // 4. 設定 Context
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                        accessor.setUser(authentication);
                     }
                 } catch (Exception e) {
                     logger.warn("WebSocket 認證失敗: {}", e.getMessage());

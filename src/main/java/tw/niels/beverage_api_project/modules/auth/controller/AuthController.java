@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
 import tw.niels.beverage_api_project.common.constants.ApiPaths;
+import tw.niels.beverage_api_project.modules.auth.dto.GuestLoginRequestDto;
 import tw.niels.beverage_api_project.modules.auth.dto.JwtAuthResponseDto;
 import tw.niels.beverage_api_project.modules.auth.dto.LoginRequestDto;
 import tw.niels.beverage_api_project.modules.auth.service.AuthService;
@@ -50,5 +51,14 @@ public class AuthController {
             logger.warn("登入失敗 (帳號: {}): {}", loginRequestDto.getUsername(), e.getMessage());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("登入失敗：帳號、密碼或品牌不正確。");
         }
+    }
+
+    @PostMapping("/guest")
+    @Operation(summary = "訪客登入", description = "訪客輸入暱稱，獲取臨時 JWT Token 以加入即時互動")
+    public ResponseEntity<JwtAuthResponseDto> guestLogin(@RequestBody @Valid GuestLoginRequestDto requestDto) {
+        // 使用 record 的存取方式： requestDto.displayName()
+        logger.info("收到訪客登入請求: {}", requestDto.displayName());
+        JwtAuthResponseDto jwtAuthResponseDto = authService.guestLogin(requestDto);
+        return ResponseEntity.ok(jwtAuthResponseDto);
     }
 }

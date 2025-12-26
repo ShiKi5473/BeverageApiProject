@@ -1,6 +1,7 @@
 package tw.niels.beverage_api_project.security.jwt;
 
 import java.util.Date;
+import java.util.UUID;
 
 import javax.crypto.SecretKey;
 
@@ -86,7 +87,43 @@ public class JwtTokenProvider {
             return tokenBuilder
                     .signWith(key) // 使用密鑰簽名
                     .compact(); // 壓縮成最終的令牌字串
-        }
+    }
+
+    /**
+     * 生成訪客專用的 JWT 令牌。
+     *
+     * @param displayName 訪客顯示名稱
+     * @return 訪客 JWT 令牌
+     */
+    public String generateGuestToken(String displayName) {
+        Date currentDate = new Date();
+        Date expireDate = new Date(currentDate.getTime() + jwtExpirationInMs);
+
+        // 產生一個隨機的 ID 作為 Subject，避免重複
+        String guestId = "GUEST:" + UUID.randomUUID().toString();
+
+        return Jwts.builder()
+                .subject(guestId)
+                .issuedAt(currentDate)
+                .expiration(expireDate)
+                .claim("type", "GUEST")        // 標記為訪客類型
+                .claim("name", displayName)    // 存入顯示名稱
+                .signWith(key)
+                .compact();
+    }
+
+    /**
+     * 從 Token 取得顯示名稱 (用於訪客)
+     */
+    public String getNameFromJWT(String token) {
+        Claims claims = Jwts.parser()
+                .verifyWith(key)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+        // 如果是訪客 Token，name 存在 claim 裡；如果是正式會員，通常 name 也在，或直接用 Subject
+        return claims.get("name", String.class);
+    }
 
     /**
      * 從 JWT 令牌中提取使用者名稱。

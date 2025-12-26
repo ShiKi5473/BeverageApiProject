@@ -6,6 +6,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+import tw.niels.beverage_api_project.modules.auth.dto.GuestLoginRequestDto;
 import tw.niels.beverage_api_project.modules.auth.dto.JwtAuthResponseDto;
 import tw.niels.beverage_api_project.modules.auth.dto.LoginRequestDto;
 import tw.niels.beverage_api_project.security.AppUserDetails;
@@ -21,6 +22,16 @@ public class AuthService {
                        JwtTokenProvider tokenProvider) {
         this.authenticationManager = authenticationManager;
         this.tokenProvider = tokenProvider;
+    }
+
+    /**
+     * 訪客登入
+     */
+    public JwtAuthResponseDto guestLogin(GuestLoginRequestDto requestDto) {
+        // 使用 record 的存取方式： requestDto.displayName() (沒有 get)
+        String token = tokenProvider.generateGuestToken(requestDto.displayName());
+
+        return new JwtAuthResponseDto(token);
     }
 
     public JwtAuthResponseDto login(LoginRequestDto loginRequestDto) {
