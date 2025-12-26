@@ -29,7 +29,6 @@ import tw.niels.beverage_api_project.modules.product.service.OptionGroupService;
 
 @RestController
 @RequestMapping(value = ApiPaths.API_V1 + ApiPaths.BRANDS, produces = MediaType.APPLICATION_JSON_VALUE)
-@PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER')") // 僅管理員可設定
 @Tag(name = "Product Options", description = "商品客製化選項管理 (甜度、冰塊、加料)")
 public class OptionGroupController {
 
@@ -44,6 +43,7 @@ public class OptionGroupController {
 
     // 建立選項群組 (例如: 甜度)
     @PostMapping("/option-groups")
+    @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER')") // 僅管理員可設定
     @Operation(summary = "建立選項群組", description = "例如建立「甜度」、「冰塊」或「加料」群組") // 【新增】
     public ResponseEntity<OptionGroupResponseDto> createOptionGroup(
             @Valid @RequestBody CreateOptionGroupRequestDto requestDto) {
@@ -54,7 +54,7 @@ public class OptionGroupController {
 
     // 取得品牌的所有選項群組
     @GetMapping("/option-groups")
-    @Operation(summary = "取得品牌所有選項群組", description = "列出該品牌下定義的所有客製化選項群組及其內容") // 【新增】
+    @Operation(summary = "取得品牌所有選項群組", description = "列出該品牌下定義的所有客製化選項群組及其內容")
     public ResponseEntity<List<OptionGroupResponseDto>> getOptionGroupsByBrand() {
         Long brandId = this.helperService.getCurrentBrandId();
         List<OptionGroup> groups = optionGroupService.getOptionGroupsByBrand(brandId);

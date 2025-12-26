@@ -1,5 +1,6 @@
 package tw.niels.beverage_api_project.modules.user.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import tw.niels.beverage_api_project.modules.user.entity.User;
 import tw.niels.beverage_api_project.modules.user.entity.profile.StaffProfile;
@@ -10,15 +11,32 @@ import tw.niels.beverage_api_project.modules.user.enums.StaffRole;
  * 這是根據最新的 User + StaffProfile 架構設計的。
  */
 @Data
+@Schema(description = "員工資訊回應")
 public class StaffDto {
-    private Long userId; // 使用 User 的 ID
-    private String primaryPhone; // 登入帳號，來自 User
-    private String fullName; // 員工姓名，來自 StaffProfile
-    private StaffRole role; // 員工角色，來自 StaffProfile
-    private boolean isActive; // 帳號狀態，來自 User
-    private Long storeId; // 店家 ID，來自 StaffProfile
-    private String storeName; // 店家名稱，來自 StaffProfile
-    private Long brandId; // 品牌 ID，來自 User
+
+    @Schema(description = "使用者 ID", example = "10")
+    private Long userId;
+
+    @Schema(description = "登入帳號 (手機)", example = "0912345678")
+    private String primaryPhone;
+
+    @Schema(description = "員工姓名", example = "王小明")
+    private String fullName;
+
+    @Schema(description = "員工職位", example = "STAFF")
+    private StaffRole role;
+
+    @Schema(description = "帳號是否啟用", example = "true")
+    private boolean isActive;
+
+    @Schema(description = "所屬分店 ID", example = "1")
+    private Long storeId;
+
+    @Schema(description = "所屬分店名稱", example = "台北信義店")
+    private String storeName;
+
+    @Schema(description = "所屬品牌 ID", example = "1")
+    private Long brandId;
 
     /**
      * 靜態工廠方法，用於將 User 實體轉換為 StaffDto。

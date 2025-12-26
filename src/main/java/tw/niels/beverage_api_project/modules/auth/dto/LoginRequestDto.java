@@ -11,7 +11,7 @@ import lombok.Setter;
 @Schema(description = "使用者登入請求資訊")
 public class LoginRequestDto {
     @NotEmpty
-    @Schema(description = "使用者帳號 (手機號碼)", example = "0912345678")
+    @Schema(description = "使用者帳號 (手機號碼)", example = "0988888888")
     private String username; // 對應到 User 的 primaryPhone
 
     @NotEmpty

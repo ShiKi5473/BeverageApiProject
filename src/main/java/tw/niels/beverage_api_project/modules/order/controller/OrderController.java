@@ -102,6 +102,7 @@ public class OrderController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
+    @Operation(summary = "查詢訂單列表", description = "根據分店 ID 與訂單狀態篩選訂單")
     public ResponseEntity<List<OrderResponseDto>> getOrders(
             @RequestParam Long storeId,
             @RequestParam(required = false) OrderStatus status) {
@@ -118,6 +119,7 @@ public class OrderController {
 
     @GetMapping("/{orderId}")
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
+    @Operation(summary = "查詢訂單詳情", description = "取得單一訂單的完整資訊")
     public ResponseEntity<OrderResponseDto> getOrderDetails(@PathVariable Long orderId) {
         Long brandId = this.helperService.getCurrentBrandId();
         Order order = orderService.getOrderDetails(brandId, orderId);
@@ -127,6 +129,7 @@ public class OrderController {
     @PatchMapping("/{orderId}/status")
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
     @Audit(action = "UPDATE_ORDER_STATUS")
+    @Operation(summary = "更新訂單狀態", description = "手動更改訂單狀態 (如: 製作中 -> 可取餐)")
     public ResponseEntity<OrderResponseDto> updateOrderStatus(
             @PathVariable Long orderId,
             @Valid @RequestBody UpdateOrderStatusDto requestDto) {
@@ -138,6 +141,7 @@ public class OrderController {
     @PutMapping("/{orderId}")
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
     @Audit(action = "UPDATE_HELD_ORDER")
+    @Operation(summary = "更新暫存訂單", description = "更新 HELD 狀態的訂單內容 (如: 顧客修改品項)")
     public ResponseEntity<OrderResponseDto> updateHeldOrder(
             @PathVariable Long orderId,
             @Valid @RequestBody CreateOrderRequestDto createOrderRequestDto) {
@@ -152,6 +156,7 @@ public class OrderController {
 
     @PatchMapping("/{orderId}/checkout")
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
+    @Operation(summary = "訂單結帳付款", description = "對已建立的訂單進行付款結帳動作")
     public ResponseEntity<OrderResponseDto> processOrderPayment(
             @PathVariable Long orderId,
             @Valid @RequestBody ProcessPaymentRequestDto requestDto) {
@@ -163,6 +168,7 @@ public class OrderController {
     @PatchMapping("/{orderId}/accept")
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
     @Audit(action = "ACCEPT_ORDER")
+    @Operation(summary = "接受訂單", description = "將訂單從 AWAITING_ACCEPTANCE 轉為 PREPARING")
     public ResponseEntity<OrderResponseDto> acceptOrder(@PathVariable Long orderId) {
         Long brandId = this.helperService.getCurrentBrandId();
         Order updatedOrder = orderService.acceptOrder(brandId, orderId);
