@@ -91,7 +91,7 @@ public class InventoryReportService {
                 // A. 飲品本體配方
                 // 暫時解法：假設 Product 只有一個 "Default Variant"
                 // 正確做法應在 OrderItem 記錄 variantId (Phase 5 優化)
-                List<ProductVariant> variants = productVariantRepository.findByProduct_Brand_IdAndProduct_Id(brandId, productId);
+                List<ProductVariant> variants = productVariantRepository.findByProduct_Brand_IdAndProduct_IdAndIsDeletedFalse(brandId, productId);
                 if (!variants.isEmpty()) {
                     Long variantId = variants.getFirst().getId(); // 取第一個
                     List<Recipe> recipes = variantRecipeMap.getOrDefault(variantId, Collections.emptyList());

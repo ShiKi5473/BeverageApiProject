@@ -27,4 +27,7 @@ public class ProductVariant extends BaseTsidEntity {
     @Column(name = "sku_code", length = 50)
     private String skuCode;
 
+    @Column(name = "is_deleted", nullable = false)
+    private boolean isDeleted = false;
+
 }

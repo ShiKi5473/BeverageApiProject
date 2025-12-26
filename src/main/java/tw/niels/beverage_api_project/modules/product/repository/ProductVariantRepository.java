@@ -12,15 +12,16 @@ import java.util.Optional;
 public interface ProductVariantRepository extends JpaRepository<ProductVariant, Long> {
 
     /**
-     * 查詢指定品牌、指定商品的所有規格
-     * 路徑：ProductVariant -> Product -> Brand
+     * 查詢指定品牌、指定商品的所有「未刪除」規格
+     * 修改：增加 AndIsDeletedFalse
      */
-    List<ProductVariant> findByProduct_Brand_IdAndProduct_Id(Long brandId, Long productId);
+    List<ProductVariant> findByProduct_Brand_IdAndProduct_IdAndIsDeletedFalse(Long brandId, Long productId);
 
     /**
-     * 查詢指定品牌下的單一規格 (安全查詢)
+     * 查詢指定品牌下的單一「未刪除」規格
+     * 修改：增加 AndIsDeletedFalse
      */
-    Optional<ProductVariant> findByProduct_Brand_IdAndId(Long brandId, Long id);
+    Optional<ProductVariant> findByProduct_Brand_IdAndIdAndIsDeletedFalse(Long brandId, Long id);
 
     // --- 安全防護：禁用預設不分租戶的查詢方法 ---
 

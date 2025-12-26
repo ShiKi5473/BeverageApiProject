@@ -173,4 +173,116 @@ public class ProductService {
     private ProductResponseDto convertToDto(Product product) {
         return ProductResponseDto.fromEntity(product);
     }
+
+    /**
+     * 新增單一規格
+     */
+    @Transactional
+    @CacheEvict(value = {"product-summary", "product-pos"}, key = "#brandId")
+    public ProductResponseDto addProductVariant(Long brandId, Long productId, CreateProductVariantDto requestDto) {
+        Product product = productRepository.findByBrand_IdAndId(brandId, productId)
+                .orElseThrow(() -> new ResourceNotFoundException("找不到商品，ID：" + productId));
+
+        ProductVariant variant = new ProductVariant();
+        variant.setName(requestDto.name());
+        variant.setPrice(requestDto.price());
+        variant.setSkuCode(requestDto.skuCode());
+        variant.setDeleted(false); // 確保預設為未刪除
+
+        // 建立關聯
+        product.addVariant(variant);
+
+        // 更新商品 Base Price (若新規格價格更低)
+        if (product.getBasePrice() == null || variant.getPrice().compareTo(product.getBasePrice()) < 0) {
+            product.setBasePrice(variant.getPrice());
+        }
+
+        productRepository.save(product); // 會 Cascade save variant
+
+        return ProductResponseDto.fromEntity(product);
+    }
+
+    /**
+     * 更新規格
+     * 修改：更新後自動重新計算商品 BasePrice
+     */
+    @Transactional
+    @CacheEvict(value = {"product-summary", "product-pos"}, key = "#brandId")
+    public void updateProductVariant(Long brandId, Long variantId, UpdateProductVariantDto requestDto) {
+        ProductVariant variant = productVariantRepository.findByProduct_Brand_IdAndIdAndIsDeletedFalse(brandId, variantId)
+                .orElseThrow(() -> new ResourceNotFoundException("找不到規格或已刪除，ID：" + variantId));
+
+        boolean priceChanged = false;
+
+        variant.setName(requestDto.name());
+
+        if (requestDto.price() != null && requestDto.price().compareTo(variant.getPrice()) != 0) {
+            variant.setPrice(requestDto.price());
+            priceChanged = true;
+        }
+
+        variant.setSkuCode(requestDto.skuCode());
+
+        productVariantRepository.save(variant); // 先儲存變更
+
+        // 若價格有變動，重新計算該商品的 BasePrice
+        if (priceChanged) {
+            recalculateProductBasePrice(variant.getProduct());
+        }
+    }
+
+    /**
+     * 軟刪除規格
+     * 修改：刪除後自動重新計算商品 BasePrice
+     */
+    @Transactional
+    @CacheEvict(value = {"product-summary", "product-pos"}, key = "#brandId")
+    public void deleteProductVariant(Long brandId, Long variantId) {
+        ProductVariant variant = productVariantRepository.findByProduct_Brand_IdAndIdAndIsDeletedFalse(brandId, variantId)
+                .orElseThrow(() -> new ResourceNotFoundException("找不到規格或已刪除，ID：" + variantId));
+
+        // 檢查是否為該商品的最後一個有效規格
+        long activeVariantsCount = productVariantRepository
+                .findByProduct_Brand_IdAndProduct_IdAndIsDeletedFalse(brandId, variant.getProduct().getId())
+                .size();
+
+        if (activeVariantsCount <= 1) {
+            throw new BadRequestException("無法刪除：商品必須至少保留一個有效規格");
+        }
+
+        // 執行軟刪除
+        variant.setDeleted(true);
+        productVariantRepository.save(variant); // 先儲存刪除狀態
+
+        // 重新計算該商品的 BasePrice (因為刪除的可能是最低價規格)
+        recalculateProductBasePrice(variant.getProduct());
+    }
+
+    // --- Private Helper Methods ---
+
+    /**
+     * 重新計算並更新商品的 BasePrice
+     * 邏輯：找出所有「未刪除」的規格，取最低價更新回 Product
+     */
+    private void recalculateProductBasePrice(Product product) {
+        // 1. 查詢該商品目前所有的有效規格
+        List<ProductVariant> activeVariants = productVariantRepository
+                .findByProduct_Brand_IdAndProduct_IdAndIsDeletedFalse(product.getBrand().getId(), product.getId());
+
+        if (activeVariants.isEmpty()) {
+            return; // 理論上因刪除防護機制，不會走到這裡
+        }
+
+        // 2. 找出最低價格
+        BigDecimal minPrice = activeVariants.stream()
+                .map(ProductVariant::getPrice)
+                .min(BigDecimal::compareTo)
+                .orElse(product.getBasePrice());
+
+        // 3. 如果計算出的最低價與目前 BasePrice 不同，則更新並儲存
+        if (product.getBasePrice().compareTo(minPrice) != 0) {
+            product.setBasePrice(minPrice);
+            productRepository.save(product);
+        }
+    }
 }

@@ -9,23 +9,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
 import tw.niels.beverage_api_project.common.constants.ApiPaths;
 import tw.niels.beverage_api_project.common.service.ControllerHelperService;
-import tw.niels.beverage_api_project.modules.product.dto.CategoryResponseDto;
-import tw.niels.beverage_api_project.modules.product.dto.CreateCategoryRequestDto;
-import tw.niels.beverage_api_project.modules.product.dto.CreateProductRequestDto;
-import tw.niels.beverage_api_project.modules.product.dto.ProductPosDto;
-import tw.niels.beverage_api_project.modules.product.dto.ProductResponseDto;
-import tw.niels.beverage_api_project.modules.product.dto.ProductSummaryDto;
+import tw.niels.beverage_api_project.modules.product.dto.*;
 import tw.niels.beverage_api_project.modules.product.entity.Category;
 import tw.niels.beverage_api_project.modules.product.entity.Product;
 import tw.niels.beverage_api_project.modules.product.service.CategoryService;
@@ -108,6 +97,37 @@ public class ProductController {
                 .map(CategoryResponseDto::fromEntity)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(dtos);
+    }
+
+    @PostMapping(ApiPaths.PRODUCTS + "/{productId}/variants")
+    @PreAuthorize("hasRole('BRAND_ADMIN')")
+    @Operation(summary = "新增商品規格", description = "為現有商品增加新的規格 (如：特大杯)")
+    public ResponseEntity<ProductResponseDto> addProductVariant(
+            @PathVariable Long productId,
+            @Valid @RequestBody CreateProductVariantDto requestDto) {
+        Long brandId = this.helperService.getCurrentBrandId();
+        ProductResponseDto updatedProduct = productService.addProductVariant(brandId, productId, requestDto);
+        return ResponseEntity.status(HttpStatus.CREATED).body(updatedProduct);
+    }
+
+    @PutMapping(ApiPaths.PRODUCTS + "/variants/{variantId}")
+    @PreAuthorize("hasRole('BRAND_ADMIN')")
+    @Operation(summary = "更新商品規格", description = "修改規格名稱、價格或 SKU")
+    public ResponseEntity<Void> updateProductVariant(
+            @PathVariable Long variantId,
+            @Valid @RequestBody UpdateProductVariantDto requestDto) {
+        Long brandId = this.helperService.getCurrentBrandId();
+        productService.updateProductVariant(brandId, variantId, requestDto);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping(ApiPaths.PRODUCTS + "/variants/{variantId}")
+    @PreAuthorize("hasRole('BRAND_ADMIN')")
+    @Operation(summary = "刪除商品規格 (軟刪除)", description = "將規格標記為刪除，不會從資料庫物理移除。注意：商品至少需保留一個規格。")
+    public ResponseEntity<Void> deleteProductVariant(@PathVariable Long variantId) {
+        Long brandId = this.helperService.getCurrentBrandId();
+        productService.deleteProductVariant(brandId, variantId);
+        return ResponseEntity.noContent().build();
     }
 
 }
