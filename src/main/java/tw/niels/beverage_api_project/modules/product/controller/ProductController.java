@@ -50,8 +50,12 @@ public class ProductController {
     @Operation(summary = "建立新商品", description = "建立品牌下的新飲品資料")
     public ResponseEntity<ProductResponseDto> createProduct(@Valid @RequestBody CreateProductRequestDto requestDto) {
         Long brandId = this.helperService.getCurrentBrandId();
-        Product newProduct = productService.createProduct(brandId, requestDto);
-        return new ResponseEntity<>(ProductResponseDto.fromEntity(newProduct), HttpStatus.CREATED);
+
+        // 現在 productService.createProduct 直接回傳 ProductResponseDto
+        ProductResponseDto newProduct = productService.createProduct(brandId, requestDto);
+
+        // 直接回傳 newProduct，不需要再轉換
+        return new ResponseEntity<>(newProduct, HttpStatus.CREATED);
     }
 
     /**

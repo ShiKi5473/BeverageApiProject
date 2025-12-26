@@ -51,5 +51,14 @@ public class Product extends BaseTsidEntity {
     @JoinTable(name = "product_option_group_mappings", joinColumns = @JoinColumn(name = "product_id"), inverseJoinColumns = @JoinColumn(name = "group_id"))
     private Set<OptionGroup> optionGroups = new HashSet<>();
 
+    // 規格列表關聯
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private Set<ProductVariant> variants = new HashSet<>();
+
+    // Helper Method：方便加入 Variant 並維持雙向關聯
+    public void addVariant(ProductVariant variant) {
+        variants.add(variant);
+        variant.setProduct(this);
+    }
 
 }

@@ -2,9 +2,11 @@ package tw.niels.beverage_api_project.modules.product.dto;
 
 import java.math.BigDecimal;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -42,4 +44,7 @@ public class CreateProductRequestDto {
     @Schema(description = "關聯的客製化選項群組 ID 列表", example = "[10, 11]")
     private Set<Long> optionGroupIds = new HashSet<>();
 
+    @Valid
+    @Schema(description = "商品規格列表 (例如：中杯、大杯)")
+    private List<CreateProductVariantDto> variants;
 }

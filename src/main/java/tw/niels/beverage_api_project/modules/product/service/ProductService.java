@@ -1,5 +1,6 @@
 package tw.niels.beverage_api_project.modules.product.service;
 
+import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -14,9 +15,7 @@ import tw.niels.beverage_api_project.common.exception.BadRequestException;
 import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
 import tw.niels.beverage_api_project.modules.brand.entity.Brand;
 import tw.niels.beverage_api_project.modules.brand.repository.BrandRepository;
-import tw.niels.beverage_api_project.modules.product.dto.CreateProductRequestDto;
-import tw.niels.beverage_api_project.modules.product.dto.ProductPosDto;
-import tw.niels.beverage_api_project.modules.product.dto.ProductSummaryDto;
+import tw.niels.beverage_api_project.modules.product.dto.*;
 import tw.niels.beverage_api_project.modules.product.entity.Category;
 import tw.niels.beverage_api_project.modules.product.entity.OptionGroup;
 import tw.niels.beverage_api_project.modules.product.entity.Product;
@@ -52,7 +51,7 @@ public class ProductService {
      */
     @Transactional
     @CacheEvict(value = {"product-summary", "product-pos"}, key = "#brandId")
-    public Product createProduct(Long brandId, CreateProductRequestDto request) {
+    public ProductResponseDto createProduct(Long brandId, CreateProductRequestDto request) {
         Brand brand = brandRepository.findById(brandId)
                 .orElseThrow(() -> new RuntimeException("找不到品牌，ID：" + brandId));
 
@@ -84,19 +83,47 @@ public class ProductService {
         newProduct.setCategories(categories);
         newProduct.setOptionGroups(optionGroups);
 
+        if (request.getVariants() != null && !request.getVariants().isEmpty()) {
+            BigDecimal minPrice = null;
+
+            for (CreateProductVariantDto variantDto : request.getVariants()) {
+                ProductVariant variant = new ProductVariant();
+
+                // Record 取值直接用 .name() 而不是 .getName()
+                variant.setName(variantDto.name());
+                variant.setPrice(variantDto.price());
+                variant.setSkuCode(variantDto.skuCode());
+
+                // 利用 Entity 的 helper method 建立雙向關聯
+                newProduct.addVariant(variant);
+
+                // 計算最低價格
+                if (minPrice == null || variant.getPrice().compareTo(minPrice) < 0) {
+                    minPrice = variant.getPrice();
+                }
+            }
+            // 設定 Base Price 為最低規格價
+            newProduct.setBasePrice(minPrice);
+        } else {
+            // 🛑 防呆策略：如果沒傳規格，是否要建立一個預設規格？
+            // 建議：若前端沒傳 variants，強制建立一個 "預設" 規格，避免後續 Recipe 關聯出錯
+            if (request.getBasePrice() == null) {
+                throw new BadRequestException("若未指定規格，則必須填寫基本售價");
+            }
+
+            ProductVariant defaultVariant = new ProductVariant();
+            defaultVariant.setName("常規"); // 或與商品同名
+            defaultVariant.setPrice(request.getBasePrice());
+            defaultVariant.setSkuCode(null);
+
+            newProduct.addVariant(defaultVariant);
+            newProduct.setBasePrice(request.getBasePrice());
+        }
+
+        // 4. 儲存 (Cascade 會一併儲存 Variants)
         Product savedProduct = productRepository.save(newProduct);
 
-        // 4. 【新增邏輯】自動建立預設規格 (Variant)
-        // 為了相容舊系統與簡化操作，預設建立一個名為 "標準" 的規格
-        ProductVariant defaultVariant = new ProductVariant();
-        defaultVariant.setProduct(savedProduct);
-        defaultVariant.setName("標準"); // 或使用 "預設", "Regular"
-        defaultVariant.setPrice(request.getBasePrice()); // 預設價格 = 商品基本價
-        // defaultVariant.setSkuCode(...); // 未來可加入自動生成 SKU 邏輯
-
-        productVariantRepository.save(defaultVariant);
-
-        return savedProduct;
+        return convertToDto(savedProduct);
     }
 
     /**
@@ -141,5 +168,9 @@ public class ProductService {
         return products.stream()
                 .map(ProductPosDto::fromEntity)
                 .collect(Collectors.toList());
+    }
+
+    private ProductResponseDto convertToDto(Product product) {
+        return ProductResponseDto.fromEntity(product);
     }
 }
