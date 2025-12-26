@@ -6,5 +6,6 @@ public record ProductSnapshot(
         Long productId,
         String name,
         BigDecimal basePrice,
-        String categoryName
+        String categoryName,
+        String variantName
 ) {}

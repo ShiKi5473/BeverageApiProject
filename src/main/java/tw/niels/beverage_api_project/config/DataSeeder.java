@@ -19,11 +19,13 @@ import tw.niels.beverage_api_project.modules.inventory.repository.PurchaseShipme
 import tw.niels.beverage_api_project.modules.product.entity.OptionGroup;
 import tw.niels.beverage_api_project.modules.product.entity.Product;
 import tw.niels.beverage_api_project.modules.product.entity.ProductOption;
+import tw.niels.beverage_api_project.modules.product.entity.ProductVariant;
 import tw.niels.beverage_api_project.modules.product.enums.ProductStatus;
 import tw.niels.beverage_api_project.modules.product.enums.SelectionType;
 import tw.niels.beverage_api_project.modules.product.repository.OptionGroupRepository;
 import tw.niels.beverage_api_project.modules.product.repository.ProductOptionRepository;
 import tw.niels.beverage_api_project.modules.product.repository.ProductRepository;
+import tw.niels.beverage_api_project.modules.product.repository.ProductVariantRepository;
 import tw.niels.beverage_api_project.modules.store.entity.Store;
 import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
 import tw.niels.beverage_api_project.modules.user.entity.User;
@@ -48,6 +50,7 @@ public class DataSeeder implements CommandLineRunner {
     private final ProductRepository productRepository;
     private final OptionGroupRepository optionGroupRepository;
     private final ProductOptionRepository productOptionRepository;
+    private final ProductVariantRepository productVariantRepository;
     private final PasswordEncoder passwordEncoder;
     private final InventoryItemRepository inventoryItemRepository;
     private final InventoryBatchRepository inventoryBatchRepository;
@@ -59,6 +62,7 @@ public class DataSeeder implements CommandLineRunner {
                       ProductRepository productRepository,
                       OptionGroupRepository optionGroupRepository,
                       ProductOptionRepository productOptionRepository,
+                      ProductVariantRepository productVariantRepository,
                       PasswordEncoder passwordEncoder,
                       InventoryItemRepository inventoryItemRepository,
                       InventoryBatchRepository inventoryBatchRepository,
@@ -68,6 +72,7 @@ public class DataSeeder implements CommandLineRunner {
         this.storeRepository = storeRepository;
         this.productRepository = productRepository;
         this.optionGroupRepository = optionGroupRepository;
+        this.productVariantRepository = productVariantRepository;
         this.productOptionRepository = productOptionRepository;
         this.passwordEncoder = passwordEncoder;
         this.inventoryItemRepository = inventoryItemRepository;
@@ -141,7 +146,7 @@ public class DataSeeder implements CommandLineRunner {
         }
 
         // ==========================================
-        // 4. 建立選項群組與選項 (【本次修正重點】)
+        // 4. 建立選項群組與選項
         // ==========================================
 
         // --- 4.1 甜度 ---
@@ -227,8 +232,35 @@ public class DataSeeder implements CommandLineRunner {
             productRepository.save(product);
         }
 
-        // 確保 Variant 存在 (配合 V9 新架構)
-        // 您之後可能需要在此處補上 ProductVariant 的 Seeder 邏輯
+        // ==========================================
+        // 5.1 建立商品規格 (Product Variants)
+        // ==========================================
+
+        // 建立 "中杯" (ID: 1)
+        productVariantRepository.findByProduct_Brand_IdAndId(brand.getId(), 1L)
+                .orElseGet(() -> {
+                    ProductVariant v = new ProductVariant();
+                    v.setId(1L); // 明確指定 ID 方便測試
+                    v.setProduct(product);
+                    v.setName("中杯");
+                    v.setPrice(new BigDecimal("30.00"));
+                    v.setSkuCode("TEA-M");
+                    v.setDeleted(false);
+                    return productVariantRepository.save(v);
+                });
+
+        // 建立 "大杯" (ID: 2)
+        productVariantRepository.findByProduct_Brand_IdAndId(brand.getId(), 2L)
+                .orElseGet(() -> {
+                    ProductVariant v = new ProductVariant();
+                    v.setId(2L); // 明確指定 ID 方便測試
+                    v.setProduct(product);
+                    v.setName("大杯");
+                    v.setPrice(new BigDecimal("40.00"));
+                    v.setSkuCode("TEA-L");
+                    v.setDeleted(false);
+                    return productVariantRepository.save(v);
+                });
 
         // ==========================================
         // 6. 建立庫存資料 (【本次修正重點】)
