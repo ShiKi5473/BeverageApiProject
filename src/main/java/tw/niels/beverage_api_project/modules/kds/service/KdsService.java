@@ -9,6 +9,8 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import tw.niels.beverage_api_project.config.RabbitConfig;
 import tw.niels.beverage_api_project.modules.kds.dto.KdsOrderDto;
@@ -75,9 +77,11 @@ public class KdsService {
      * 【第一步】監聽本地事件 (Local Event Listener)
      * 觸發來源：OrderMessageConsumer, OrderService 等
      * 動作：決定 Action 並「廣播」到 RabbitMQ
+     * Update: 改用 @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+     * 確保只有在 DB 事務提交成功後，才發送通知，避免 Race Condition。
      */
     @Async
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleOrderStateChange(OrderStateChangedEvent event) {
         Order order = event.order();
         if (order.getStore() == null) return;
