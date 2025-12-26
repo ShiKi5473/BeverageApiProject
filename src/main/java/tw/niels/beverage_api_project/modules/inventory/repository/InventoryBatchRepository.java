@@ -12,6 +12,7 @@ import tw.niels.beverage_api_project.modules.inventory.entity.InventoryBatch;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Repository
 public interface InventoryBatchRepository extends JpaRepository<InventoryBatch, Long> {
@@ -32,6 +33,11 @@ public interface InventoryBatchRepository extends JpaRepository<InventoryBatch, 
             "ORDER BY b.expiryDate ASC")
     List<InventoryBatch> findAvailableBatchesForUpdate(@Param("storeId") Long storeId,
                                                        @Param("itemId") Long itemId);
+
+    // 批次查詢多個 Item 的可用批次 (用於 performAudit)
+    @Query("SELECT b FROM InventoryBatch b WHERE b.store.id = :storeId AND b.inventoryItem.id IN :itemIds AND b.currentQuantity > 0 ORDER BY b.expiryDate ASC")
+    List<InventoryBatch> findAvailableBatchesForItems(@Param("storeId") Long storeId, @Param("itemIds") Set<Long> itemIds);
+
 
     /**
      * 查詢某店某商品的總庫存量

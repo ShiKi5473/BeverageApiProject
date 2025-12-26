@@ -12,6 +12,7 @@ import tw.niels.beverage_api_project.modules.inventory.entity.InventoryItem;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Repository
 public interface InventoryItemRepository extends JpaRepository<InventoryItem, Long> {
@@ -30,6 +31,11 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, Lo
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT i FROM InventoryItem i WHERE i.id = :id AND i.brand.id = :brandId")
     Optional<InventoryItem> findByBrandIdAndIdForUpdate(@Param("brandId") Long brandId, @Param("id") Long id);
+
+    //  批次鎖定查詢，用於大量扣庫存時防止競爭與死鎖
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT i FROM InventoryItem i WHERE i.brand.id = :brandId AND i.id IN :ids")
+    List<InventoryItem> findByBrandIdAndIdInForUpdate(@Param("brandId") Long brandId, @Param("ids") Set<Long> ids);
 
     // 安全的單筆查詢
     Optional<InventoryItem> findByBrand_IdAndId(Long brandId, Long id);

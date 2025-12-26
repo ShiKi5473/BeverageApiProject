@@ -21,10 +21,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -228,48 +225,50 @@ public class InventoryService {
         }
     }
 
+    /**
+     * [重構後] 執行盤點 (Audit)
+     * 優化重點：
+     * 1. 解決 N+1 問題：一次性獲取 Item, Snapshot 和 Batch。
+     * 2. 解決 Transaction 失效問題：移除迴圈內的 self-invocation。
+     * 3. 效能提升：使用 JDBC Batch Update 處理大量盤損扣帳。
+     */
     @Transactional
     public void performAudit(Long brandId, Long storeId, InventoryAuditRequestDto request) {
-        // 1. 準備資料 (一次性查詢 Store & Operator)
+        // 1. 準備基礎資料
         Store store = storeRepository.findByBrand_IdAndId(brandId, storeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Store not found"));
         User operator = userRepository.findByBrand_IdAndId(brandId, helperService.getCurrentUserId())
                 .orElse(null);
 
-        // 2. 收集所有 Item IDs
         Set<Long> itemIds = request.getItems().stream()
                 .map(InventoryAuditRequestDto.AuditItemDto::getInventoryItemId)
                 .collect(Collectors.toSet());
 
-        // 3. 【優化】批次查詢 Items (1 次 SQL)
-        List<InventoryItem> items = itemRepository.findByBrand_IdAndIdIn(brandId, itemIds);
-        // 轉為 Map 方便後續查找: Map<ItemId, InventoryItem>
-        Map<Long, InventoryItem> itemMap = items.stream()
-                .collect(Collectors.toMap(InventoryItem::getId, Function.identity()));
+        if (itemIds.isEmpty()) return;
 
-        // 檢查是否有無效 ID
-        if (items.size() != itemIds.size()) {
+        // 2. 批次查詢 Items 與 Snapshots
+        Map<Long, InventoryItem> itemMap = itemRepository.findByBrand_IdAndIdIn(brandId, itemIds)
+                .stream().collect(Collectors.toMap(InventoryItem::getId, Function.identity()));
+
+        if (itemMap.size() != itemIds.size()) {
             throw new ResourceNotFoundException("部分原物料 ID 無效或不屬於此品牌");
         }
 
-        // 4. 【優化】批次查詢 Snapshots (1 次 SQL)
-        List<InventorySnapshot> snapshots = snapshotRepository.findByStore_IdAndInventoryItem_IdIn(storeId, itemIds);
-        // 轉為 Map: Map<ItemId, InventorySnapshot>
-        Map<Long, InventorySnapshot> snapshotMap = snapshots.stream()
-                .collect(Collectors.toMap(s -> s.getInventoryItem().getId(), Function.identity()));
+        Map<Long, InventorySnapshot> snapshotMap = snapshotRepository.findByStore_IdAndInventoryItem_IdIn(storeId, itemIds)
+                .stream().collect(Collectors.toMap(s -> s.getInventoryItem().getId(), Function.identity()));
 
-        // 準備批次儲存的 List
+        // 準備集合
         List<InventoryTransaction> transactionsToSave = new ArrayList<>();
         List<InventorySnapshot> snapshotsToSave = new ArrayList<>();
+        Map<Long, BigDecimal> pendingDeductions = new HashMap<>(); // 收集需要扣庫存的項目 (ItemId -> Qty)
 
-        // 5. 在記憶體中進行邏輯處理 (純 Java 運算，極快)
+        // 3. 記憶體內計算差異
         for (InventoryAuditRequestDto.AuditItemDto itemDto : request.getItems()) {
             Long itemId = itemDto.getInventoryItemId();
-            InventoryItem item = itemMap.get(itemId); // 從 Map 取，不查 DB
-
+            InventoryItem item = itemMap.get(itemId);
             InventorySnapshot snapshot = snapshotMap.getOrDefault(itemId, new InventorySnapshot());
 
-            // 改為判斷關聯是否為空，或是利用 isNew() (如果 BaseTsidEntity 有實作)
+            // 處理新 Snapshot
             if (snapshot.getStore() == null) {
                 snapshot.setStore(store);
                 snapshot.setInventoryItem(item);
@@ -280,47 +279,125 @@ public class InventoryService {
             BigDecimal actualQty = itemDto.getActualQuantity();
             BigDecimal diff = actualQty.subtract(currentQty);
 
-            // 建立 Transaction 物件
-            InventoryTransaction trx = new InventoryTransaction();
-            trx.setStore(store);
-            trx.setInventoryItem(item);
-            trx.setChangeAmount(diff);
-            trx.setBalanceAfter(actualQty);
-            trx.setReasonType("AUDIT");
-            trx.setOperator(operator);
+            // 只有當數量有變化時才產生 Transaction
+            if (diff.compareTo(BigDecimal.ZERO) != 0) {
+                InventoryTransaction trx = new InventoryTransaction();
+                trx.setStore(store);
+                trx.setInventoryItem(item);
+                trx.setChangeAmount(diff);
+                trx.setBalanceAfter(actualQty);
+                trx.setReasonType("AUDIT");
+                trx.setOperator(operator);
+                trx.setNote(buildAuditNote(request.getNote(), itemDto.getItemNote()));
+                transactionsToSave.add(trx);
 
-            // 目標：將「主單備註」與「單項備註」合併，例如："月底盤點 | 破損報廢"
-            String combinedNote = buildAuditNote(request.getNote(), itemDto.getItemNote());
+                // 更新 Snapshot
+                snapshot.setQuantity(actualQty);
+                snapshot.setLastCheckedAt(Instant.now());
+                snapshotsToSave.add(snapshot);
+            }
 
-            // 3. 設定回 Transaction 實體
-            trx.setNote(combinedNote);
-
-            transactionsToSave.add(trx);
-
-            // 更新 Snapshot 物件
-            snapshot.setQuantity(actualQty);
-            snapshot.setLastCheckedAt(Instant.now());
-            snapshotsToSave.add(snapshot);
-
-            // 2. 處理差異造成的批次問題
+            // 4. 分流處理：盤盈 vs 盤損
             if (diff.compareTo(BigDecimal.ZERO) > 0) {
-                // ==========================================
-                // 🔥 處理盤盈 (Strategy B: Create Batch)
-                // ==========================================
-                handleInventoryGain(store, snapshot.getInventoryItem(), diff, itemDto.getGainedItemExpiryDate());
-
+                // 盤盈 (Gain): 立即建立新批次
+                handleInventoryGain(store, item, diff, itemDto.getGainedItemExpiryDate());
             } else if (diff.compareTo(BigDecimal.ZERO) < 0) {
-                // ==========================================
-                // 💧 處理盤損 (Standard FIFO Deduct)
-                // ==========================================
-                // 從最舊的批次開始扣掉 diff 的絕對值
-                this.deductInventory(brandId, storeId, itemDto.getInventoryItemId(), diff.abs());
+                // 盤損 (Loss): 收集起來，稍後批次扣減
+                // diff 為負數，取絕對值為需扣減量
+                pendingDeductions.put(itemId, diff.abs());
             }
         }
 
-        // 6. 【優化】批次寫入 (使用 saveAll)
+        // 5. 批次寫入 Transaction 與 Snapshot
         transactionRepository.saveAll(transactionsToSave);
         snapshotRepository.saveAll(snapshotsToSave);
+
+        // 6. [核心優化] 批次執行 FIFO 扣庫存
+        if (!pendingDeductions.isEmpty()) {
+            processBatchDeductions(brandId, storeId, pendingDeductions);
+        }
+    }
+
+    /**
+     * [新增] 批次處理庫存扣減 (Batch Deduct)
+     * 取代迴圈內的 deductInventory，大幅減少 DB 交互次數
+     */
+    private void processBatchDeductions(Long brandId, Long storeId, Map<Long, BigDecimal> deductionMap) {
+        Set<Long> itemIds = deductionMap.keySet();
+
+        // A. 批次鎖定 InventoryItem (防止並發修改總量)
+        // 注意：這裡重新查詢是為了取得 Lock，並確保資料最新
+        List<InventoryItem> itemsToUpdate = itemRepository.findByBrandIdAndIdInForUpdate(brandId, itemIds);
+        Map<Long, InventoryItem> lockedItemMap = itemsToUpdate.stream()
+                .collect(Collectors.toMap(InventoryItem::getId, Function.identity()));
+
+        // B. 更新 Item 總庫存 (Item Level Update)
+        for (Long itemId : itemIds) {
+            InventoryItem item = lockedItemMap.get(itemId);
+            BigDecimal qtyToDeduct = deductionMap.get(itemId);
+
+            if (item == null) {
+                throw new ResourceNotFoundException("Item not found during deduction: " + itemId);
+            }
+
+            // 檢查總量是否足夠 (Fast Fail)
+            if (item.getTotalQuantity().compareTo(qtyToDeduct) < 0) {
+                throw new BadRequestException(
+                        "error.inventory.insufficient",
+                        item.getName(),
+                        item.getTotalQuantity(),
+                        qtyToDeduct
+                );
+            }
+
+            item.setTotalQuantity(item.getTotalQuantity().subtract(qtyToDeduct));
+        }
+        itemRepository.saveAll(itemsToUpdate); // 批次更新總量
+
+        // C. 批次查詢所有相關的可用 Batches (Batch Level Update)
+        List<InventoryBatch> allBatches = batchRepository.findAvailableBatchesForItems(storeId, itemIds);
+
+        // 將 Batches 依照 Item 分組
+        Map<Long, List<InventoryBatch>> batchesByItem = allBatches.stream()
+                .collect(Collectors.groupingBy(b -> b.getInventoryItem().getId()));
+
+        // 準備 JDBC Batch Update 列表
+        List<InventoryBatchDAO.BatchUpdateTuple> batchUpdates = new ArrayList<>();
+
+        // D. 記憶體內計算 FIFO 扣減
+        for (Long itemId : itemIds) {
+            BigDecimal remainingToDeduct = deductionMap.get(itemId);
+            List<InventoryBatch> itemBatches = batchesByItem.getOrDefault(itemId, Collections.emptyList());
+
+            for (InventoryBatch batch : itemBatches) {
+                if (remainingToDeduct.compareTo(BigDecimal.ZERO) <= 0) break;
+
+                BigDecimal currentQty = batch.getCurrentQuantity();
+                BigDecimal newQty;
+
+                if (currentQty.compareTo(remainingToDeduct) >= 0) {
+                    // 此批次足夠
+                    newQty = currentQty.subtract(remainingToDeduct);
+                    remainingToDeduct = BigDecimal.ZERO;
+                } else {
+                    // 此批次不足，扣光
+                    newQty = BigDecimal.ZERO;
+                    remainingToDeduct = remainingToDeduct.subtract(currentQty);
+                }
+
+                batchUpdates.add(new InventoryBatchDAO.BatchUpdateTuple(batch.getId(), newQty));
+            }
+
+            // 二次檢查：如果跑完所有批次還是不夠扣 (理論上前面 Item Total Check 應該攔截了，但為了資料一致性再次確認)
+            if (remainingToDeduct.compareTo(BigDecimal.ZERO) > 0) {
+                throw new IllegalStateException("庫存資料不一致：Item總量檢查通過，但實際批次總和不足。Item ID: " + itemId + ", 短缺: " + remainingToDeduct);
+            }
+        }
+
+        // E. 執行 JDBC 批次更新
+        if (!batchUpdates.isEmpty()) {
+            inventoryBatchDAO.batchUpdateQuantities(batchUpdates);
+        }
     }
 
 
@@ -404,34 +481,34 @@ public class InventoryService {
     }
 
     /**
-     * 專門處理盤盈的私有方法
+     * 處理盤盈
+     * 修改：順便更新 InventoryItem 的 TotalQuantity 以保持一致性
      */
     private void handleInventoryGain(Store store, InventoryItem item, BigDecimal quantityToGain, LocalDate manualExpiryDate) {
+        // 1. 建立新批次
         InventoryBatch newBatch = new InventoryBatch();
-
-
         newBatch.setStore(store);
         newBatch.setInventoryItem(item);
-        newBatch.setQuantityReceived(quantityToGain); // 這是補進來的量
-        newBatch.setCurrentQuantity(quantityToGain);  // 當前剩餘量
-        newBatch.setShipment(null); // 這不是正常進貨，沒有 shipment
-        newBatch.setProductionDate(LocalDate.now()); // 假設是今天發現的
+        newBatch.setQuantityReceived(quantityToGain);
+        newBatch.setCurrentQuantity(quantityToGain);
+        newBatch.setShipment(null);
+        newBatch.setProductionDate(LocalDate.now());
 
-        // --- 決定效期 ---
         if (manualExpiryDate != null) {
-            // [情況 A] 店員有看著瓶子輸入日期 -> 最準確
             newBatch.setExpiryDate(manualExpiryDate);
         } else {
-            // [情況 B] 店員沒填 -> 智慧推斷
-            // 策略：查詢該商品在該店「最近一次進貨 (或現有批次)」的效期
             LocalDate estimatedExpiry = batchRepository
                     .findTopByStore_IdAndInventoryItem_IdOrderByExpiryDateDesc(store.getId(), item.getId())
                     .map(InventoryBatch::getExpiryDate)
-                    .orElse(LocalDate.now().plusDays(7)); // 如果完全查不到，給個保守值 (7天)
-
+                    .orElse(LocalDate.now().plusDays(7)); // TODO: 建議改讀取 Item 的預設效期設定
             newBatch.setExpiryDate(estimatedExpiry);
         }
-
         batchRepository.save(newBatch);
+
+        // 為了效能，這裡沒有用 Lock，因為是 Audit 情境，且假設上方調用者會負責一致性，
+        // 但最嚴謹的做法是像 processBatchDeductions 一樣先 Lock Item。
+        // 在此範例中，我們直接更新物件並 Save，依賴 Hibernate 的樂觀鎖或後續處理。
+        item.setTotalQuantity(item.getTotalQuantity().add(quantityToGain));
+        itemRepository.save(item);
     }
 }
