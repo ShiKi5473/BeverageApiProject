@@ -12,7 +12,7 @@ import {
 
 // 狀態變數
 let revenueChartInstance = null;
-let rankingChartInstance = null; // 改名：因為可能是商品排行，也可能是分店排行
+let rankingChartInstance = null;
 
 document.addEventListener("DOMContentLoaded", async () => {
     // 1. 初始化 Navbar

@@ -3,10 +3,10 @@ import '@material/web/labs/card/filled-card.js';
 import '@material/web/button/filled-button.js';
 
 import { getOrdersByStatus, updateOrderStatus } from "./api.js";
-// 【修改 1】移除 WebSocket 的 import
-// import { connectToWebSocket } from "./ws-client.js";
+import { getAccessToken, getStoreId } from './auth.js';
 
-const MY_STORE_ID = localStorage.getItem("storeId");
+
+const MY_STORE_ID = getStoreId();
 
 document.addEventListener("DOMContentLoaded", () => {
     if (!MY_STORE_ID) {
@@ -48,7 +48,7 @@ document.addEventListener("DOMContentLoaded", () => {
      * 【修改 2】啟動 SSE 連線 (取代 startWebSocket)
      */
     function startSse() {
-        const token = localStorage.getItem("accessToken");
+        const token = getAccessToken();
         if (!token) {
             console.error("SSE 啟動失敗：找不到 Token");
             return;

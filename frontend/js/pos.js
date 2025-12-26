@@ -17,6 +17,7 @@ import {
     getOrdersByStatus,
     updateOrderStatus // 雖然 pos.js 主要用來顯示待取餐，但如果需要在這頁完成取餐也需要這個
 } from "./api.js";
+import { getAccessToken, logout, getStoreId } from './auth.js';
 import { createProductCard } from "./components/ProductCard.js";
 import { createOptionsModalContent } from "./components/OptionsModal.js";
 import { createCartItem, updateCartTotal } from "./components/Cart.js";
@@ -28,7 +29,7 @@ let allProducts = [];
 let shoppingCart = [];
 let currentModal = null;
 
-const MY_STORE_ID = localStorage.getItem("storeId");
+const MY_STORE_ID = getStoreId()
 
 const optionsDialog = document.getElementById("options-dialog");
 const dialogContentSlot = document.getElementById("dialog-content-slot");
@@ -40,7 +41,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const errorMsg = "錯誤：找不到店家 ID (storeId)。\n\n品牌管理員帳號無法使用 POS 點餐系統。\n\n將導回登入頁。";
         console.error(errorMsg);
         alert(errorMsg);
-        window.location.href = "login.html";
+        logout();
         return;
     }
 
@@ -53,12 +54,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const cartTotalAmount = document.getElementById("cart-total-amount");
     const pickupListEl = document.getElementById("pickup-list");
 
-    const handleLogout = () => {
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("brandId");
-        window.location.href = "login.html";
-    };
-    const navbar = createNavbar("POS 點餐系統", handleLogout);
+    const navbar = createNavbar("POS 點餐系統", logout);
     posLayout.insertBefore(navbar, mainContent);
 
     // ... (holdOrder, goToCheckout, loadAllData, renderCategoryList, renderProducts 函式保持不變) ...
@@ -298,7 +294,7 @@ document.addEventListener("DOMContentLoaded", () => {
      * 【修改 2】啟動 SSE 連線 (取代 WebSocket)
      */
     function startSse() {
-        const token = localStorage.getItem("accessToken");
+        const token = getAccessToken();
         if (!token) return;
 
         // 使用與 kds.js 相同的 SSE 端點

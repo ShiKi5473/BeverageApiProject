@@ -1,5 +1,6 @@
 import '@material/web/iconbutton/icon-button.js';
 import '@material/web/icon/icon.js';
+import { logout } from '../auth.js';
 
 /**
  * 建立一個可複用的導覽列元件 (標準 HTML <header> 版本)

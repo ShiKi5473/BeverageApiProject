@@ -7,8 +7,8 @@
 const TOKEN_KEY = "accessToken";
 const ROLE_KEY = "userRole";
 const NAME_KEY = "displayName";
-const BRAND_KEY = "brandId"; // 品牌 ID 也歸類在此管理
-const STORE_KEY = "storeId"; // 分店 ID
+const BRAND_KEY = "brandId";
+const STORE_KEY = "storeId";
 
 /**
  * 儲存登入工作階段 (Session)
@@ -63,4 +63,28 @@ export function logout() {
     if (!window.location.pathname.endsWith("login.html")) {
         window.location.href = "/pages/login.html"; // 請確認您的路徑結構
     }
+}
+
+/**
+ * 取得使用者角色
+ * @returns {string|null} e.g., "ROLE_STAFF"
+ */
+export function getUserRole() {
+    return localStorage.getItem(ROLE_KEY);
+}
+
+/**
+ * 取得目前分店 ID
+ * @returns {string|null}
+ */
+export function getStoreId() {
+    return localStorage.getItem(STORE_KEY);
+}
+
+/**
+ * 取得目前品牌 ID
+ * @returns {string|null}
+ */
+export function getBrandId() {
+    return localStorage.getItem(BRAND_KEY);
 }
