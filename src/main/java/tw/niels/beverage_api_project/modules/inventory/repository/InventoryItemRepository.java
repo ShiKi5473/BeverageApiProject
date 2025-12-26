@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Repository;
 import tw.niels.beverage_api_project.modules.inventory.entity.InventoryItem;
@@ -13,6 +14,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.math.BigDecimal;
 
 @Repository
 public interface InventoryItemRepository extends JpaRepository<InventoryItem, Long> {
@@ -23,6 +25,14 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, Lo
 
     // 一次查詢多個 ID
     List<InventoryItem> findByBrand_IdAndIdIn(Long brandId, Collection<Long> ids);
+
+    /**
+     * 原子性更新總庫存 (增加)
+     * 使用 @Modifying 直接在資料庫執行 UPDATE，避免並發寫入衝突
+     */
+    @Modifying
+    @Query("UPDATE InventoryItem i SET i.totalQuantity = i.totalQuantity + :amount WHERE i.id = :id")
+    void increaseTotalQuantity(@Param("id") Long id, @Param("amount") BigDecimal amount);
 
     /**
      * 取得原物料並加寫入鎖 (SELECT FOR UPDATE)

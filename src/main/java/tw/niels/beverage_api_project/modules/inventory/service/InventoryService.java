@@ -505,10 +505,6 @@ public class InventoryService {
         }
         batchRepository.save(newBatch);
 
-        // 為了效能，這裡沒有用 Lock，因為是 Audit 情境，且假設上方調用者會負責一致性，
-        // 但最嚴謹的做法是像 processBatchDeductions 一樣先 Lock Item。
-        // 在此範例中，我們直接更新物件並 Save，依賴 Hibernate 的樂觀鎖或後續處理。
-        item.setTotalQuantity(item.getTotalQuantity().add(quantityToGain));
-        itemRepository.save(item);
+        itemRepository.increaseTotalQuantity(item.getId(), quantityToGain);
     }
 }
