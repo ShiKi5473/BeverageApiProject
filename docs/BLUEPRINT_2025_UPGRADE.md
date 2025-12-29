@@ -115,7 +115,7 @@
 *目標：升級通訊協定，實作技術亮點功能。*
 
 ### 7.1 後端基礎建設 (Backend Infrastructure) - ✅ 已完成
-* [x] **啟用 STOMP**：配置 `WebSocketConfig` 與端點 `/ws-kds`。
+* [x] **啟用 STOMP**：配置 `WebSocketConfig` 與端點 `/ws-kds`，作為未來互動功能的底層協議。。
 * [x] **安全性整合**：實作 `JwtAuthChannelInterceptor` 攔截 WebSocket 連線並驗證 Token。
 * [x] **主動推播邏輯**：整合 `SimpMessagingTemplate` 至 `OrderMessageConsumer`，在訂單寫入成功後推播至 `/user/queue/orders`。
 
@@ -125,15 +125,16 @@
 * [ ] **UI 通知**：在收到 `ORDER_CREATED` 訊息時顯示 Toast 或 Alert 通知使用者。
 
 ### 7.3 線上揪團功能 (Group Ordering)
-* **邏輯設計**：
-    - [ ] 實作「揪團房間」邏輯，利用 Redis Hash 儲存房間狀態。
+* **技術定位**：明確採用 WebSocket 實現複雜的雙向互動邏輯（如：同步購物車、參與者狀態、即時金額分攤）。
+  * [ ] 房間邏輯設計：實作「揪團房間」機制，利用 Redis Hash 儲存房間內成員與商品狀態。
+  * [ ] 前端整合：升級 `ws-client.js` 以支援揪團房間的頻道訂閱。
 
 ---
 
 ## 8. 🎨 階段七：前端生態系補完 (Frontend Ecosystem Completion) 
 *目標：為強大的後端功能提供對應的視覺化操作介面，完善使用者體驗 (UX)。*
 
-### 8.1 智慧庫存作業 (Smart Inventory UI) - 🔥 最高優先 (Priority)
+### 8.1 智慧庫存作業 (Smart Inventory UI)
 * **對應後端**：Phase 4 (Inventory Audit) & Phase 5 (Waste Analysis)
 * **執行計畫**：
     - [X] **盤點作業 App (Mobile-first)**：

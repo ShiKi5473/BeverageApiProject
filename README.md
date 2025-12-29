@@ -27,13 +27,38 @@
 * **進貨履歷與食安追溯**：保留 `InventoryBatch` 作為進貨履歷，支援食安效期追溯。
 
 ### 3. 即時互動與非同步 (Real-time & Async)
-* **事件驅動 KDS**：訂單狀態變更時發布 Domain Event，透過 **RabbitMQ** 廣播，並利用 **SSE (Server-Sent Events)** 推送至廚房螢幕，無需輪詢。
-* **非同步審計日誌**：關鍵操作 (如手動扣庫存、修改權限) 透過 AOP 攔截，並以 `@Async` 非同步寫入 **MongoDB**，實現操作軌跡全記錄。
+* **WebSocket & SSE 雙重推播**：
+    * **KDS 端**：透過 SSE 即時接收訂單變更。
+    * **消費者端**：透過 WebSocket (STOMP) 接收個人訂單狀態通知。
+* **非同步訂單處理**：整合 RabbitMQ 實現線上訂單削峰填谷，解耦 API 響應與訂單寫入邏輯。
+* **非同步審計日誌**：使用 AOP 攔截關鍵操作並非同步寫入 MongoDB。
 
 ### 4. 可靠性與效能 (Reliability & Performance)
 * **分散式鎖**：使用 **ShedLock** 確保排程任務 (如日結報表) 在叢集環境中單一執行。
 * **資料一致性**：庫存扣減採用 `PESSIMISTIC_WRITE` 悲觀鎖，經 **K6** 壓力測試驗證，在高併發搶購場景下無超賣。
 * **檔案分片上傳**：整合 **MinIO** 物件儲存，支援大檔案分片上傳與斷點續傳。
+
+---
+
+
+## 🖥️ 系統介面與功能模組 (Frontend Pages)
+
+### 本專案提供全方位的前端操作介面，涵蓋從點餐到後台管理的全流程：
+* **登入系統(`login.html`)**：
+  * 支援品牌員工登入。
+* **POS 點餐收銀(`pos.html`)**：
+  * 商品分類瀏覽與高度客製化選項（甜度、冰塊、加料）選擇。
+  * 即時購物車管理與金額計算。
+* **結帳與支付 (`checkout.html`)**：
+  * 支援會員點數抵扣。
+* **KDS 廚房顯示系統(`kds.html`)**：
+  * 即時接收新訂單通知（透過 SSE）。
+  * 視覺化訂單卡片管理，支援狀態一鍵切換（製作中、待取餐）。
+* **智慧庫存盤點 (`inventory_audit.html`)**：
+  * 進貨與盤盈虧管理：整合批次進貨（含效期記錄）與盤點差異分析。
+* **營運報表看板 (`report.html`)**：
+  * 整合 ECharts，提供營收統計、熱門商品及庫存損耗分析圖表。
+
 
 ---
 
@@ -139,6 +164,6 @@ k6 run tests/k6/scenarios/inventory_stress.js
 
 - [x] Phase 3: 非同步與效能 (RabbitMQ, MinIO, MongoDB Audit, K6)
 
-- [ ] Phase 4: 即時互動 (WebSocket 線上揪團) - Next Step
+- [X] Phase 4: 即時互動 (WebSocket 線上揪團)
 
 - [ ] Phase 5: 微服務拆分
