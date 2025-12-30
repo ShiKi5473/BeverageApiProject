@@ -12,16 +12,18 @@ services:
       - SPRING_RABBITMQ_HOST=rabbitmq
       - MINIO_ENDPOINT=http://minio:9000
       - ZIPKIN_ENDPOINT=http://zipkin:9411/api/v2/spans
+      - SPRING_DATA_MONGODB_URI=mongodb://mongoadmin:mongoadmin@mongo:27017/beverage_audit_db?authSource=admin
     depends_on:
       - postgres
       - redis
       - rabbitmq
       - minio
+      - mongo
 
   postgres:
     image: postgres:17.5
     ports:
-      - "5473:5432"
+      - "5474:5432"
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=password
