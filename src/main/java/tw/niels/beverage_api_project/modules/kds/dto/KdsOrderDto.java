@@ -1,5 +1,7 @@
 package tw.niels.beverage_api_project.modules.kds.dto;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import tw.niels.beverage_api_project.modules.order.entity.Order;
@@ -20,6 +22,7 @@ import java.util.stream.Collectors;
 @NoArgsConstructor // 生成無參數建構子 (Jackson 反序列化必備)
 public class KdsOrderDto {
 
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long orderId;
     private String orderNumber;
     private OrderStatus status;
@@ -50,6 +53,7 @@ public class KdsOrderDto {
     @Data
     @NoArgsConstructor
     public static class KdsOrderItemDto {
+        @JsonSerialize(using = ToStringSerializer.class)
         private Long orderItemId;
         private String productName;
         private Integer quantity;

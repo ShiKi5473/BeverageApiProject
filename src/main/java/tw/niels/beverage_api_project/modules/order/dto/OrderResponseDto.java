@@ -1,5 +1,7 @@
 package tw.niels.beverage_api_project.modules.order.dto;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import tw.niels.beverage_api_project.modules.order.entity.Order;
@@ -16,12 +18,14 @@ import java.util.stream.Collectors;
 public class OrderResponseDto {
 
     @Schema(description = "訂單 ID", example = "1001")
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long orderId;
 
     @Schema(description = "訂單編號 (流水號)", example = "1-20231020-0001")
     private String orderNumber;
 
     @Schema(description = "分店 ID", example = "1")
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long storeId;
 
     @Schema(description = "會員 ID", example = "5")
@@ -67,9 +71,11 @@ public class OrderResponseDto {
     @Schema(description = "訂單內單一品項資訊")
     public static class OrderItemResponseDto {
         @Schema(description = "訂單品項 ID", example = "501")
+        @JsonSerialize(using = ToStringSerializer.class)
         private Long orderItemId;
 
         @Schema(description = "商品 ID", example = "101")
+        @JsonSerialize(using = ToStringSerializer.class)
         private Long productId;
 
         @Schema(description = "商品名稱", example = "珍珠奶茶")
@@ -95,6 +101,7 @@ public class OrderResponseDto {
     @Schema(description = "已選選項資訊")
     public static class OptionResponseDto {
         @Schema(description = "選項 ID", example = "20")
+        @JsonSerialize(using = ToStringSerializer.class)
         private Long optionId;
 
         @Schema(description = "選項名稱", example = "半糖")

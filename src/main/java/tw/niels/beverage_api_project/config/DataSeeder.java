@@ -36,6 +36,7 @@ import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.Set;
 
 @Component
@@ -83,10 +84,10 @@ public class DataSeeder implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) throws Exception {
-        seedDataForK6Testing();
+        seedData();
     }
 
-    private void seedDataForK6Testing() {
+    private void seedData() {
         // ==========================================
         // 1. 建立品牌 (修正：優先檢查名稱，避免 Unique Constraint 衝突)
         // ==========================================
@@ -120,93 +121,56 @@ public class DataSeeder implements CommandLineRunner {
             return storeRepository.save(s);
         });
 
-        // 3. 建立或更新店員帳號
-        User staffUser = userRepository.findByPrimaryPhoneAndBrandId("0911111111", brand.getId())
-                .orElseGet(() -> {
-                    User user = new User();
-                    user.setBrand(brand);
-                    user.setPrimaryPhone("0911111111");
-                    user.setPasswordHash(passwordEncoder.encode("password123"));
-                    user.setIsActive(true);
+        // ==========================================
+        // 3. 建立各角色測試帳號 (修正：為所有 StaffRole 建立帳號)
+        // ==========================================
 
-                    StaffProfile profile = new StaffProfile();
-                    profile.setFullName("K6 測試員");
-                    profile.setEmployeeNumber("K6-001");
-                    profile.setRole(StaffRole.MANAGER);
-                    profile.setStore(store);
-                    user.setStaffProfile(profile);
+        // 3.1 BRAND_ADMIN (品牌管理員)
+        createSeededUser(brand, store, "0900000001", "測試品牌管理員", StaffRole.BRAND_ADMIN, "ADMIN-001");
 
-                    return userRepository.save(user);
-                });
+        // 3.2 MANAGER (店經理) - 保留原本號碼 0911111111 供相容性
+        User staffUser = createSeededUser(brand, store, "0911111111", "K6 測試員(店長)", StaffRole.MANAGER, "MANAGER-001");
 
-        if (!passwordEncoder.matches("password123", staffUser.getPasswordHash())) {
-            staffUser.setPasswordHash(passwordEncoder.encode("password123"));
-            userRepository.save(staffUser);
-            logger.info("DataSeeder: 已更新測試帳號密碼: 0911111111");
-        }
+        // 3.3 STAFF (一般店員)
+        createSeededUser(brand, store, "0900000003", "測試店員", StaffRole.STAFF, "STAFF-001");
+
+        // 3.4 TESTER (測試人員)
+        createSeededUser(brand, store, "0900000004", "測試人員", StaffRole.TESTER, "TESTER-001");
 
         // ==========================================
         // 4. 建立選項群組與選項
         // ==========================================
+// --- 4.1 甜度 (單選) ---
+        OptionGroup sugarGroup = createOptionGroup(brand, 10L, "甜度", SelectionType.SINGLE, 1);
 
-        // --- 4.1 甜度 ---
-        OptionGroup sugarGroup = optionGroupRepository.findByBrand_IdAndName(brand.getId(), "甜度")
-                .orElseGet(() -> optionGroupRepository.findByBrand_IdAndId(brand.getId(), 10L)
-                        .map(existing -> {
-                            existing.setName("甜度");
-                            return optionGroupRepository.save(existing);
-                        })
-                        .orElseGet(() -> {
-                            OptionGroup g = new OptionGroup();
-                            g.setId(10L);
-                            g.setBrand(brand);
-                            g.setName("甜度");
-                            g.setSelectionType(SelectionType.SINGLE);
-                            g.setSortOrder(1);
-                            return optionGroupRepository.save(g);
-                        }));
+        // 建立甜度選項
+        createOption(sugarGroup, 11L, "全糖", BigDecimal.ZERO, false);
+        createOption(sugarGroup, 12L, "少糖", BigDecimal.ZERO, false);
+        createOption(sugarGroup, 13L, "半糖", BigDecimal.ZERO, true);  // 預設
+        createOption(sugarGroup, 14L, "微糖", BigDecimal.ZERO, false);
+        createOption(sugarGroup, 15L, "無糖", BigDecimal.ZERO, false);
 
-        // 建立 "半糖" 選項 (檢查邏輯不變，因為 Option 沒有 Unique Name Constraint)
-        if (productOptionRepository.findByOptionGroup_Brand_IdAndId(brand.getId(), 11L).isEmpty()) {
-            ProductOption opt = new ProductOption();
-            opt.setId(11L);
-            opt.setOptionGroup(sugarGroup);
-            opt.setOptionName("半糖");
-            opt.setPriceAdjustment(BigDecimal.ZERO);
-            opt.setDefault(false);
-            productOptionRepository.save(opt);
-        }
+        // --- 4.2 冰塊 (單選) ---
+        OptionGroup iceGroup = createOptionGroup(brand, 20L, "冰塊", SelectionType.SINGLE, 2);
 
-        // --- 4.2 冰塊 ---
-        OptionGroup iceGroup = optionGroupRepository.findByBrand_IdAndName(brand.getId(), "冰塊")
-                .orElseGet(() -> optionGroupRepository.findByBrand_IdAndId(brand.getId(), 20L)
-                        .map(existing -> {
-                            existing.setName("冰塊");
-                            return optionGroupRepository.save(existing);
-                        })
-                        .orElseGet(() -> {
-                            OptionGroup g = new OptionGroup();
-                            g.setId(20L);
-                            g.setBrand(brand);
-                            g.setName("冰塊");
-                            g.setSelectionType(SelectionType.SINGLE);
-                            g.setSortOrder(2);
-                            return optionGroupRepository.save(g);
-                        }));
+        // 建立冰塊選項
+        createOption(iceGroup, 21L, "正常冰", BigDecimal.ZERO, false);
+        createOption(iceGroup, 22L, "少冰", BigDecimal.ZERO, true);    // 預設
+        createOption(iceGroup, 23L, "微冰", BigDecimal.ZERO, false);
+        createOption(iceGroup, 24L, "去冰", BigDecimal.ZERO, false);
+        createOption(iceGroup, 25L, "溫", BigDecimal.ZERO, false);
+        createOption(iceGroup, 26L, "熱", BigDecimal.ZERO, false);
 
-        // 建立 "少冰" 選項
-        if (productOptionRepository.findByOptionGroup_Brand_IdAndId(brand.getId(), 21L).isEmpty()) {
-            ProductOption opt = new ProductOption();
-            opt.setId(21L);
-            opt.setOptionGroup(iceGroup);
-            opt.setOptionName("少冰");
-            opt.setPriceAdjustment(BigDecimal.ZERO);
-            opt.setDefault(false);
-            productOptionRepository.save(opt);
-        }
+        // --- 4.3 加料 (多選) ---
+        OptionGroup toppingGroup = createOptionGroup(brand, 30L, "加料", SelectionType.MULTIPLE, 3);
+
+        // 建立加料選項
+        createOption(toppingGroup, 31L, "珍珠", new BigDecimal("10.00"), false);
+        createOption(toppingGroup, 32L, "椰果", new BigDecimal("10.00"), false);
+
 
         // ==========================================
-        // 5. 建立商品 (【本次修正重點】)
+        // 5. 建立商品
         // ==========================================
         Product product = productRepository.findByBrand_IdAndName(brand.getId(), "招牌紅茶")
                 .orElseGet(() -> productRepository.findByBrand_IdAndId(brand.getId(), 1L)
@@ -222,16 +186,17 @@ public class DataSeeder implements CommandLineRunner {
                             p.setDescription("K6 測試專用商品");
                             p.setBasePrice(new BigDecimal("30.00"));
                             p.setStatus(ProductStatus.ACTIVE);
-                            // 注意：關聯會在下面處理
                             return productRepository.save(p);
                         }));
 
-        // 補上關聯
-        if (product.getOptionGroups() == null || product.getOptionGroups().isEmpty()) {
-            product.setOptionGroups(Set.of(sugarGroup, iceGroup));
-            productRepository.save(product);
-        }
+        // 更新商品關聯的選項群組 (加入加料群組)
+        Set<OptionGroup> productOptionGroups = new HashSet<>();
+        productOptionGroups.add(sugarGroup);
+        productOptionGroups.add(iceGroup);
+        productOptionGroups.add(toppingGroup);
 
+        product.setOptionGroups(productOptionGroups);
+        productRepository.save(product);
         // ==========================================
         // 5.1 建立商品規格 (Product Variants)
         // ==========================================
@@ -244,7 +209,7 @@ public class DataSeeder implements CommandLineRunner {
                     v.setProduct(product);
                     v.setName("中杯");
                     v.setPrice(new BigDecimal("30.00"));
-                    v.setSkuCode("TEA-M");
+                    v.setSkuCode("BLACK-TEA-M");
                     v.setDeleted(false);
                     return productVariantRepository.save(v);
                 });
@@ -257,13 +222,13 @@ public class DataSeeder implements CommandLineRunner {
                     v.setProduct(product);
                     v.setName("大杯");
                     v.setPrice(new BigDecimal("40.00"));
-                    v.setSkuCode("TEA-L");
+                    v.setSkuCode("BLACK-TEA-L");
                     v.setDeleted(false);
                     return productVariantRepository.save(v);
                 });
 
         // ==========================================
-        // 6. 建立庫存資料 (【本次修正重點】)
+        // 6. 建立庫存資料
         // ==========================================
 
         // 6-1. 原物料
@@ -310,5 +275,78 @@ public class DataSeeder implements CommandLineRunner {
         });
 
         logger.info("DataSeeder: 初始化資料完成！");
+    }
+
+    /**
+     * 建立或取得 OptionGroup
+     */
+    private OptionGroup createOptionGroup(Brand brand, Long id, String name, SelectionType type, int sortOrder) {
+        return optionGroupRepository.findByBrand_IdAndName(brand.getId(), name)
+                .orElseGet(() -> optionGroupRepository.findByBrand_IdAndId(brand.getId(), id)
+                        .map(existing -> {
+                            existing.setName(name);
+                            return optionGroupRepository.save(existing);
+                        })
+                        .orElseGet(() -> {
+                            OptionGroup g = new OptionGroup();
+                            g.setId(id);
+                            g.setBrand(brand);
+                            g.setName(name);
+                            g.setSelectionType(type);
+                            g.setSortOrder(sortOrder);
+                            return optionGroupRepository.save(g);
+                        }));
+    }
+
+    /**
+     * 建立或取得 ProductOption (不檢查名稱是否重複，若 ID 不存在則建立)
+     */
+    private void createOption(OptionGroup group, Long id, String name, BigDecimal price, boolean isDefault) {
+        // 為了避免重複建立同名選項，這裡簡單檢查一下：
+        // 如果該 ID 已存在，我們暫不更新內容 (避免覆蓋使用者修改)，若不存在則新增。
+        // 若希望強制更新名稱，可在此處修改邏輯。
+        if (productOptionRepository.findByOptionGroup_Brand_IdAndId(group.getBrand().getId(), id).isPresent()) {
+            return;
+        }
+
+        ProductOption opt = new ProductOption();
+        opt.setId(id);
+        opt.setOptionGroup(group);
+        opt.setOptionName(name);
+        opt.setPriceAdjustment(price);
+        opt.setDefault(isDefault);
+        productOptionRepository.save(opt);
+    }
+
+    /**
+     * 建立或更新指定角色的測試帳號
+     */
+    private User createSeededUser(Brand brand, Store store, String phone, String name, StaffRole role, String empNo) {
+        User user = userRepository.findByPrimaryPhoneAndBrandId(phone, brand.getId())
+                .orElseGet(() -> {
+                    User u = new User();
+                    u.setBrand(brand);
+                    u.setPrimaryPhone(phone);
+                    u.setPasswordHash(passwordEncoder.encode("password123"));
+                    u.setIsActive(true);
+
+                    StaffProfile profile = new StaffProfile();
+                    profile.setFullName(name);
+                    profile.setEmployeeNumber(empNo);
+                    profile.setRole(role);
+                    profile.setStore(store);
+                    u.setStaffProfile(profile);
+
+                    return userRepository.save(u);
+                });
+
+        // 強制檢查並重設密碼為 password123
+        if (!passwordEncoder.matches("password123", user.getPasswordHash())) {
+            user.setPasswordHash(passwordEncoder.encode("password123"));
+            user = userRepository.save(user);
+            logger.info("DataSeeder: 已更新測試帳號密碼: {} ({})", phone, role);
+        }
+
+        return user;
     }
 }

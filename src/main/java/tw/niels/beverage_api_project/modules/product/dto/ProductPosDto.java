@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import tw.niels.beverage_api_project.modules.product.entity.Product;
+import tw.niels.beverage_api_project.modules.product.entity.ProductVariant;
 
 @Data
 @NoArgsConstructor
@@ -22,6 +23,9 @@ public class ProductPosDto {
     @Schema(description = "基本價格", example = "50.00")
     private BigDecimal basePrice;
 
+    @Schema(description = "商品規格列表 (新增)", example = "[{id:1, name:'大杯', price:60}]")
+    private Set<ProductVariantDto> variants;
+
     @Schema(description = "選項群組 (POS 選單用)")
     private Set<OptionGroupResponseDto> optionGroups;
 
@@ -34,6 +38,15 @@ public class ProductPosDto {
         dto.setId(product.getId());
         dto.setName(product.getName());
         dto.setBasePrice(product.getBasePrice());
+
+        // 轉換規格資料
+        if (product.getVariants() != null) {
+            dto.setVariants(product.getVariants().stream()
+                    .filter(v -> !v.isDeleted()) // 排除已刪除的規格
+                    .map(ProductVariantDto::fromEntity)
+                    .collect(Collectors.toSet()));
+        }
+
         if (product.getOptionGroups() != null) {
             dto.setOptionGroups(product.getOptionGroups().stream().map(OptionGroupResponseDto::fromEntity).collect(Collectors.toSet()));
         }
@@ -41,5 +54,21 @@ public class ProductPosDto {
             dto.setCategories(product.getCategories().stream().map(CategoryBasicDto::fromEntity).collect(Collectors.toSet()));
         }
         return dto;
+    }
+
+    // 內部類別，用於傳輸簡單的規格資訊
+    @Data
+    public static class ProductVariantDto {
+        private Long id;
+        private String name;
+        private BigDecimal price;
+
+        public static ProductVariantDto fromEntity(ProductVariant variant) {
+            ProductVariantDto dto = new ProductVariantDto();
+            dto.setId(variant.getId());
+            dto.setName(variant.getName());
+            dto.setPrice(variant.getPrice());
+            return dto;
+        }
     }
 }
