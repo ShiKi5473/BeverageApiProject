@@ -23,7 +23,7 @@ public class ProductPosDto {
     @Schema(description = "基本價格", example = "50.00")
     private BigDecimal basePrice;
 
-    @Schema(description = "商品規格列表 (新增)", example = "[{id:1, name:'大杯', price:60}]")
+    @Schema(description = "商品規格列表", example = "[{id:1, name:'大杯', price:60}]")
     private Set<ProductVariantDto> variants;
 
     @Schema(description = "選項群組 (POS 選單用)")

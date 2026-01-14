@@ -7,6 +7,7 @@ import java.util.stream.Collectors;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import tw.niels.beverage_api_project.modules.product.entity.Product;
+import tw.niels.beverage_api_project.modules.product.entity.ProductVariant;
 import tw.niels.beverage_api_project.modules.product.enums.ProductStatus;
 
 @Data
@@ -37,6 +38,9 @@ public class ProductResponseDto {
     @Schema(description = "關聯的客製化選項群組")
     private Set<OptionGroupResponseDto> optionGroups;
 
+    @Schema(description = "商品規格列表", example = "[{id:1, name:'大杯', price:60}]")
+    private Set<ProductPosDto.ProductVariantDto> variants;
+
     public static ProductResponseDto fromEntity(Product product) {
         if (product == null) return null;
         ProductResponseDto dto = new ProductResponseDto();
@@ -59,5 +63,20 @@ public class ProductResponseDto {
                     .collect(Collectors.toSet()));
         }
         return dto;
+    }
+
+    @Data
+    public static class ProductVariantDto {
+        private Long id;
+        private String name;
+        private BigDecimal price;
+
+        public static ProductPosDto.ProductVariantDto fromEntity(ProductVariant variant) {
+            ProductPosDto.ProductVariantDto dto = new ProductPosDto.ProductVariantDto();
+            dto.setId(variant.getId());
+            dto.setName(variant.getName());
+            dto.setPrice(variant.getPrice());
+            return dto;
+        }
     }
 }
