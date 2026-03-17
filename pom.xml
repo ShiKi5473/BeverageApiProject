@@ -32,6 +32,7 @@
         <commons-lang3.version>3.18.0</commons-lang3.version>
         <logback.version>1.5.19</logback.version>
         <spring-framework.version>6.2.10</spring-framework.version>
+        <testcontainers.version>1.21.4</testcontainers.version>
     </properties>
 	<dependencies>
 
@@ -183,18 +184,21 @@
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>junit-jupiter</artifactId>
+            <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
 
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>postgresql</artifactId>
+            <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
 
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>rabbitmq</artifactId>
+            <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
 

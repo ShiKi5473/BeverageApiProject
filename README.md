@@ -84,6 +84,13 @@
 
 ---
 
+## 📜 程式碼規範 (Coding Standards)
+
+本專案遵循統一的開發規範，包含後端 Java、前端 JavaScript 及資料庫命名等準則。
+詳細規範請參閱：[docs/coding_standards.md](docs/coding_standards.md)
+
+---
+
 ## 📂 系統架構圖 (簡易)
 
 ```mermaid

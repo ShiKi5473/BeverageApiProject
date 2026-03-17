@@ -28,6 +28,12 @@ import java.util.stream.Collectors;
 @Service
 public class InventoryService {
 
+    private static final String REASON_TYPE_RESTOCK = "RESTOCK";
+    private static final String REASON_TYPE_AUDIT = "AUDIT";
+    private static final String SHIPMENT_NOTE_PREFIX = "進貨單號: ";
+    private static final String MSG_STORE_NOT_FOUND = "Store not found";
+    private static final String MSG_INSUFFICIENT_STOCK = "error.inventory.insufficient";
+
     private final InventoryItemRepository itemRepository;
     private final InventoryBatchRepository batchRepository;
     private final PurchaseShipmentRepository shipmentRepository;
@@ -64,7 +70,7 @@ public class InventoryService {
     @Transactional
     public PurchaseShipment addShipment(Long brandId, Long storeId, AddShipmentRequestDto request) {
         Store store = storeRepository.findByBrand_IdAndId(brandId, storeId)
-                .orElseThrow(() -> new ResourceNotFoundException("Store not found: " + storeId));
+                .orElseThrow(() -> new ResourceNotFoundException(MSG_STORE_NOT_FOUND));
 
         Long userId = helperService.getCurrentUserId();
         User staff = userRepository.findByBrand_IdAndId(brandId, userId)
@@ -142,9 +148,9 @@ public class InventoryService {
             trx.setInventoryItem(item);
             trx.setChangeAmount(itemDto.getQuantity());
             trx.setBalanceAfter(newQuantity);
-            trx.setReasonType("RESTOCK");
+            trx.setReasonType(REASON_TYPE_RESTOCK);
             trx.setOperator(staff);
-            trx.setNote("進貨單號: " + shipment.getId());
+            trx.setNote(SHIPMENT_NOTE_PREFIX + shipment.getId());
             transactionsToSave.add(trx);
         }
 
@@ -176,7 +182,7 @@ public class InventoryService {
         // 2. 檢查總庫存 (Fast Fail)
         if (item.getTotalQuantity().compareTo(quantityToDeduct) < 0) {
             throw new BadRequestException(
-                    "error.inventory.insufficient",
+                    MSG_INSUFFICIENT_STOCK,
                     item.getName(),
                     item.getTotalQuantity(),
                     quantityToDeduct
@@ -236,7 +242,7 @@ public class InventoryService {
     public void performAudit(Long brandId, Long storeId, InventoryAuditRequestDto request) {
         // 1. 準備基礎資料
         Store store = storeRepository.findByBrand_IdAndId(brandId, storeId)
-                .orElseThrow(() -> new ResourceNotFoundException("Store not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(MSG_STORE_NOT_FOUND));
         User operator = userRepository.findByBrand_IdAndId(brandId, helperService.getCurrentUserId())
                 .orElse(null);
 
@@ -262,7 +268,24 @@ public class InventoryService {
         List<InventorySnapshot> snapshotsToSave = new ArrayList<>();
         Map<Long, BigDecimal> pendingDeductions = new HashMap<>(); // 收集需要扣庫存的項目 (ItemId -> Qty)
 
-        // 3. 記憶體內計算差異
+        // 3. 記憶體內計算差異 (包含盤盈/盤損判斷)
+        calculateAuditDifferences(request, store, operator, itemMap, snapshotMap,
+                transactionsToSave, snapshotsToSave, pendingDeductions);
+
+        // 5. 批次寫入 Transaction 與 Snapshot
+        transactionRepository.saveAll(transactionsToSave);
+        snapshotRepository.saveAll(snapshotsToSave);
+
+        // 6. [核心優化] 批次執行 FIFO 扣庫存
+        if (!pendingDeductions.isEmpty()) {
+            processBatchDeductions(brandId, storeId, pendingDeductions);
+        }
+    }
+
+    private void calculateAuditDifferences(InventoryAuditRequestDto request, Store store, User operator,
+                                           Map<Long, InventoryItem> itemMap, Map<Long, InventorySnapshot> snapshotMap,
+                                           List<InventoryTransaction> transactionsToSave, List<InventorySnapshot> snapshotsToSave,
+                                           Map<Long, BigDecimal> pendingDeductions) {
         for (InventoryAuditRequestDto.AuditItemDto itemDto : request.getItems()) {
             Long itemId = itemDto.getInventoryItemId();
             InventoryItem item = itemMap.get(itemId);
@@ -286,7 +309,7 @@ public class InventoryService {
                 trx.setInventoryItem(item);
                 trx.setChangeAmount(diff);
                 trx.setBalanceAfter(actualQty);
-                trx.setReasonType("AUDIT");
+                trx.setReasonType(REASON_TYPE_AUDIT);
                 trx.setOperator(operator);
                 trx.setNote(buildAuditNote(request.getNote(), itemDto.getItemNote()));
                 transactionsToSave.add(trx);
@@ -303,18 +326,8 @@ public class InventoryService {
                 handleInventoryGain(store, item, diff, itemDto.getGainedItemExpiryDate());
             } else if (diff.compareTo(BigDecimal.ZERO) < 0) {
                 // 盤損 (Loss): 收集起來，稍後批次扣減
-                // diff 為負數，取絕對值為需扣減量
                 pendingDeductions.put(itemId, diff.abs());
             }
-        }
-
-        // 5. 批次寫入 Transaction 與 Snapshot
-        transactionRepository.saveAll(transactionsToSave);
-        snapshotRepository.saveAll(snapshotsToSave);
-
-        // 6. [核心優化] 批次執行 FIFO 扣庫存
-        if (!pendingDeductions.isEmpty()) {
-            processBatchDeductions(brandId, storeId, pendingDeductions);
         }
     }
 
@@ -343,7 +356,7 @@ public class InventoryService {
             // 檢查總量是否足夠 (Fast Fail)
             if (item.getTotalQuantity().compareTo(qtyToDeduct) < 0) {
                 throw new BadRequestException(
-                        "error.inventory.insufficient",
+                        MSG_INSUFFICIENT_STOCK,
                         item.getName(),
                         item.getTotalQuantity(),
                         qtyToDeduct

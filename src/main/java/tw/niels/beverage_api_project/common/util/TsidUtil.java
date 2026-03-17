@@ -1,6 +1,8 @@
 package tw.niels.beverage_api_project.common.util;
 
 import com.github.f4b6a3.tsid.TsidFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * TSID (Time-Sorted Unique Identifier) 生成工具類別。
@@ -10,6 +12,8 @@ import com.github.f4b6a3.tsid.TsidFactory;
  * </p>
  */
 public class TsidUtil {
+
+    private static final Logger logger = LoggerFactory.getLogger(TsidUtil.class);
 
     // 使用 volatile 確保多執行緒下的可見性，雖然通常只在啟動時設定一次
     private static volatile TsidFactory FACTORY = TsidFactory.builder()
@@ -29,7 +33,7 @@ public class TsidUtil {
                 .withNode(nodeId)
                 .build();
 
-        System.out.println("[TsidUtil] TSID Factory initialized with Node ID: " + nodeId);
+        logger.info("[TsidUtil] TSID Factory initialized with Node ID: {}", nodeId);
     }
 
     public static long nextId() {

@@ -6,16 +6,43 @@ import org.springframework.stereotype.Service;
 
 import tw.niels.beverage_api_project.common.exception.BadRequestException;
 import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
+import tw.niels.beverage_api_project.modules.store.entity.Store;
 import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
+import tw.niels.beverage_api_project.modules.user.entity.User;
+import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
 import tw.niels.beverage_api_project.security.AppUserDetails;
 
 @Service // 標註為 Spring Bean，使其可以被注入
 public class ControllerHelperService {
 
     private final StoreRepository storeRepository; // 新增欄位
+    private final UserRepository userRepository; // 新增欄位
 
-    public ControllerHelperService(StoreRepository storeRepository) {
+    public ControllerHelperService(StoreRepository storeRepository, UserRepository userRepository) {
         this.storeRepository = storeRepository;
+        this.userRepository = userRepository;
+    }
+
+    /**
+     * 獲取當前安全的所屬分店實體 (Safe Current Store)
+     * 並處理相應的防呆邏輯
+     */
+    public Store getSafeCurrentUserStore() {
+        Long brandId = getCurrentBrandId();
+        Long userId = getCurrentUserId();
+
+        User user = userRepository.findByBrand_IdAndId(brandId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("找不到當前登入的使用者資料"));
+
+        if (user.getStaffProfile() == null) {
+            throw new BadRequestException("非員工帳號或員工檔案缺失，無法執行與分店相關的操作");
+        }
+
+        Store store = user.getStaffProfile().getStore();
+        if (store == null) {
+            throw new BadRequestException("當前使用者不屬於任何分店，無法執行與分店相關的操作");
+        }
+        return store;
     }
 
     /**

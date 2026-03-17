@@ -55,24 +55,42 @@ public class ProductService {
         Brand brand = brandRepository.findById(brandId)
                 .orElseThrow(() -> new RuntimeException("找不到品牌，ID：" + brandId));
 
-        // 1. 驗證與設定分類
-        Set<Category> categories = categoryRepository.findByBrand_IdAndIdIn(brandId, request.getCategoryIds());
-        if (categories.size() != request.getCategoryIds().size()) {
+        Set<Category> categories = validateAndGetCategories(brandId, request.getCategoryIds());
+        Set<OptionGroup> optionGroups = validateAndGetOptionGroups(brandId, request.getOptionGroupIds());
+
+        Product newProduct = buildProductEntity(brand, request, categories, optionGroups);
+
+        if (request.getVariants() != null && !request.getVariants().isEmpty()) {
+            buildVariantsAndCalculateBasePrice(newProduct, request.getVariants());
+        } else {
+            buildDefaultVariantAndBasePrice(newProduct, request.getBasePrice());
+        }
+
+        Product savedProduct = productRepository.save(newProduct);
+        return convertToDto(savedProduct);
+    }
+
+    private Set<Category> validateAndGetCategories(Long brandId, Set<Long> categoryIds) {
+        Set<Category> categories = categoryRepository.findByBrand_IdAndIdIn(brandId, categoryIds);
+        if (categories.size() != categoryIds.size()) {
             throw new RuntimeException("部分分類 ID 無效");
         }
+        return categories;
+    }
 
-        // 2. 驗證與設定選項群組
-        Set<OptionGroup> optionGroups = new HashSet<>();
-        if (request.getOptionGroupIds() != null && !request.getOptionGroupIds().isEmpty()) {
-            optionGroups = request.getOptionGroupIds().stream()
-                    .map(groupId -> optionGroupRepository
-                            .findByBrand_IdAndId(brandId, groupId)
-                            .orElseThrow(() -> new BadRequestException(
-                                    "無效的選項群組 ID：" + groupId + " 或不屬於此品牌")))
-                    .collect(Collectors.toSet());
+    private Set<OptionGroup> validateAndGetOptionGroups(Long brandId, Set<Long> optionGroupIds) {
+        if (optionGroupIds == null || optionGroupIds.isEmpty()) {
+            return new HashSet<>();
         }
+        return optionGroupIds.stream()
+                .map(groupId -> optionGroupRepository
+                        .findByBrand_IdAndId(brandId, groupId)
+                        .orElseThrow(() -> new BadRequestException(
+                                "無效的選項群組 ID：" + groupId + " 或不屬於此品牌")))
+                .collect(Collectors.toSet());
+    }
 
-        // 3. 建立並儲存 Product (主檔)
+    private Product buildProductEntity(Brand brand, CreateProductRequestDto request, Set<Category> categories, Set<OptionGroup> optionGroups) {
         Product newProduct = new Product();
         newProduct.setBrand(brand);
         newProduct.setName(request.getName());
@@ -82,48 +100,35 @@ public class ProductService {
         newProduct.setStatus(request.getStatus());
         newProduct.setCategories(categories);
         newProduct.setOptionGroups(optionGroups);
+        return newProduct;
+    }
 
-        if (request.getVariants() != null && !request.getVariants().isEmpty()) {
-            BigDecimal minPrice = null;
+    private void buildVariantsAndCalculateBasePrice(Product product, List<CreateProductVariantDto> variantDtos) {
+        BigDecimal minPrice = null;
+        for (CreateProductVariantDto variantDto : variantDtos) {
+            ProductVariant variant = new ProductVariant();
+            variant.setName(variantDto.name());
+            variant.setPrice(variantDto.price());
+            variant.setSkuCode(variantDto.skuCode());
+            product.addVariant(variant);
 
-            for (CreateProductVariantDto variantDto : request.getVariants()) {
-                ProductVariant variant = new ProductVariant();
-
-                // Record 取值直接用 .name() 而不是 .getName()
-                variant.setName(variantDto.name());
-                variant.setPrice(variantDto.price());
-                variant.setSkuCode(variantDto.skuCode());
-
-                // 利用 Entity 的 helper method 建立雙向關聯
-                newProduct.addVariant(variant);
-
-                // 計算最低價格
-                if (minPrice == null || variant.getPrice().compareTo(minPrice) < 0) {
-                    minPrice = variant.getPrice();
-                }
+            if (minPrice == null || variant.getPrice().compareTo(minPrice) < 0) {
+                minPrice = variant.getPrice();
             }
-            // 設定 Base Price 為最低規格價
-            newProduct.setBasePrice(minPrice);
-        } else {
-            // 🛑 防呆策略：如果沒傳規格，是否要建立一個預設規格？
-            // 建議：若前端沒傳 variants，強制建立一個 "預設" 規格，避免後續 Recipe 關聯出錯
-            if (request.getBasePrice() == null) {
-                throw new BadRequestException("若未指定規格，則必須填寫基本售價");
-            }
-
-            ProductVariant defaultVariant = new ProductVariant();
-            defaultVariant.setName("常規"); // 或與商品同名
-            defaultVariant.setPrice(request.getBasePrice());
-            defaultVariant.setSkuCode(null);
-
-            newProduct.addVariant(defaultVariant);
-            newProduct.setBasePrice(request.getBasePrice());
         }
+        product.setBasePrice(minPrice);
+    }
 
-        // 4. 儲存 (Cascade 會一併儲存 Variants)
-        Product savedProduct = productRepository.save(newProduct);
-
-        return convertToDto(savedProduct);
+    private void buildDefaultVariantAndBasePrice(Product product, BigDecimal basePrice) {
+        if (basePrice == null) {
+            throw new BadRequestException("若未指定規格，則必須填寫基本售價");
+        }
+        ProductVariant defaultVariant = new ProductVariant();
+        defaultVariant.setName("常規");
+        defaultVariant.setPrice(basePrice);
+        defaultVariant.setSkuCode(null);
+        product.addVariant(defaultVariant);
+        product.setBasePrice(basePrice);
     }
 
     /**

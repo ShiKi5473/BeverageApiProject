@@ -12,11 +12,14 @@ import tw.niels.beverage_api_project.modules.auth.dto.LoginRequestDto;
 import tw.niels.beverage_api_project.security.AppUserDetails;
 import tw.niels.beverage_api_project.security.BrandContextHolder;
 import tw.niels.beverage_api_project.security.jwt.JwtTokenProvider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider tokenProvider;
+    private static final Logger logger = LoggerFactory.getLogger(AuthService.class);
 
     public AuthService(AuthenticationManager authenticationManager,
                        JwtTokenProvider tokenProvider) {
@@ -29,6 +32,7 @@ public class AuthService {
      */
     public JwtAuthResponseDto guestLogin(GuestLoginRequestDto requestDto) {
         // 使用 record 的存取方式： requestDto.displayName() (沒有 get)
+        logger.info("Generating guest token for display name: {}", requestDto.displayName());
         String token = tokenProvider.generateGuestToken(requestDto.displayName());
 
         return new JwtAuthResponseDto(token);
@@ -36,6 +40,7 @@ public class AuthService {
 
     public JwtAuthResponseDto login(LoginRequestDto loginRequestDto) {
         try {
+            logger.info("Attempting login for user: {}, brand: {}", loginRequestDto.getUsername(), loginRequestDto.getBrandId());
             // 在認證前，將 brandId 存入 ThreadLocal
             BrandContextHolder.setBrandId(loginRequestDto.getBrandId());
 
@@ -46,6 +51,8 @@ public class AuthService {
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
             String token = tokenProvider.generateToken(authentication);
+
+            logger.info("Login successful for user: {}", loginRequestDto.getUsername());
 
             JwtAuthResponseDto responseDto = new JwtAuthResponseDto(token);
             Object principal = authentication.getPrincipal();

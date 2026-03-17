@@ -28,6 +28,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
         SELECT DISTINCT p
         FROM Product p
         LEFT JOIN FETCH p.categories
+        LEFT JOIN FETCH p.variants
         LEFT JOIN FETCH p.optionGroups og
         LEFT JOIN FETCH og.options
         WHERE p.brand.id = :brandId
