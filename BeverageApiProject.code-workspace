@@ -1,9 +1,13 @@
 {
 	"folders": [
 		{
-			"name": "BeverageApiProject",
 			"path": "."
+		},
+		{
+			"path": "../BeverageApiProjectFrontend"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"java.configuration.updateBuildConfiguration": "interactive"
+	}
 }
