@@ -45,6 +45,7 @@ public class MinioConfig {
 
             return minioClient;
         } catch (Exception e) {
+            // 啟動時 MinIO 初始化失敗應中止應用程式，因此保留 RuntimeException 使 Spring Context 載入失敗
             logger.error("Error initializing MinIO client: {}", e.getMessage());
             throw new RuntimeException("MinIO initialization failed", e);
         }

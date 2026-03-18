@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -82,9 +83,11 @@ public class OnlineOrderController {
                     task
             );
             logger.info("線上訂單請求已發送至佇列，Ticket ID: {}", ticketId);
-        } catch (Exception e) {
+        // 修正：捕捉特定的 AmqpException 取代 catch(Exception)，避免吞掉非 MQ 相關的例外
+        // 保留 RuntimeException 重新拋出，GlobalExceptionHandler 會將其處理為 HTTP 500
+        } catch (AmqpException e) {
             logger.error("發送 RabbitMQ 失敗", e);
-            throw new RuntimeException("系統繁忙，請稍後再試");
+            throw new RuntimeException("系統繁忙，請稍後再試", e);
         }
 
         // 5. 立即回傳 202 Accepted

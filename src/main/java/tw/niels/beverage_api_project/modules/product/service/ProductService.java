@@ -52,8 +52,9 @@ public class ProductService {
     @Transactional
     @CacheEvict(value = {"product-summary", "product-pos"}, key = "#brandId")
     public ProductResponseDto createProduct(Long brandId, CreateProductRequestDto request) {
+        // 修正：使用 ResourceNotFoundException 取代 RuntimeException，使 GlobalExceptionHandler 回傳 HTTP 404
         Brand brand = brandRepository.findById(brandId)
-                .orElseThrow(() -> new RuntimeException("找不到品牌，ID：" + brandId));
+                .orElseThrow(() -> new ResourceNotFoundException("找不到品牌，ID：" + brandId));
 
         Set<Category> categories = validateAndGetCategories(brandId, request.getCategoryIds());
         Set<OptionGroup> optionGroups = validateAndGetOptionGroups(brandId, request.getOptionGroupIds());
@@ -73,7 +74,8 @@ public class ProductService {
     private Set<Category> validateAndGetCategories(Long brandId, Set<Long> categoryIds) {
         Set<Category> categories = categoryRepository.findByBrand_IdAndIdIn(brandId, categoryIds);
         if (categories.size() != categoryIds.size()) {
-            throw new RuntimeException("部分分類 ID 無效");
+            // 修正：使用 BadRequestException 取代 RuntimeException，使 GlobalExceptionHandler 回傳 HTTP 400
+            throw new BadRequestException("部分分類 ID 無效");
         }
         return categories;
     }

@@ -47,9 +47,11 @@ public class FileService {
                             .build()
             );
             logger.debug("Chunk uploaded: {}", objectName);
+        // 修正：使用 BadRequestException 取代 RuntimeException，讓 GlobalExceptionHandler 正確回傳 HTTP 400
+        // 注意：MinIO SDK 拋出多種 checked exception，此處保留 catch(Exception) 以簡化處理
         } catch (Exception e) {
             logger.error("Failed to upload chunk", e);
-            throw new RuntimeException("Chunk upload failed: " + e.getMessage());
+            throw new BadRequestException("Chunk upload failed: " + e.getMessage());
         }
     }
 
@@ -97,6 +99,7 @@ public class FileService {
             // 這裡回傳 objectName 供後續業務邏輯存入 DB
             return finalObjectName;
 
+        // 注意：MinIO composeObject 可能拋出多種 checked exception，此處保留 catch(Exception) 涵蓋所有情況
         } catch (Exception e) {
             logger.error("Failed to merge file", e);
             throw new BadRequestException("File merge failed: " + e.getMessage());
@@ -114,8 +117,9 @@ public class FileService {
                         RemoveObjectArgs.builder().bucket(bucketName).object(chunkName).build()
                 );
             }
+        // 清理分片失敗不影響主流程（合併已完成），僅記錄警告
         } catch (Exception e) {
-            logger.warn("Failed to cleanup chunks for fileId: {}", fileId);
+            logger.warn("Failed to cleanup chunks for fileId: {}, reason: {}", fileId, e.getMessage());
         }
     }
 
@@ -132,7 +136,9 @@ public class FileService {
                             .expiry(60 * 60) // 1 小時有效
                             .build()
             );
+        // 取得 presigned URL 失敗時回傳 null，由呼叫端決定後續處理
         } catch (Exception e) {
+            logger.warn("Failed to generate presigned URL for: {}", objectName, e);
             return null;
         }
     }

@@ -4,6 +4,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.scheduling.annotation.Async;
@@ -106,7 +107,8 @@ public class KdsService {
             // 4. 發布到 RabbitMQ Fanout Exchange -> 所有 Server 實例都會收到
             rabbitTemplate.convertAndSend(RabbitConfig.KDS_EXCHANGE, "", broadcastMsg);
             logger.debug("已廣播 RabbitMQ 訊息: {} (Store: {})", action, storeId);
-        } catch (Exception e) {
+        // 修正：捕捉特定的 AmqpException，KDS 廣播失敗不影響訂單狀態變更（訂單已提交成功）
+        } catch (AmqpException e) {
             logger.error("RabbitMQ 發送失敗", e);
         }
     }
@@ -120,6 +122,7 @@ public class KdsService {
     public void handleRabbitMessage(KdsBroadcastMessage msg) {
         try {
             sendToStore(msg.getStoreId(), msg.getKdsMessage());
+        // 保留 catch(Exception)：消費端需防止未預期例外導致訊息無限重試
         } catch (Exception e) {
             logger.error("處理 RabbitMQ 訊息失敗", e);
         }

@@ -112,6 +112,7 @@ public class  JwtAuthenticationFilter extends OncePerRequestFilter {
                 BrandContextHolder.setBrandId(appUser.brandId());
             }
 
+        // 安全過濾器保留 catch(Exception)：任何認證失敗都應清除上下文，避免部分認證狀態殘留
         } catch (Exception e) {
             filterLogger.warn("SSE ticket 認證失敗: {}", e.getMessage());
             BrandContextHolder.clear();
@@ -153,6 +154,7 @@ public class  JwtAuthenticationFilter extends OncePerRequestFilter {
             authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(authenticationToken);
 
+        // 安全過濾器保留 catch(Exception)：任何認證失敗都應清除上下文，避免部分認證狀態殘留
         } catch (Exception e) {
             filterLogger.warn("Authentication failed: {}", e.getMessage());
             BrandContextHolder.clear();

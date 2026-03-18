@@ -1,5 +1,7 @@
 package tw.niels.beverage_api_project.modules.promotion.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -26,6 +28,8 @@ import java.util.Set;
 
 @Service
 public class PromotionService {
+
+    private static final Logger logger = LoggerFactory.getLogger(PromotionService.class);
 
     private final PromotionRepository promotionRepository;
     private final PromotionStrategyFactory strategyFactory;
@@ -78,7 +82,9 @@ public class PromotionService {
                     maxDiscount = discount;
                 }
             } catch (Exception e) {
-                // 忽略不支援或計算錯誤的活動
+                // 個別促銷計算失敗不應中斷整體折扣計算，記錄警告後跳過該活動
+                logger.warn("促銷活動 '{}' (ID: {}) 折扣計算失敗，已跳過: {}",
+                        promotion.getName(), promotion.getId(), e.getMessage());
             }
         }
 
