@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,8 +17,11 @@ import tw.niels.beverage_api_project.modules.auth.dto.GuestLoginRequestDto;
 import tw.niels.beverage_api_project.modules.auth.dto.JwtAuthResponseDto;
 import tw.niels.beverage_api_project.modules.auth.dto.LoginRequestDto;
 import tw.niels.beverage_api_project.modules.auth.service.AuthService;
+import tw.niels.beverage_api_project.modules.auth.service.SseTicketService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping(ApiPaths.API_V1 + ApiPaths.AUTH) // 使用定義好的常數
@@ -25,10 +29,11 @@ import org.slf4j.LoggerFactory;
 public class AuthController {
 
     private final AuthService authService;
+    private final SseTicketService sseTicketService;
 
-    // 推薦使用建構子注入 (Constructor Injection)
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, SseTicketService sseTicketService) {
         this.authService = authService;
+        this.sseTicketService = sseTicketService;
     }
 
     private static final Logger logger = LoggerFactory.getLogger(AuthController.class); // 新增
@@ -60,5 +65,13 @@ public class AuthController {
         logger.info("收到訪客登入請求: {}", requestDto.displayName());
         JwtAuthResponseDto jwtAuthResponseDto = authService.guestLogin(requestDto);
         return ResponseEntity.ok(jwtAuthResponseDto);
+    }
+
+    @PostMapping("/sse-ticket")
+    @Operation(summary = "取得 SSE 連線票券", description = "產生一次性短期票券，用於建立 SSE 連線。票券有效期 30 秒，僅能使用一次。")
+    public ResponseEntity<Map<String, String>> createSseTicket() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        String ticket = sseTicketService.createTicket(username);
+        return ResponseEntity.ok(Map.of("ticket", ticket));
     }
 }

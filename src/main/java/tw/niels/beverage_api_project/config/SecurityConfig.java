@@ -71,8 +71,10 @@ public class SecurityConfig {
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(authenticationEntryPoint))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(ApiPaths.API_V1 + ApiPaths.AUTH + "/**").permitAll() // 允許 "品牌" 登入
-                        .requestMatchers(ApiPaths.API_V1 + "/platform/auth/login").permitAll() // 【新增】允許 "平台" 登入
+                        // sse-ticket 需要認證才能呼叫（必須放在 auth/** permitAll 之前，否則會被覆蓋）
+                        .requestMatchers(ApiPaths.API_V1 + ApiPaths.AUTH + "/sse-ticket").authenticated()
+                        .requestMatchers(ApiPaths.API_V1 + ApiPaths.AUTH + "/**").permitAll() // 允許 "品牌" 登入、訪客登入
+                        .requestMatchers(ApiPaths.API_V1 + "/platform/auth/login").permitAll() // 允許 "平台" 登入
                         .requestMatchers("/error").permitAll()
                         .requestMatchers("/ws-kds/**").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()

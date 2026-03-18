@@ -21,14 +21,15 @@ public class KdsSseController {
         this.controllerHelperService = controllerHelperService;
     }
 
-    @Operation(summary = "訂閱訂單即時更新 (SSE)", description = "建立 SSE 長連線，當訂單狀態改變時，Server 會主動推播事件。前端需使用 EventSource 連線。")
+    @Operation(summary = "訂閱訂單即時更新 (SSE)",
+            description = "建立 SSE 長連線，當訂單狀態改變時，Server 會主動推播事件。" +
+                    "前端需先呼叫 POST /api/v1/auth/sse-ticket 取得一次性 ticket，" +
+                    "再以 EventSource(/api/v1/kds/stream?ticket=xxx) 建立連線。")
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter streamOrders(@RequestParam(required = false) String token) {
-        // 1. 取得當前操作人員所屬的分店 ID
-        // (假設 ControllerHelperService 會從 SecurityContext 或 Token 解析)
+    public SseEmitter streamOrders() {
+        // 身份驗證已由 JwtAuthenticationFilter 透過 SSE ticket 完成
+        // 此處直接從 SecurityContext 取得當前使用者的分店 ID
         Long storeId = controllerHelperService.getCurrentStoreId();
-
-        // 2. 訂閱 SSE
         return kdsService.subscribe(storeId);
     }
 }
