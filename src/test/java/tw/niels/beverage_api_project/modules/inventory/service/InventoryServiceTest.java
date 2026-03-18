@@ -7,12 +7,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import tw.niels.beverage_api_project.common.exception.BadRequestException;
-import tw.niels.beverage_api_project.common.service.ControllerHelperService;
 import tw.niels.beverage_api_project.modules.inventory.dao.InventoryBatchDAO;
 import tw.niels.beverage_api_project.modules.inventory.entity.InventoryBatch;
 import tw.niels.beverage_api_project.modules.inventory.entity.InventoryItem;
 import tw.niels.beverage_api_project.modules.inventory.repository.InventoryBatchRepository;
 import tw.niels.beverage_api_project.modules.inventory.repository.InventoryItemRepository;
+import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -31,10 +31,11 @@ class InventoryServiceTest {
     @Mock private InventoryItemRepository itemRepository;
     @Mock private InventoryBatchRepository batchRepository;
     @Mock private InventoryBatchDAO inventoryBatchDAO;
-    @Mock private ControllerHelperService helperService; // 即使沒直接用到，Service 依賴它也需要 Mock
+    @Mock private StoreRepository storeRepository; // InventoryDeductionService 依賴
 
+    // 注意：測試對象已改為 InventoryDeductionService（包含 4 參數的 deductInventory 方法）
     @InjectMocks
-    private InventoryService inventoryService;
+    private InventoryDeductionService inventoryService;
 
     @Test
     @DisplayName("庫存扣減 - 成功 (單一批次足夠)")

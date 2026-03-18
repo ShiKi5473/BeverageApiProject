@@ -10,7 +10,7 @@ import tw.niels.beverage_api_project.modules.inventory.entity.InventoryBatch;
 import tw.niels.beverage_api_project.modules.inventory.entity.InventoryItem;
 import tw.niels.beverage_api_project.modules.inventory.repository.InventoryBatchRepository;
 import tw.niels.beverage_api_project.modules.inventory.repository.InventoryItemRepository;
-import tw.niels.beverage_api_project.modules.inventory.service.InventoryService;
+import tw.niels.beverage_api_project.modules.inventory.service.InventoryDeductionService;
 import tw.niels.beverage_api_project.modules.store.entity.Store;
 import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
 
@@ -28,7 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class InventoryConcurrencyIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
-    private InventoryService inventoryService;
+    private InventoryDeductionService inventoryService;
     @Autowired
     private InventoryItemRepository itemRepository;
     @Autowired
