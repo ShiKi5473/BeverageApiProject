@@ -8,12 +8,12 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import tw.niels.beverage_api_project.common.annotation.Audit;
 import tw.niels.beverage_api_project.common.constants.ApiPaths;
-import tw.niels.beverage_api_project.common.exception.BadRequestException;
-import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
 import tw.niels.beverage_api_project.common.service.ControllerHelperService;
 import tw.niels.beverage_api_project.modules.inventory.dto.AddShipmentRequestDto;
 import tw.niels.beverage_api_project.modules.inventory.dto.InventoryAuditItemResponseDto;
 import tw.niels.beverage_api_project.modules.inventory.dto.InventoryAuditRequestDto;
+import tw.niels.beverage_api_project.modules.inventory.service.InventoryAuditService;
+import tw.niels.beverage_api_project.modules.inventory.service.InventoryDeductionService;
 import tw.niels.beverage_api_project.modules.inventory.service.InventoryService;
 import tw.niels.beverage_api_project.modules.store.entity.Store;
 
@@ -27,11 +27,18 @@ import java.util.Map;
 public class InventoryController {
 
     private final InventoryService inventoryService;
+    private final InventoryDeductionService deductionService;
+    private final InventoryAuditService auditService;
     private final ControllerHelperService helperService;
 
+    // [重構] 拆分後注入三個獨立的 Service，各自負責進貨/扣庫存/盤點
     public InventoryController(InventoryService inventoryService,
+                               InventoryDeductionService deductionService,
+                               InventoryAuditService auditService,
                                ControllerHelperService helperService) {
         this.inventoryService = inventoryService;
+        this.deductionService = deductionService;
+        this.auditService = auditService;
         this.helperService = helperService;
     }
 
@@ -71,7 +78,8 @@ public class InventoryController {
         Store store = helperService.getSafeCurrentUserStore();
         Long brandId = helperService.getCurrentBrandId();
 
-        inventoryService.performAudit(brandId, store.getId(), request);
+        // [重構] 盤點邏輯委派給 InventoryAuditService
+        auditService.performAudit(brandId, store.getId(), request);
 
         return ResponseEntity.ok(Map.of("message", "盤點完成，庫存已更新。"));
     }
@@ -92,7 +100,8 @@ public class InventoryController {
 
         helperService.validateStoreAccess(store.getId());
 
-        inventoryService.deductInventory(store.getId(), itemId, quantity);
+        // [重構] FIFO 扣庫存邏輯委派給 InventoryDeductionService
+        deductionService.deductInventory(store.getId(), itemId, quantity);
 
         return ResponseEntity.ok(Map.of("message", "扣減成功", "deductedQuantity", quantity));
     }
@@ -105,7 +114,8 @@ public class InventoryController {
         Store store = helperService.getSafeCurrentUserStore();
         Long brandId = helperService.getCurrentBrandId();
 
-        var list = inventoryService.getAuditList(brandId, store.getId());
+        // [重構] 盤點清單查詢委派給 InventoryAuditService
+        var list = auditService.getAuditList(brandId, store.getId());
         return ResponseEntity.ok(list);
     }
 }
