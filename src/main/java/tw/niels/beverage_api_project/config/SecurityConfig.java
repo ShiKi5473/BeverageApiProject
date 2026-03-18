@@ -1,9 +1,11 @@
 package tw.niels.beverage_api_project.config;
 
 import java.util.Arrays;
+import java.util.List;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -37,6 +39,10 @@ public class SecurityConfig {
 
     private final JwtAuthenticationEntryPoint authenticationEntryPoint;
     private final JwtAuthenticationFilter authenticationFilter;
+
+    // 從 application.properties 讀取允許的 CORS 來源，避免寫死於程式碼中
+    @Value("${app.cors.allowed-origins}")
+    private List<String> allowedOrigins;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -94,13 +100,8 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // 允許來自您前端 Live Server 的來源
-        configuration.setAllowedOrigins(Arrays.asList(
-                "http://localhost:63342",
-                "http://127.0.0.1:63342",
-                "http://localhost:5173",
-                "http://127.0.0.1:5173"
-        ));
+        // 允許的來源從 application.properties 的 app.cors.allowed-origins 讀取
+        configuration.setAllowedOrigins(allowedOrigins);
         // 允許所有標準的 HTTP 方法
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS", "HEAD"));
         // 允許前端攜帶認證資訊 (例如 Cookies 或 Authorization header)

@@ -6,6 +6,6 @@ import org.springframework.stereotype.Repository;
 import tw.niels.beverage_api_project.modules.order.entity.OrderItem;
 
 @Repository
-public interface OrderItenRepository extends JpaRepository<OrderItem, Long> {
+public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
 
 }

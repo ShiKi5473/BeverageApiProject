@@ -24,8 +24,6 @@ import java.io.Serializable;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 @Service
 public class KdsService {
@@ -33,16 +31,17 @@ public class KdsService {
     private static final Logger logger = LoggerFactory.getLogger(KdsService.class);
 
     private final RabbitTemplate rabbitTemplate;
-
-    // SSE 連線管理 Map<StoreId, List<Emitter>>
-    private final Map<Long, List<SseEmitter>> storeEmitters = new ConcurrentHashMap<>();
+    // SSE 連線生命週期管理委派給 SseEmitterManager，與業務邏輯分離
+    private final SseEmitterManager sseEmitterManager;
 
     // 保留策略模式，用於處理特定狀態的複雜邏輯 (如果有的話)
     private final Map<OrderStatus, KdsEventStrategy> strategyMap = new EnumMap<>(OrderStatus.class);
 
     public KdsService(List<KdsEventStrategy> strategies,
-                      RabbitTemplate rabbitTemplate) {
+                      RabbitTemplate rabbitTemplate,
+                      SseEmitterManager sseEmitterManager) {
         this.rabbitTemplate = rabbitTemplate;
+        this.sseEmitterManager = sseEmitterManager;
         for (KdsEventStrategy strategy : strategies) {
             strategyMap.put(strategy.getHandledStatus(), strategy);
         }
@@ -53,24 +52,8 @@ public class KdsService {
      */
     public SseEmitter subscribe(Long storeId) {
         SseEmitter emitter = new SseEmitter(30 * 60 * 1000L); // 30分鐘
-        addEmitter(storeId, emitter);
+        sseEmitterManager.addEmitter(storeId, emitter);
         return emitter;
-    }
-
-    public void addEmitter(Long storeId, SseEmitter emitter) {
-        storeEmitters.computeIfAbsent(storeId, k -> new CopyOnWriteArrayList<>()).add(emitter);
-        logger.debug("店家 {} 新增 SSE 連線。目前連線數: {}", storeId, storeEmitters.get(storeId).size());
-
-        emitter.onCompletion(() -> removeEmitter(storeId, emitter));
-        emitter.onTimeout(() -> removeEmitter(storeId, emitter));
-        emitter.onError((e) -> removeEmitter(storeId, emitter));
-    }
-
-    private void removeEmitter(Long storeId, SseEmitter emitter) {
-        List<SseEmitter> emitters = storeEmitters.get(storeId);
-        if (emitters != null) {
-            emitters.remove(emitter);
-        }
     }
 
     /**
@@ -132,8 +115,8 @@ public class KdsService {
      * 實際執行 SSE 推送
      */
     private void sendToStore(Long storeId, KdsMessage message) {
-        List<SseEmitter> emitters = storeEmitters.get(storeId);
-        if (emitters == null || emitters.isEmpty()) {
+        List<SseEmitter> emitters = sseEmitterManager.getEmitters(storeId);
+        if (emitters.isEmpty()) {
             return;
         }
 
@@ -144,7 +127,7 @@ public class KdsService {
             try {
                 emitter.send(SseEmitter.event().data(payload));
             } catch (IOException e) {
-                removeEmitter(storeId, emitter);
+                sseEmitterManager.removeEmitter(storeId, emitter);
             }
         }
     }

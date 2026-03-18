@@ -22,6 +22,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
 import tw.niels.beverage_api_project.modules.brand.entity.Brand;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
@@ -90,6 +91,11 @@ public class Order extends BaseTsidEntity {
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<OrderItem> items = new HashSet<>();
+
+    // 樂觀鎖版本號，防止多人同時修改訂單狀態造成 race condition
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
 
     // 會員快照
     @JdbcTypeCode(SqlTypes.JSON)

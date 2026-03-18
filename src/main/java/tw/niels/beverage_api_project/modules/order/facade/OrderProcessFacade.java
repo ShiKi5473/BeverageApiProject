@@ -3,8 +3,6 @@ package tw.niels.beverage_api_project.modules.order.facade;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import tw.niels.beverage_api_project.common.exception.BadRequestException;
-import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
 import tw.niels.beverage_api_project.modules.member.service.MemberPointService;
 import tw.niels.beverage_api_project.modules.order.dto.CreateOrderRequestDto;
 import tw.niels.beverage_api_project.modules.order.dto.OrderTotalDto;
@@ -13,9 +11,9 @@ import tw.niels.beverage_api_project.modules.order.entity.Order;
 import tw.niels.beverage_api_project.modules.order.entity.PaymentMethodEntity;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
 import tw.niels.beverage_api_project.modules.order.event.OrderStateChangedEvent;
-import tw.niels.beverage_api_project.modules.order.repository.PaymentMethodRepository;
 import tw.niels.beverage_api_project.modules.order.service.OrderItemProcessorService;
 import tw.niels.beverage_api_project.modules.order.service.OrderService;
+import tw.niels.beverage_api_project.modules.order.service.PaymentMethodService;
 import tw.niels.beverage_api_project.modules.promotion.service.PromotionService;
 import tw.niels.beverage_api_project.modules.store.entity.Store;
 import tw.niels.beverage_api_project.modules.store.service.StoreService;
@@ -38,7 +36,7 @@ public class OrderProcessFacade {
     // 跨模組查詢透過各模組的 Service，不直接依賴其 Repository
     private final StoreService storeService;
     private final UserService userService;
-    private final PaymentMethodRepository paymentMethodRepository;
+    private final PaymentMethodService paymentMethodService;
     private final ApplicationEventPublisher eventPublisher;
 
     public OrderProcessFacade(OrderService orderService,
@@ -47,7 +45,7 @@ public class OrderProcessFacade {
                               OrderItemProcessorService orderItemProcessorService,
                               StoreService storeService,
                               UserService userService,
-                              PaymentMethodRepository paymentMethodRepository,
+                              PaymentMethodService paymentMethodService,
                               ApplicationEventPublisher eventPublisher) {
         this.orderService = orderService;
         this.memberPointService = memberPointService;
@@ -55,7 +53,7 @@ public class OrderProcessFacade {
         this.orderItemProcessorService = orderItemProcessorService;
         this.storeService = storeService;
         this.userService = userService;
-        this.paymentMethodRepository = paymentMethodRepository;
+        this.paymentMethodService = paymentMethodService;
         this.eventPublisher = eventPublisher;
     }
 
@@ -69,8 +67,7 @@ public class OrderProcessFacade {
         Store store = storeService.getStore(brandId, storeId);
         User staff = userService.getUser(brandId, staffUserId);
 
-        PaymentMethodEntity paymentMethod = paymentMethodRepository.findByCode(requestDto.getPaymentMethod())
-                .orElseThrow(() -> new BadRequestException("無效的支付方式代碼：" + requestDto.getPaymentMethod()));
+        PaymentMethodEntity paymentMethod = paymentMethodService.getByCode(requestDto.getPaymentMethod());
 
         // 2. 初始化訂單 (委派給 OrderService 建立空殼)
         Order order = orderService.initOrder(staff, store);
