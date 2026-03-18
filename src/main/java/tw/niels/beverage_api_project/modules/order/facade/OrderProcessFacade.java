@@ -18,9 +18,9 @@ import tw.niels.beverage_api_project.modules.order.service.OrderItemProcessorSer
 import tw.niels.beverage_api_project.modules.order.service.OrderService;
 import tw.niels.beverage_api_project.modules.promotion.service.PromotionService;
 import tw.niels.beverage_api_project.modules.store.entity.Store;
-import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
+import tw.niels.beverage_api_project.modules.store.service.StoreService;
 import tw.niels.beverage_api_project.modules.user.entity.User;
-import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
+import tw.niels.beverage_api_project.modules.user.service.UserService;
 
 import java.math.BigDecimal;
 
@@ -35,9 +35,9 @@ public class OrderProcessFacade {
     private final MemberPointService memberPointService;
     private final PromotionService promotionService;
     private final OrderItemProcessorService orderItemProcessorService;
-    // Repositories 用於查驗基礎資料
-    private final StoreRepository storeRepository;
-    private final UserRepository userRepository;
+    // 跨模組查詢透過各模組的 Service，不直接依賴其 Repository
+    private final StoreService storeService;
+    private final UserService userService;
     private final PaymentMethodRepository paymentMethodRepository;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -45,16 +45,16 @@ public class OrderProcessFacade {
                               MemberPointService memberPointService,
                               PromotionService promotionService,
                               OrderItemProcessorService orderItemProcessorService,
-                              StoreRepository storeRepository,
-                              UserRepository userRepository,
+                              StoreService storeService,
+                              UserService userService,
                               PaymentMethodRepository paymentMethodRepository,
                               ApplicationEventPublisher eventPublisher) {
         this.orderService = orderService;
         this.memberPointService = memberPointService;
         this.promotionService = promotionService;
         this.orderItemProcessorService = orderItemProcessorService;
-        this.storeRepository = storeRepository;
-        this.userRepository = userRepository;
+        this.storeService = storeService;
+        this.userService = userService;
         this.paymentMethodRepository = paymentMethodRepository;
         this.eventPublisher = eventPublisher;
     }
@@ -65,12 +65,9 @@ public class OrderProcessFacade {
      */
     @Transactional
     public Order processPosCheckout(Long brandId, Long storeId, Long staffUserId, PosCheckoutRequestDto requestDto) {
-        // 1. 驗證基礎資料
-        Store store = storeRepository.findByBrand_IdAndId(brandId, storeId)
-                .orElseThrow(() -> new ResourceNotFoundException("找不到店家 (ID: " + storeId + ")"));
-
-        User staff = userRepository.findByBrand_IdAndId(brandId, staffUserId)
-                .orElseThrow(() -> new ResourceNotFoundException("找不到員工 (ID: " + staffUserId + ")"));
+        // 1. 驗證基礎資料（透過各模組 Service，不直接存取跨模組 Repository）
+        Store store = storeService.getStore(brandId, storeId);
+        User staff = userService.getUser(brandId, staffUserId);
 
         PaymentMethodEntity paymentMethod = paymentMethodRepository.findByCode(requestDto.getPaymentMethod())
                 .orElseThrow(() -> new BadRequestException("無效的支付方式代碼：" + requestDto.getPaymentMethod()));
@@ -92,9 +89,7 @@ public class OrderProcessFacade {
         BigDecimal pointDiscount = BigDecimal.ZERO;
 
         if (requestDto.getMemberId() != null) {
-            User member = userRepository.findByBrand_IdAndId(brandId, requestDto.getMemberId())
-                    .filter(u -> u.getMemberProfile() != null)
-                    .orElseThrow(() -> new ResourceNotFoundException("找不到會員，ID：" + requestDto.getMemberId()));
+            User member = userService.getMember(brandId, requestDto.getMemberId());
 
             order.setMember(member);
             // 建立會員快照
@@ -135,10 +130,8 @@ public class OrderProcessFacade {
      */
     @Transactional
     public Order createOrder(Long brandId, Long storeId, Long staffUserId, CreateOrderRequestDto requestDto) {
-        Store store = storeRepository.findByBrand_IdAndId(brandId, storeId)
-                .orElseThrow(() -> new ResourceNotFoundException("找不到店家"));
-        User staff = userRepository.findByBrand_IdAndId(brandId, staffUserId)
-                .orElseThrow(() -> new ResourceNotFoundException("找不到員工"));
+        Store store = storeService.getStore(brandId, storeId);
+        User staff = userService.getUser(brandId, staffUserId);
 
         Order order = orderService.initOrder(staff, store);
         order.setStatus(requestDto.getStatus());

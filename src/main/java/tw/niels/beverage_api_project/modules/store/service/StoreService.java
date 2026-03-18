@@ -20,6 +20,16 @@ public class StoreService {
         this.brandRepository = brandRepository;
     }
 
+    /**
+     * 依品牌 ID 與店家 ID 查詢店家，找不到則拋出例外。
+     * 供跨模組的 Application Service 使用，避免直接依賴 StoreRepository。
+     */
+    @Transactional(readOnly = true)
+    public Store getStore(Long brandId, Long storeId) {
+        return storeRepository.findByBrand_IdAndId(brandId, storeId)
+                .orElseThrow(() -> new ResourceNotFoundException("找不到店家 (ID: " + storeId + ")"));
+    }
+
     @Transactional
     public Store createStore(CreateStoreRequestDto requestDto) {
         Brand brand = brandRepository.findById(requestDto.getBrandId())

@@ -109,6 +109,28 @@ public class UserService {
     }
 
     /**
+     * 依品牌 ID 與使用者 ID 查詢使用者（適用於員工查驗），找不到則拋出例外。
+     * 供跨模組的 Application Service 使用，避免直接依賴 UserRepository。
+     */
+    @Transactional(readOnly = true)
+    public User getUser(Long brandId, Long userId) {
+        return userRepository.findByBrand_IdAndId(brandId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("找不到使用者 (ID: " + userId + ")"));
+    }
+
+    /**
+     * 依品牌 ID 與使用者 ID 查詢會員（須有 memberProfile），找不到或非會員則拋出例外。
+     * 「是否為會員」的判斷封裝在此，外部不需自行 filter。
+     * 供跨模組的 Application Service 使用，避免直接依賴 UserRepository。
+     */
+    @Transactional(readOnly = true)
+    public User getMember(Long brandId, Long memberId) {
+        return userRepository.findByBrand_IdAndId(brandId, memberId)
+                .filter(u -> u.getMemberProfile() != null)
+                .orElseThrow(() -> new ResourceNotFoundException("找不到會員，ID：" + memberId));
+    }
+
+    /**
      * 根據手機號碼和品牌 ID 查找會員資訊
      *
      * @param phone   會員手機號碼
