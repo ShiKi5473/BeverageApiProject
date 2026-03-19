@@ -5,6 +5,9 @@ import java.util.HashSet;
 import java.util.Set;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -40,12 +43,18 @@ public class OrderItem extends BaseTsidEntity {
     private ProductVariant productVariant;
 
     @Column(name = "quantity", nullable = false)
+    @NotNull
+    @Min(1)
     private Integer quantity;
 
     @Column(name = "unit_price", nullable = false, precision = 10, scale = 2)
+    @NotNull
+    @DecimalMin("0.00")
     private BigDecimal unitPrice;
 
     @Column(name = "subtotal", nullable = false, precision = 10, scale = 2)
+    @NotNull
+    @DecimalMin("0.00")
     private BigDecimal subtotal;
 
     @Column(name = "notes")

@@ -7,6 +7,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import tw.niels.beverage_api_project.common.constants.AuthorityConstants;
+import tw.niels.beverage_api_project.common.exception.ApplicationException;
+import tw.niels.beverage_api_project.common.exception.DomainException;
 import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
 import tw.niels.beverage_api_project.modules.brand.dto.CreateBrandRequestDto;
 import tw.niels.beverage_api_project.modules.brand.dto.UpdatePointConfigDto;
@@ -32,7 +35,7 @@ public class BrandService {
     public Brand createBrand(CreateBrandRequestDto requestDto) {
         // 檢查品牌名稱是否已存在
         brandRepository.findByName(requestDto.getName()).ifPresent(b -> {
-            throw new IllegalStateException("品牌名稱 '" + requestDto.getName() + "' 已經存在。");
+            throw new DomainException("品牌名稱 '" + requestDto.getName() + "' 已經存在。");
         });
 
         Brand brand = new Brand();
@@ -52,7 +55,7 @@ public class BrandService {
         Long currentBrandId = BrandContextHolder.getBrandId();
 
         if (currentBrandId == null) {
-            throw new IllegalStateException("無法取得當前品牌 Context");
+            throw new ApplicationException("無法取得當前品牌 Context");
         }
 
         return brandRepository.findById(currentBrandId)
@@ -87,7 +90,7 @@ public class BrandService {
      * 【危險方法】僅供平台管理員使用
      * 建議重新命名以明確意圖，例如 getAllBrandsForAdmin
      */
-    @PreAuthorize("hasRole('PLATFORM_ADMIN')") // Service 層也可加防護
+    @PreAuthorize(AuthorityConstants.HAS_ROLE_PLATFORM_ADMIN) // Service 層也可加防護
     public List<Brand> getAllBrandsForAdmin() {
         return brandRepository.findAll();
     }

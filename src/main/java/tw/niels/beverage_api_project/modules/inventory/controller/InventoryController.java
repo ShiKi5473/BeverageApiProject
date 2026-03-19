@@ -49,8 +49,9 @@ public class InventoryController {
     public ResponseEntity<?> addShipment(@Valid @RequestBody AddShipmentRequestDto request) {
         Store store = helperService.getSafeCurrentUserStore();
         Long brandId = helperService.getCurrentBrandId();
+        Long userId = helperService.getCurrentUserId();
 
-        inventoryService.addShipment(brandId, store.getId(), request);
+        inventoryService.addShipment(brandId, store.getId(), userId, request);
         return ResponseEntity.ok(Map.of("message", "進貨成功"));
     }
 

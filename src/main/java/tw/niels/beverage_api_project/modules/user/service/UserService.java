@@ -8,6 +8,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import tw.niels.beverage_api_project.common.constants.AuthorityConstants;
+import tw.niels.beverage_api_project.common.exception.DomainException;
 import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
 import tw.niels.beverage_api_project.common.service.ControllerHelperService;
 import tw.niels.beverage_api_project.modules.brand.entity.Brand;
@@ -62,7 +64,7 @@ public class UserService {
         // 2. 檢查手機號碼是否已在該品牌下註冊
         userRepository.findByPrimaryPhoneAndBrandId(requestDto.getPrimaryPhone(), requestDto.getBrandId())
                 .ifPresent(existingUser -> {
-                    throw new IllegalStateException("Error: Phone number '" + requestDto.getPrimaryPhone() + "' is already taken for this brand!");
+                    throw new DomainException("Error: Phone number '" + requestDto.getPrimaryPhone() + "' is already taken for this brand!");
                 });
 
         // 3. 建立核心 User 物件
@@ -178,23 +180,23 @@ public class UserService {
         // 權限檢查邏輯
         AppUserDetails currentUser = helperService.getCurrentUserDetails();
         boolean isCurrentUserBrandAdmin = currentUser.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_BRAND_ADMIN"));
+                .anyMatch(a -> a.getAuthority().equals(AuthorityConstants.ROLE_BRAND_ADMIN));
 
         // 如果當前操作者「不是」品牌管理員 (即為店長 MANAGER)
         if (!isCurrentUserBrandAdmin) {
             // A. 禁止修改 BRAND_ADMIN 的資料
             if (targetProfile.getRole() == StaffRole.BRAND_ADMIN) {
-                throw new IllegalStateException("權限不足：店長無法修改品牌管理員的資料");
+                throw new DomainException("權限不足：店長無法修改品牌管理員的資料");
             }
             // B. 禁止將任何人提升為 BRAND_ADMIN
             if (dto.getRole() == StaffRole.BRAND_ADMIN) {
-                throw new IllegalStateException("權限不足：店長無法指派品牌管理員角色");
+                throw new DomainException("權限不足：店長無法指派品牌管理員角色");
             }
             // C. 禁止跨店操作 (雖然 Controller 層有檢查，這裡做雙重保險)
             Long targetStoreId = targetProfile.getStore() != null ? targetProfile.getStore().getId() : null;
             Long currentStoreId = currentUser.storeId();
             if (targetStoreId != null && !targetStoreId.equals(currentStoreId)) {
-                throw new IllegalStateException("權限不足：無法修改非本店員工資料");
+                throw new DomainException("權限不足：無法修改非本店員工資料");
             }
         }
 

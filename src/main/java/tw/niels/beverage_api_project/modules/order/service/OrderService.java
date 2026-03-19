@@ -19,8 +19,8 @@ import tw.niels.beverage_api_project.modules.store.entity.Store;
 import tw.niels.beverage_api_project.modules.user.entity.User;
 
 import java.math.BigDecimal;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @Service
@@ -49,9 +49,7 @@ public class OrderService {
 
         // 初始化預設值
         order.setPointsUsed(0L);
-        order.setDiscountAmount(BigDecimal.ZERO);
         order.setPointsEarned(0L);
-
         order.setDiscountAmount(BigDecimal.ZERO);
         order.setTotalAmount(BigDecimal.ZERO); // 防止存檔時為 null
         order.setFinalAmount(BigDecimal.ZERO); // 防止存檔時為 null (這行是解決本次錯誤的關鍵)
@@ -89,7 +87,7 @@ public class OrderService {
 
     // 產生一個訂單號碼 (Private helper)
     private String generateOrderNumber(Long storeId) {
-        String date = new SimpleDateFormat("yyyyMMdd").format(new Date());
+        String date = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         long sequence = orderNumberService.getNextStoreDailySequence(storeId);
         return String.format("%d-%s-%04d", storeId, date, sequence);
     }

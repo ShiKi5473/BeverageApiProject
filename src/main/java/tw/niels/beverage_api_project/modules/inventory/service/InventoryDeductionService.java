@@ -2,6 +2,7 @@ package tw.niels.beverage_api_project.modules.inventory.service;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tw.niels.beverage_api_project.common.exception.ApplicationException;
 import tw.niels.beverage_api_project.common.exception.BadRequestException;
 import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
 import tw.niels.beverage_api_project.modules.inventory.dao.InventoryBatchDAO;
@@ -114,7 +115,7 @@ public class InventoryDeductionService {
 
         // 6. 二次檢查：理論上不應發生，但確保資料一致性
         if (remainingToDeduct.compareTo(BigDecimal.ZERO) > 0) {
-            throw new IllegalStateException("庫存資料異常：總量檢查通過但批次不足。短缺: " + remainingToDeduct);
+            throw new ApplicationException("庫存資料異常：總量檢查通過但批次不足。短缺: " + remainingToDeduct);
         }
     }
 
@@ -203,7 +204,7 @@ public class InventoryDeductionService {
 
             // 二次檢查：確保批次總和足夠
             if (remainingToDeduct.compareTo(BigDecimal.ZERO) > 0) {
-                throw new IllegalStateException("庫存資料不一致：Item總量檢查通過，但實際批次總和不足。Item ID: " + itemId + ", 短缺: " + remainingToDeduct);
+                throw new ApplicationException("庫存資料不一致：Item總量檢查通過，但實際批次總和不足。Item ID: " + itemId + ", 短缺: " + remainingToDeduct);
             }
         }
 

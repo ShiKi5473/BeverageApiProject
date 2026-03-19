@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Date;
 
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -21,25 +22,16 @@ import tw.niels.beverage_api_project.modules.report.dto.ProductSalesStatsDto;
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
     // 查詢特定品牌和店家的所有訂單 (依狀態篩選)
-    @Query("SELECT DISTINCT o FROM Order o " +
-            "LEFT JOIN FETCH o.items item " +
-            "LEFT JOIN FETCH item.product " +
-            "LEFT JOIN FETCH item.options " +
-            "WHERE o.brand.id = :brandId AND o.store.id = :storeId AND o.status = :status")
+    @EntityGraph(attributePaths = {"items", "items.product", "items.options"})
+    @Query("SELECT DISTINCT o FROM Order o WHERE o.brand.id = :brandId AND o.store.id = :storeId AND o.status = :status")
     List<Order> findAllByBrand_IdAndStore_IdAndStatus(Long brandId, Long storeId, OrderStatus status);
 
-    @Query("SELECT DISTINCT o FROM Order o " +
-            "LEFT JOIN FETCH o.items item " +
-            "LEFT JOIN FETCH item.product " +
-            "LEFT JOIN FETCH item.options " +
-            "WHERE o.brand.id = :brandId AND o.store.id = :storeId")
+    @EntityGraph(attributePaths = {"items", "items.product", "items.options"})
+    @Query("SELECT DISTINCT o FROM Order o WHERE o.brand.id = :brandId AND o.store.id = :storeId")
     List<Order> findAllByBrand_IdAndStore_Id(Long brandId, Long storeId);
 
-    @Query("SELECT o FROM Order o " +
-            "LEFT JOIN FETCH o.items item " +
-            "LEFT JOIN FETCH item.product " +
-            "LEFT JOIN FETCH item.options " +
-            "WHERE o.brand.id = :brandId AND o.id = :orderId")
+    @EntityGraph(attributePaths = {"items", "items.product", "items.options"})
+    @Query("SELECT o FROM Order o WHERE o.brand.id = :brandId AND o.id = :orderId")
     Optional<Order> findByBrand_IdAndId(Long brandId, Long orderId);
 
     /**

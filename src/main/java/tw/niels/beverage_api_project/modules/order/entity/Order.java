@@ -23,6 +23,8 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotNull;
 import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
 import tw.niels.beverage_api_project.modules.brand.entity.Brand;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
@@ -58,15 +60,22 @@ public class Order extends BaseTsidEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status_code", nullable = false)
+    @NotNull
     private OrderStatus status;
 
     @Column(name = "total_amount", nullable = false, precision = 10, scale = 2)
+    @NotNull
+    @DecimalMin("0.00")
     private BigDecimal totalAmount;
 
     @Column(name = "discount_amount", nullable = false, precision = 10, scale = 2)
+    @NotNull
+    @DecimalMin("0.00")
     private BigDecimal discountAmount = BigDecimal.ZERO;
 
     @Column(name = "final_amount", nullable = false, precision = 10, scale = 2)
+    @NotNull
+    @DecimalMin("0.00")
     private BigDecimal finalAmount;
 
     @Column(name = "points_used", nullable = false)

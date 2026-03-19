@@ -3,7 +3,6 @@ package tw.niels.beverage_api_project.modules.inventory.service;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
-import tw.niels.beverage_api_project.common.service.ControllerHelperService;
 import tw.niels.beverage_api_project.modules.inventory.dto.AddShipmentRequestDto;
 import tw.niels.beverage_api_project.modules.inventory.entity.*;
 import tw.niels.beverage_api_project.modules.inventory.repository.*;
@@ -35,7 +34,6 @@ public class InventoryService {
     private final PurchaseShipmentRepository shipmentRepository;
     private final StoreRepository storeRepository;
     private final UserRepository userRepository;
-    private final ControllerHelperService helperService;
     private final InventorySnapshotRepository snapshotRepository;
     private final InventoryTransactionRepository transactionRepository;
 
@@ -44,7 +42,6 @@ public class InventoryService {
                             PurchaseShipmentRepository shipmentRepository,
                             StoreRepository storeRepository,
                             UserRepository userRepository,
-                            ControllerHelperService helperService,
                             InventorySnapshotRepository snapshotRepository,
                             InventoryTransactionRepository transactionRepository) {
         this.itemRepository = itemRepository;
@@ -52,7 +49,6 @@ public class InventoryService {
         this.shipmentRepository = shipmentRepository;
         this.storeRepository = storeRepository;
         this.userRepository = userRepository;
-        this.helperService = helperService;
         this.snapshotRepository = snapshotRepository;
         this.transactionRepository = transactionRepository;
     }
@@ -61,11 +57,10 @@ public class InventoryService {
      * 員工執行進貨操作 (Add Stock)
      */
     @Transactional
-    public PurchaseShipment addShipment(Long brandId, Long storeId, AddShipmentRequestDto request) {
+    public PurchaseShipment addShipment(Long brandId, Long storeId, Long userId, AddShipmentRequestDto request) {
         Store store = storeRepository.findByBrand_IdAndId(brandId, storeId)
                 .orElseThrow(() -> new ResourceNotFoundException(MSG_STORE_NOT_FOUND));
 
-        Long userId = helperService.getCurrentUserId();
         User staff = userRepository.findByBrand_IdAndId(brandId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Staff not found: " + userId));
 
