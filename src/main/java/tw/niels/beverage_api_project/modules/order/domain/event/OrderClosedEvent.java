@@ -1,6 +1,6 @@
 package tw.niels.beverage_api_project.modules.order.domain.event;
 
-import tw.niels.beverage_api_project.modules.order.domain.model.Money;
+import tw.niels.beverage_api_project.common.domain.vo.Money;
 
 import java.time.Instant;
 

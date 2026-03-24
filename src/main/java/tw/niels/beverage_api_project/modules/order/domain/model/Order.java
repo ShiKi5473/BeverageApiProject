@@ -1,5 +1,7 @@
 package tw.niels.beverage_api_project.modules.order.domain.model;
 
+import tw.niels.beverage_api_project.common.domain.vo.Money;
+
 import tw.niels.beverage_api_project.modules.order.domain.event.OrderCancelledEvent;
 import tw.niels.beverage_api_project.modules.order.domain.event.OrderClosedEvent;
 import tw.niels.beverage_api_project.modules.order.domain.event.OrderPlacedEvent;

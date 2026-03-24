@@ -1,13 +1,13 @@
-package tw.niels.beverage_api_project.modules.order.domain.model;
+package tw.niels.beverage_api_project.common.domain.vo;
 
-import tw.niels.beverage_api_project.modules.order.domain.exception.OrderDomainException;
+import tw.niels.beverage_api_project.common.exception.DomainException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
 /**
  * ============================================================
- * Bounded Context: Order
+ * Bounded Context: Common
  * Layer: Domain - Value Object
  * ============================================================
  *
@@ -17,7 +17,7 @@ import java.math.RoundingMode;
  * 並確保金額語意清晰（加、減、乘運算回傳新物件）。
  *
  * 不變量（Invariants）：
- * - 金額不得為負數（負數會在建構時拋出 OrderDomainException）
+ * - 金額不得為負數（負數會在建構時拋出 DomainException）
  * - 所有金額統一使用小數點後 2 位，採用 HALF_UP 四捨五入
  *
  * 不可變（Immutable）：所有欄位為 final，所有運算回傳新的 Money 實例。
@@ -31,16 +31,16 @@ public record Money(BigDecimal amount) {
     /**
      * 緊湊建構子：驗證金額不得為負數，並統一精度為 2 位小數。
      *
-     * @throws OrderDomainException 若 amount 為 null 或負數
+     * @throws DomainException 若 amount 為 null 或負數
      */
     public Money {
         if (amount == null) {
-            throw new OrderDomainException("金額不得為 null");
+            throw new DomainException("金額不得為 null");
         }
         // 統一精度：小數點後 2 位，四捨五入
         amount = amount.setScale(2, RoundingMode.HALF_UP);
         if (amount.compareTo(BigDecimal.ZERO) < 0) {
-            throw new OrderDomainException("金額不得為負數，收到：" + amount);
+            throw new DomainException("金額不得為負數，收到：" + amount);
         }
     }
 
@@ -88,7 +88,7 @@ public record Money(BigDecimal amount) {
     }
 
     /**
-     * 乘法：this × multiplier（用於計算小計或折扣比例）。
+     * 乘法：this × multiplier（用於計算小計 or 折扣比例）。
      *
      * @param multiplier 乘數
      * @return 相乘後的新 Money 實例
