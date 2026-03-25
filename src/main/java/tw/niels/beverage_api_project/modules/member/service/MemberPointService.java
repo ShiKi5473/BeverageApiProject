@@ -187,4 +187,29 @@ public class MemberPointService {
         memberPointLogRepository.save(log);
     }
 
+    /**
+     * 調整點數 (通用方法，供管理員手動調整或系統其他邏輯使用)
+     */
+    @Transactional
+    public void adjustPoints(Long brandId, Long memberId, Long points, String reason, String reasonType) {
+        User member = memberProfileRepository.findById(memberId)
+                .map(MemberProfile::getUser)
+                .orElseThrow(() -> new BadRequestException("找不到會員，ID：" + memberId));
+
+        if (!member.getBrand().getId().equals(brandId)) {
+            throw new BadRequestException("會員不屬於該品牌");
+        }
+
+        MemberProfile profile = member.getMemberProfile();
+        long newTotalPoints = profile.getTotalPoints() + points;
+        if (newTotalPoints < 0) {
+            throw new BadRequestException("調整後點數不能小於 0");
+        }
+
+        profile.setTotalPoints(newTotalPoints);
+        memberProfileRepository.save(profile);
+
+        MemberPointLog log = new MemberPointLog(member, null, points, newTotalPoints, reason);
+        memberPointLogRepository.save(log);
+    }
 }

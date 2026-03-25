@@ -5,6 +5,7 @@ import tw.niels.beverage_api_project.common.domain.vo.Money;
 import tw.niels.beverage_api_project.modules.order.domain.event.OrderCancelledEvent;
 import tw.niels.beverage_api_project.modules.order.domain.event.OrderClosedEvent;
 import tw.niels.beverage_api_project.modules.order.domain.event.OrderPlacedEvent;
+import tw.niels.beverage_api_project.modules.order.domain.event.OrderPointsDeductedEvent;
 import tw.niels.beverage_api_project.modules.order.domain.event.OrderStatusChangedEvent;
 import tw.niels.beverage_api_project.modules.order.domain.exception.OrderDomainException;
 
@@ -44,6 +45,7 @@ import java.util.Set;
  * - OrderStatusChangedEvent：狀態轉換（除 CLOSED 和 CANCELLED 外）
  * - OrderClosedEvent：訂單完成取餐時
  * - OrderCancelledEvent：訂單取消時
+ * - OrderPointsDeductedEvent：付款時若有使用積點（供 PointDeductionEventHandler 於 AFTER_COMMIT 執行扣減，解決 C3 技術債）
  *
  * 與其他 Context 的互動：
  * - 發布 OrderClosedEvent → Inventory, Member, Report Application 訂閱
@@ -351,6 +353,11 @@ public class Order {
         // 狀態轉換：→ PREPARING
         this.status = OrderStatus.PREPARING;
         domainEvents.add(OrderStatusChangedEvent.of(this.id, oldStatus, this.status));
+        
+        // 若有使用積點，發布積點扣減事件（供 PointDeductionEventHandler 於 AFTER_COMMIT 時執行扣減）
+        if (this.pointsUsed > 0) {
+            domainEvents.add(OrderPointsDeductedEvent.of(this.id, this.brandId, this.memberId, this.pointsUsed, this.orderNumber.value()));
+        }
     }
 
     /**
