@@ -3,7 +3,6 @@ package tw.niels.beverage_api_project.modules.brand.service;
 import java.util.List;
 import java.util.Optional;
 
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -90,7 +89,7 @@ public class BrandService {
      * 【危險方法】僅供平台管理員使用
      * 建議重新命名以明確意圖，例如 getAllBrandsForAdmin
      */
-    @PreAuthorize(AuthorityConstants.HAS_ROLE_PLATFORM_ADMIN) // Service 層也可加防護
+    // 權限驗證由 Controller 層的 @PreAuthorize 負責（符合 Phase 0 架構決策）
     public List<Brand> getAllBrandsForAdmin() {
         return brandRepository.findAll();
     }

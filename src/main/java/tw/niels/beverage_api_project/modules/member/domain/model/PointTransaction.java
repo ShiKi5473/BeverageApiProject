@@ -84,8 +84,11 @@ public class PointTransaction {
 
     // ─── Getters（無 setters，確保不可變稽核性）────────────────────────────
 
-    /** 由 Infrastructure Mapper 在持久化後回填 ID */
-    public void setId(Long id) { this.id = id; }
+    /**
+     * 由 Infrastructure Mapper 在持久化後回填 ID。
+     * package-private：防止外部任意修改不可變稽核紀錄的 ID。
+     */
+    void setId(Long id) { this.id = id; }
 
     public Long getId()        { return id; }
     public Long getMemberId()  { return memberId; }

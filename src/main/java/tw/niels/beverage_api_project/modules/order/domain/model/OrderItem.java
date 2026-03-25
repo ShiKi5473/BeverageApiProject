@@ -122,8 +122,11 @@ public class OrderItem {
     /** 訂單品項 ID（在 Infrastructure Layer 持久化後由 Mapper 設定） */
     public Long getId() { return id; }
 
-    /** 由 Mapper 在重建 Domain Model 時設定 ID，避免重新計算 */
-    public void setId(Long id) { this.id = id; }
+    /**
+     * 由 Infrastructure Mapper 在持久化後回填 ID。
+     * package-private：僅允許同 package 的 Mapper 呼叫，防止外部任意修改 Entity ID。
+     */
+    void setId(Long id) { this.id = id; }
 
     public Long getProductId() { return productId; }
     public Long getVariantId() { return variantId; }
