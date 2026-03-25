@@ -19,8 +19,27 @@ import tw.niels.beverage_api_project.modules.report.dto.OrderStatusStatsDto;
 import tw.niels.beverage_api_project.modules.report.dto.PaymentStatsDto;
 import tw.niels.beverage_api_project.modules.report.dto.ProductSalesStatsDto;
 
+/**
+ * ============================================================
+ * Bounded Context: Order
+ * Layer: Infrastructure - Spring Data JPA Repository
+ * ============================================================
+ *
+ * 「訂單」JPA 倉儲介面（Spring Data）
+ *
+ * 直接操作 JPA Entity（Order），由 OrderRepositoryImpl 委派至此。
+ * 注意：此介面直接暴露 JPA Entity，不是 Domain Repository Interface。
+ * Domain Layer 依賴的是 domain/repository/OrderRepository，
+ * 而此類是 Infrastructure 層的 JPA 實現。
+ *
+ * 多租戶安全策略：
+ * - 所有查詢方法都強制使用 brandId 參數，確保資料隔離
+ * - 禁用 findById()、findAll()、deleteById() 等危險方法
+ *
+ * ============================================================
+ */
 @Repository
-public interface OrderRepository extends JpaRepository<Order, Long> {
+public interface OrderJpaRepository extends JpaRepository<Order, Long> {
     // 查詢特定品牌和店家的所有訂單 (依狀態篩選)
     @EntityGraph(attributePaths = {"items", "items.product", "items.options"})
     @Query("SELECT DISTINCT o FROM Order o WHERE o.brand.id = :brandId AND o.store.id = :storeId AND o.status = :status")

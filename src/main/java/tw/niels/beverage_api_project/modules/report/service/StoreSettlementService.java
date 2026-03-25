@@ -6,7 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
-import tw.niels.beverage_api_project.modules.order.repository.OrderRepository;
+import tw.niels.beverage_api_project.modules.order.repository.OrderJpaRepository;
 import tw.niels.beverage_api_project.modules.product.entity.Product;
 import tw.niels.beverage_api_project.modules.product.repository.ProductRepository;
 import tw.niels.beverage_api_project.modules.report.dto.OrderStatusStatsDto;
@@ -37,7 +37,7 @@ public class StoreSettlementService {
 
     private static final Logger logger = LoggerFactory.getLogger(StoreSettlementService.class);
 
-    private final OrderRepository orderRepository;
+    private final OrderJpaRepository orderRepository;
     private final ProductRepository productRepository;
     private final DailyStoreStatsRepository dailyStoreStatsRepository;
     private final DailyProductStatsRepository dailyProductStatsRepository;

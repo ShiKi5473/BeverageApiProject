@@ -11,7 +11,7 @@ import tw.niels.beverage_api_project.modules.order.dto.CreateOrderRequestDto;
 import tw.niels.beverage_api_project.modules.order.dto.ProcessPaymentRequestDto;
 import tw.niels.beverage_api_project.modules.order.entity.Order;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
-import tw.niels.beverage_api_project.modules.order.repository.OrderRepository;
+import tw.niels.beverage_api_project.modules.order.repository.OrderJpaRepository;
 import tw.niels.beverage_api_project.modules.order.state.OrderState;
 import tw.niels.beverage_api_project.modules.order.state.OrderStateFactory;
 import tw.niels.beverage_api_project.modules.order.vo.MemberSnapshot;
@@ -25,11 +25,11 @@ import java.util.List;
 
 @Service
 public class OrderService {
-    private final OrderRepository orderRepository;
+    private final OrderJpaRepository orderRepository;
     private final OrderNumberService orderNumberService;
     private final OrderStateFactory orderStateFactory;
 
-    public OrderService(OrderRepository orderRepository,
+    public OrderService(OrderJpaRepository orderRepository,
                         OrderNumberService orderNumberService,
                         OrderStateFactory orderStateFactory) {
         this.orderRepository = orderRepository;

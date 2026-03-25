@@ -10,7 +10,7 @@ import tw.niels.beverage_api_project.modules.inventory.repository.InventoryTrans
 import tw.niels.beverage_api_project.modules.order.entity.Order;
 import tw.niels.beverage_api_project.modules.order.entity.OrderItem;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
-import tw.niels.beverage_api_project.modules.order.repository.OrderRepository;
+import tw.niels.beverage_api_project.modules.order.repository.OrderJpaRepository;
 import tw.niels.beverage_api_project.modules.product.entity.ProductOption;
 import tw.niels.beverage_api_project.modules.product.entity.ProductVariant;
 import tw.niels.beverage_api_project.modules.product.entity.Recipe;
@@ -31,7 +31,7 @@ public class InventoryReportService {
 
     private final InventoryItemRepository itemRepository;
     private final InventoryTransactionRepository transactionRepository;
-    private final OrderRepository orderRepository;
+    private final OrderJpaRepository orderRepository;
     private final RecipeRepository recipeRepository;
 
     public InventoryReportService(InventoryItemRepository itemRepository,
