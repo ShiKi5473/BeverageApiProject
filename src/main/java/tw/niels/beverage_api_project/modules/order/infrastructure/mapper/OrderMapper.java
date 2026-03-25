@@ -1,14 +1,14 @@
 package tw.niels.beverage_api_project.modules.order.infrastructure.mapper;
 
 import tw.niels.beverage_api_project.common.domain.vo.Money;
+import tw.niels.beverage_api_project.modules.order.domain.model.MemberSnapshot;
 import tw.niels.beverage_api_project.modules.order.domain.model.Order;
 import tw.niels.beverage_api_project.modules.order.domain.model.OrderNumber;
-import tw.niels.beverage_api_project.modules.order.entity.Order as OrderJpaEntity;
-import tw.niels.beverage_api_project.modules.order.entity.OrderItem as OrderItemJpaEntity;
+import tw.niels.beverage_api_project.modules.order.domain.model.OrderStatus;
+import tw.niels.beverage_api_project.modules.order.domain.model.ProductSnapshot;
 
-import java.math.BigDecimal;
-import java.time.Instant;
-import java.util.Collections;
+import java.sql.Timestamp;
+import java.util.List;
 import java.util.stream.Collectors;
 
 /**
@@ -19,15 +19,21 @@ import java.util.stream.Collectors;
  *
  * Order BC - JPA Entity ↔ Domain Model 雙向映射工具
  *
- * 負責統一管理 OrderJpaEntity 與 Order Domain Model 之間的轉換邏輯，
+ * 負責統一管理 JPA OrderEntity 與 Order Domain Model 之間的轉換邏輯，
  * 避免轉換代碼分散在各層，提高代碼的可維護性與一致性。
  *
  * 映射規則：
- * - JPA 的 id, brandId, storeId, staffId 對應 Domain 的相應欄位
- * - JPA 的 BigDecimal 轉換為 Domain 的 Money Value Object
- * - JPA 的 Date 轉換為 Domain 的 Instant
- * - JPA Entity 關聯（Brand, Store, User）未直接映射，改用 ID
- * - OrderItem 集合遞迴轉換
+ * - JPA 的關聯欄位（brand, store, staff, member）取其 ID 對應 Domain 的 ID 欄位
+ * - JPA 的 BigDecimal 轉換為 Domain 的 Money Value Object（Money.of(BigDecimal)）
+ * - Money Value Object 轉回 BigDecimal 使用 .amount() 方法（Money 是 Java record）
+ * - JPA 的 Date 轉換為 Domain 的 Instant（.toInstant()）
+ * - JPA vo.MemberSnapshot ↔ Domain domain.model.MemberSnapshot 之間欄位名稱相同，直接複製
+ * - JPA vo.ProductSnapshot 的 basePrice 是 BigDecimal，Domain 的是 Money，需轉換
+ * - enums.OrderStatus ↔ domain.model.OrderStatus 透過 .name() 字串安全轉換
+ * - OrderItem 集合由 OrderItemMapper 遞迴轉換
+ *
+ * 使用 Order.reconstitute() 重建 Domain Aggregate，不觸發任何 Domain Event。
+ * entity.Order / entity.OrderItem 使用完整類別路徑，避免與 domain.model 同名衝突。
  *
  * ============================================================
  */
@@ -36,198 +42,190 @@ public class OrderMapper {
     /**
      * JPA Entity → Domain Model（讀取資料庫）
      *
-     * 將持久化的 JPA Entity 轉換為純業務領域模型，
-     * 適用於載入訂單時的轉換。
+     * 使用 Order.reconstitute() 靜態工廠方法重建 Domain Aggregate，
+     * 不執行業務規則驗證，不發布 Domain Event。
      *
-     * @param entity JPA 訂單實體（來自資料庫）
-     * @return 對應的 Domain Order Aggregate Root，若 entity 為 null 返回 null
+     * @param jpaOrder JPA 訂單實體（來自資料庫）
+     * @return 對應的 Domain Order Aggregate Root，若 jpaOrder 為 null 返回 null
      */
-    public static Order toDomain(OrderJpaEntity entity) {
-        if (entity == null) return null;
+    public static Order toDomain(tw.niels.beverage_api_project.modules.order.entity.Order jpaOrder) {
+        if (jpaOrder == null) return null;
 
-        // 建立 Domain Order（需調用適當的靜態工廠方法或建構子）
-        // 暫時使用反射或直接建構，待確認 Order 的開放方法
-        Order order = new Order(
-            entity.getBrandId(),
-            entity.getStoreId(),
-            entity.getStaffId(),
-            OrderNumber.of(entity.getOrderNumber()),
-            // 轉換訂單品項列表（遞迴轉換）
-            entity.getItems() != null
-                ? entity.getItems().stream()
-                    .map(OrderItemMapper::toDomain)
-                    .collect(Collectors.toList())
-                : Collections.emptyList(),
-            // 計算原始金額（BigDecimal → Money VO）
-            entity.getTotalAmount() != null
-                ? Money.of(entity.getTotalAmount())
-                : Money.ZERO,
-            entity.getCustomerNote()
+        // 轉換訂單品項集合（委派 OrderItemMapper 遞迴轉換）
+        var domainItems = jpaOrder.getItems() != null
+            ? jpaOrder.getItems().stream()
+                .map(OrderItemMapper::toDomain)
+                .collect(Collectors.toList())
+            : List.<tw.niels.beverage_api_project.modules.order.domain.model.OrderItem>of();
+
+        // 轉換 JPA enums.OrderStatus → Domain domain.model.OrderStatus（透過名稱映射）
+        OrderStatus domainStatus = jpaOrder.getStatus() != null
+            ? OrderStatus.valueOf(jpaOrder.getStatus().name())
+            : OrderStatus.PENDING;
+
+        // 轉換 JPA vo.MemberSnapshot → Domain domain.model.MemberSnapshot
+        MemberSnapshot domainMemberSnapshot = toMemberSnapshotDomain(jpaOrder.getMemberSnapshot());
+
+        // 使用 Order.reconstitute() 重建 Domain Aggregate（不觸發 Domain Event）
+        return Order.reconstitute(
+            jpaOrder.getId(),
+            // JPA 使用 Entity 關聯，需取出 ID 欄位
+            jpaOrder.getBrand()  != null ? jpaOrder.getBrand().getId()  : null,
+            jpaOrder.getStore()  != null ? jpaOrder.getStore().getId()  : null,
+            jpaOrder.getStaff()  != null ? jpaOrder.getStaff().getId()  : null,
+            jpaOrder.getMember() != null ? jpaOrder.getMember().getId() : null,
+            OrderNumber.of(jpaOrder.getOrderNumber()),
+            domainStatus,
+            // 轉換金額（BigDecimal → Money VO）
+            jpaOrder.getTotalAmount()    != null ? Money.of(jpaOrder.getTotalAmount())    : Money.ZERO,
+            jpaOrder.getDiscountAmount() != null ? Money.of(jpaOrder.getDiscountAmount()) : Money.ZERO,
+            jpaOrder.getFinalAmount()    != null ? Money.of(jpaOrder.getFinalAmount())    : Money.ZERO,
+            jpaOrder.getPointsUsed()    != null ? jpaOrder.getPointsUsed()    : 0L,
+            jpaOrder.getPointsEarned()  != null ? jpaOrder.getPointsEarned()  : 0L,
+            // PaymentMethodEntity → Long（取 ID）
+            jpaOrder.getPaymentMethod() != null
+                ? jpaOrder.getPaymentMethod().getPaymentMethodId().longValue()
+                : null,
+            jpaOrder.getCustomerNote(),
+            // 轉換 Date → Instant
+            jpaOrder.getOrderTime()     != null ? jpaOrder.getOrderTime().toInstant()     : null,
+            jpaOrder.getCompletedTime() != null ? jpaOrder.getCompletedTime().toInstant() : null,
+            domainItems,
+            domainMemberSnapshot
         );
-
-        // 設定 ID（由 Infrastructure Layer 在持久化後設定）
-        // 使用反射設定 package-private setId 方法，或改用其他方式
-        try {
-            var setIdMethod = Order.class.getDeclaredMethod("setId", Long.class);
-            setIdMethod.setAccessible(true);
-            setIdMethod.invoke(order, entity.getId());
-        } catch (Exception e) {
-            // 若反射失敗，日誌記錄但不中斷流程（之後的 save 會重新設定）
-            System.err.println("警告：無法設定 Order ID，將由 Repository save 方法處理");
-        }
-
-        // 設定支付與折扣相關欄位（若已付款或有折扣）
-        if (entity.getPaymentMethodId() != null) {
-            try {
-                var setPaymentMethodIdMethod = Order.class.getDeclaredMethod("setPaymentMethodId", Long.class);
-                setPaymentMethodIdMethod.setAccessible(true);
-                setPaymentMethodIdMethod.invoke(order, entity.getPaymentMethodId());
-
-                var setPointsUsedMethod = Order.class.getDeclaredMethod("setPointsUsed", Long.class);
-                setPointsUsedMethod.setAccessible(true);
-                setPointsUsedMethod.invoke(order, entity.getPointsUsed());
-
-                // 設定折扣欄位
-                if (entity.getDiscountAmount() != null) {
-                    var setDiscountAmountMethod = Order.class.getDeclaredMethod(
-                        "setDiscountAmount", Money.class);
-                    setDiscountAmountMethod.setAccessible(true);
-                    setDiscountAmountMethod.invoke(order, Money.of(entity.getDiscountAmount()));
-                }
-
-                // 設定最終金額
-                if (entity.getFinalAmount() != null) {
-                    var setFinalAmountMethod = Order.class.getDeclaredMethod("setFinalAmount", Money.class);
-                    setFinalAmountMethod.setAccessible(true);
-                    setFinalAmountMethod.invoke(order, Money.of(entity.getFinalAmount()));
-                }
-
-                // 設定積點相關
-                if (entity.getPointsEarned() != null) {
-                    var setPointsEarnedMethod = Order.class.getDeclaredMethod("setPointsEarned", Long.class);
-                    setPointsEarnedMethod.setAccessible(true);
-                    setPointsEarnedMethod.invoke(order, entity.getPointsEarned());
-                }
-
-            } catch (Exception e) {
-                System.err.println("警告：無法設定訂單支付相關欄位");
-            }
-        }
-
-        // 設定訂單狀態
-        if (entity.getStatus() != null) {
-            try {
-                var setStatusMethod = Order.class.getDeclaredMethod(
-                    "setStatus",
-                    tw.niels.beverage_api_project.modules.order.domain.model.OrderStatus.class);
-                setStatusMethod.setAccessible(true);
-                setStatusMethod.invoke(order, entity.getStatus());
-            } catch (Exception e) {
-                System.err.println("警告：無法設定訂單狀態");
-            }
-        }
-
-        // 設定時間戳
-        if (entity.getOrderTime() != null) {
-            try {
-                var setOrderTimeMethod = Order.class.getDeclaredMethod("setOrderTime", Instant.class);
-                setOrderTimeMethod.setAccessible(true);
-                setOrderTimeMethod.invoke(order, entity.getOrderTime().toInstant());
-            } catch (Exception e) {
-                // 時間戳設定失敗不影響核心邏輯
-            }
-        }
-
-        if (entity.getCompletedTime() != null) {
-            try {
-                var setCompletedTimeMethod = Order.class.getDeclaredMethod("setCompletedTime", Instant.class);
-                setCompletedTimeMethod.setAccessible(true);
-                setCompletedTimeMethod.invoke(order, entity.getCompletedTime().toInstant());
-            } catch (Exception e) {
-                // 時間戳設定失敗不影響核心邏輯
-            }
-        }
-
-        // 設定會員快照
-        if (entity.getMemberSnapshot() != null) {
-            try {
-                var setMemberSnapshotMethod = Order.class.getDeclaredMethod(
-                    "setMemberSnapshot",
-                    tw.niels.beverage_api_project.modules.order.domain.model.MemberSnapshot.class);
-                setMemberSnapshotMethod.setAccessible(true);
-                setMemberSnapshotMethod.invoke(order, entity.getMemberSnapshot());
-            } catch (Exception e) {
-                System.err.println("警告：無法設定會員快照");
-            }
-        }
-
-        return order;
     }
 
     /**
      * Domain Model → JPA Entity（寫入資料庫）
      *
-     * 將業務領域模型轉換為可持久化的 JPA Entity，
-     * 適用於儲存訂單時的轉換。
+     * 將業務領域模型轉換為可持久化的 JPA Entity。
+     * Brand / Store / Staff / Member 等關聯僅設定 ID（Proxy 物件），
+     * 避免額外的查詢開銷，由 JPA 在 flush 時驗證外鍵是否存在。
      *
      * @param domain Domain Order Aggregate Root
      * @return 對應的 JPA 訂單實體，若 domain 為 null 返回 null
      */
-    public static OrderJpaEntity toEntity(Order domain) {
+    public static tw.niels.beverage_api_project.modules.order.entity.Order toEntity(Order domain) {
         if (domain == null) return null;
 
-        OrderJpaEntity entity = new OrderJpaEntity();
+        tw.niels.beverage_api_project.modules.order.entity.Order jpaOrder =
+            new tw.niels.beverage_api_project.modules.order.entity.Order();
 
-        // 設定基礎欄位（ID 由 Repository 決定是否保留）
+        // 設定 ID（若已有 ID 則為更新操作，JPA 會執行 UPDATE）
         if (domain.getId() != null) {
-            entity.setId(domain.getId());
+            jpaOrder.setId(domain.getId());
         }
 
-        entity.setBrandId(domain.getBrandId());
-        entity.setStoreId(domain.getStoreId());
-        entity.setStaffId(domain.getStaffId());
-        entity.setOrderNumber(domain.getOrderNumber().value());
+        // 設定 Brand / Store / Staff / Member（透過 Proxy 物件僅帶入 ID，節省查詢）
+        if (domain.getBrandId() != null) {
+            var brand = new tw.niels.beverage_api_project.modules.brand.entity.Brand();
+            brand.setId(domain.getBrandId());
+            jpaOrder.setBrand(brand);
+        }
+        if (domain.getStoreId() != null) {
+            var store = new tw.niels.beverage_api_project.modules.store.entity.Store();
+            store.setId(domain.getStoreId());
+            jpaOrder.setStore(store);
+        }
+        if (domain.getStaffId() != null) {
+            var staff = new tw.niels.beverage_api_project.modules.user.entity.User();
+            staff.setId(domain.getStaffId());
+            jpaOrder.setStaff(staff);
+        }
+        if (domain.getMemberId() != null) {
+            var member = new tw.niels.beverage_api_project.modules.user.entity.User();
+            member.setId(domain.getMemberId());
+            jpaOrder.setMember(member);
+        }
 
-        // 轉換訂單品項集合（遞迴轉換，並設定雙向關聯）
+        jpaOrder.setOrderNumber(domain.getOrderNumber().value());
+
+        // 轉換 Domain domain.model.OrderStatus → JPA enums.OrderStatus（透過名稱映射）
+        if (domain.getStatus() != null) {
+            jpaOrder.setStatus(
+                tw.niels.beverage_api_project.modules.order.enums.OrderStatus.valueOf(
+                    domain.getStatus().name()));
+        }
+
+        // 轉換金額（Money VO → BigDecimal，使用 Money record 的 .amount() 方法）
+        jpaOrder.setTotalAmount(domain.getTotalAmount().amount());
+        jpaOrder.setDiscountAmount(domain.getDiscountAmount().amount());
+        jpaOrder.setFinalAmount(domain.getFinalAmount().amount());
+
+        // 設定積點相關
+        jpaOrder.setPointsUsed(domain.getPointsUsed()   != null ? domain.getPointsUsed()   : 0L);
+        jpaOrder.setPointsEarned(domain.getPointsEarned() != null ? domain.getPointsEarned() : 0L);
+
+        // 設定顧客備註
+        jpaOrder.setCustomerNote(domain.getCustomerNote());
+
+        // 轉換完成時間（Instant → Timestamp，JPA 接受 java.sql.Timestamp）
+        if (domain.getCompletedTime() != null) {
+            jpaOrder.setCompletedTime(Timestamp.from(domain.getCompletedTime()));
+        }
+
+        // 轉換 Domain domain.model.MemberSnapshot → JPA vo.MemberSnapshot
+        jpaOrder.setMemberSnapshot(toMemberSnapshotJpa(domain.getMemberSnapshot()));
+
+        // 轉換訂單品項集合（委派 OrderItemMapper，並設定雙向關聯）
         if (domain.getItems() != null && !domain.getItems().isEmpty()) {
             var jpaItems = domain.getItems().stream()
                 .map(item -> {
-                    OrderItemJpaEntity jpaItem = OrderItemMapper.toEntity(item);
-                    jpaItem.setOrder(entity); // 設定雙向關聯
+                    var jpaItem = OrderItemMapper.toEntity(item);
+                    jpaItem.setOrder(jpaOrder); // 設定雙向關聯，JPA Cascade 需要
                     return jpaItem;
                 })
                 .collect(Collectors.toSet());
-            entity.setItems(jpaItems);
+            jpaOrder.setItems(jpaItems);
         }
 
-        // 設定訂單狀態（Domain OrderStatus enum → JPA OrderStatus enum，通常是同一類型）
-        entity.setStatus(domain.getStatus());
+        return jpaOrder;
+    }
 
-        // 轉換金額欄位（Money VO → BigDecimal）
-        entity.setTotalAmount(domain.getTotalAmount().toBigDecimal());
-        entity.setDiscountAmount(domain.getDiscountAmount().toBigDecimal());
-        entity.setFinalAmount(domain.getFinalAmount().toBigDecimal());
+    // ─── 快照類型轉換輔助方法 ──────────────────────────────────────────────
 
-        // 設定積點相關
-        entity.setPointsUsed(domain.getPointsUsed() != null ? domain.getPointsUsed() : 0L);
-        entity.setPointsEarned(domain.getPointsEarned() != null ? domain.getPointsEarned() : 0L);
+    /**
+     * JPA vo.MemberSnapshot → Domain domain.model.MemberSnapshot
+     * 兩個 record 欄位相同，直接重新建構。
+     */
+    private static MemberSnapshot toMemberSnapshotDomain(
+            tw.niels.beverage_api_project.modules.order.vo.MemberSnapshot jpa) {
+        if (jpa == null) return null;
+        return new MemberSnapshot(jpa.userId(), jpa.fullName(), jpa.phone(), jpa.email());
+    }
 
-        // 設定支付方式 ID
-        entity.setPaymentMethodId(domain.getPaymentMethodId());
+    /**
+     * Domain domain.model.MemberSnapshot → JPA vo.MemberSnapshot
+     */
+    private static tw.niels.beverage_api_project.modules.order.vo.MemberSnapshot toMemberSnapshotJpa(
+            MemberSnapshot domain) {
+        if (domain == null) return null;
+        return new tw.niels.beverage_api_project.modules.order.vo.MemberSnapshot(
+            domain.userId(), domain.fullName(), domain.phone(), domain.email());
+    }
 
-        // 設定顧客備註
-        entity.setCustomerNote(domain.getCustomerNote());
+    /**
+     * JPA vo.ProductSnapshot → Domain domain.model.ProductSnapshot
+     * JPA 使用 BigDecimal basePrice，Domain 使用 Money basePrice。
+     */
+    static ProductSnapshot toProductSnapshotDomain(
+            tw.niels.beverage_api_project.modules.order.vo.ProductSnapshot jpa) {
+        if (jpa == null) return null;
+        return new ProductSnapshot(
+            jpa.productId(), jpa.name(),
+            jpa.basePrice() != null ? Money.of(jpa.basePrice()) : Money.ZERO,
+            jpa.categoryName(), jpa.variantName());
+    }
 
-        // 轉換時間戳（Instant → Date，若需要則轉換）
-        // 通常 JPA Entity 已有 @CreationTimestamp，不需手動設定 orderTime
-        // entity.setOrderTime(new Date(domain.getOrderTime().toEpochMilli()));
-        if (domain.getCompletedTime() != null) {
-            entity.setCompletedTime(java.sql.Timestamp.from(domain.getCompletedTime()));
-        }
-
-        // 設定會員快照
-        entity.setMemberSnapshot(domain.getMemberSnapshot());
-
-        return entity;
+    /**
+     * Domain domain.model.ProductSnapshot → JPA vo.ProductSnapshot
+     */
+    static tw.niels.beverage_api_project.modules.order.vo.ProductSnapshot toProductSnapshotJpa(
+            ProductSnapshot domain) {
+        if (domain == null) return null;
+        return new tw.niels.beverage_api_project.modules.order.vo.ProductSnapshot(
+            domain.productId(), domain.name(),
+            domain.basePrice() != null ? domain.basePrice().amount() : null,
+            domain.categoryName(), domain.variantName());
     }
 }
