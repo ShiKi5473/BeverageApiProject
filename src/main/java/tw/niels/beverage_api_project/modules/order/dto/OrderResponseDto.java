@@ -133,50 +133,48 @@ public class OrderResponseDto {
         }
     }
 
-    public static OrderResponseDto fromEntity(Order order) {
+
+    public static OrderResponseDto fromDomain(tw.niels.beverage_api_project.modules.order.domain.model.Order order) {
         OrderResponseDto dto = new OrderResponseDto();
         dto.setOrderId(order.getId());
-        dto.setOrderNumber(order.getOrderNumber());
-        dto.setStoreId(order.getStore().getId());
-        if (order.getMember() != null) {
-            dto.setMemberId(order.getMember().getUserId());
+        dto.setOrderNumber(order.getOrderNumber() != null ? order.getOrderNumber().value() : null);
+        dto.setStoreId(order.getStoreId());
+        dto.setMemberId(order.getMemberId());
+        dto.setStaffId(order.getStaffId());
+        if (order.getStatus() != null) {
+            dto.setStatus(tw.niels.beverage_api_project.modules.order.enums.OrderStatus.valueOf(order.getStatus().name()));
         }
-        if (order.getStaff() != null) {
-            dto.setStaffId(order.getStaff().getUserId());
-        }
-        dto.setStatus(order.getStatus());
-        dto.setTotalAmount(order.getTotalAmount());
-        dto.setDiscountAmount(order.getDiscountAmount());
-        dto.setFinalAmount(order.getFinalAmount());
+        dto.setTotalAmount(order.getTotalAmount() != null ? order.getTotalAmount().amount() : null);
+        dto.setDiscountAmount(order.getDiscountAmount() != null ? order.getDiscountAmount().amount() : null);
+        dto.setFinalAmount(order.getFinalAmount() != null ? order.getFinalAmount().amount() : null);
         dto.setPointsUsed(order.getPointsUsed());
         dto.setPointsEarned(order.getPointsEarned());
-        dto.setPaymentMethod(PaymentMethodDto.fromEntity(order.getPaymentMethod()));
+        
+        // 付款方式目前只存 ID，暫不展開詳細資訊或後續補齊
+        if (order.getPaymentMethodId() != null) {
+            PaymentMethodDto pmDto = new PaymentMethodDto();
+            pmDto.setId(order.getPaymentMethodId().intValue());
+            dto.setPaymentMethod(pmDto);
+        }
+
         dto.setCustomerNote(order.getCustomerNote());
-        dto.setOrderTime(order.getOrderTime());
-        dto.setCompletedTime(order.getCompletedTime());
+        dto.setOrderTime(order.getOrderTime() != null ? Date.from(order.getOrderTime()) : null);
+        dto.setCompletedTime(order.getCompletedTime() != null ? Date.from(order.getCompletedTime()) : null);
 
         List<OrderItemResponseDto> itemsDtos = order.getItems().stream().map(item -> {
             OrderItemResponseDto itemDto = new OrderItemResponseDto();
             itemDto.setOrderItemId(item.getId());
-            itemDto.setProductId(item.getProduct().getId());
-            itemDto.setProductName(item.getProduct().getName());
+            itemDto.setProductId(item.getProductId());
+            itemDto.setProductName(item.getProductSnapshot() != null ? item.getProductSnapshot().name() : null);
             itemDto.setQuantity(item.getQuantity());
-            itemDto.setUnitPrice(item.getUnitPrice());
-            itemDto.setSubtotal(item.getSubtotal());
+            itemDto.setUnitPrice(item.getUnitPrice() != null ? item.getUnitPrice().amount() : null);
+            itemDto.setSubtotal(item.getSubtotal() != null ? item.getSubtotal().amount() : null);
             itemDto.setNotes(item.getNotes());
-
-            List<OptionResponseDto> optionDtos = item.getOptions().stream().map(option -> {
-                OptionResponseDto optionDto = new OptionResponseDto();
-                optionDto.setOptionId(option.getId());
-                optionDto.setOptionName(option.getOptionName());
-                optionDto.setPriceAdjustment(option.getPriceAdjustment());
-                return optionDto;
-            }).collect(Collectors.toList());
-            itemDto.setOptions(optionDtos);
+            // 選項暫不展開詳細名稱，僅返回 ID 或後續強化
             return itemDto;
         }).collect(Collectors.toList());
 
         dto.setItems(itemsDtos);
         return dto;
     }
-}
+}
