@@ -2,9 +2,9 @@ package tw.niels.beverage_api_project.modules.brand.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
-import tw.niels.beverage_api_project.modules.brand.entity.BrandPointConfig;
+import tw.niels.beverage_api_project.modules.brand.entity.BrandPointConfigEntity;
 
 @Repository
-public interface BrandPointConfigRepository extends JpaRepository<BrandPointConfig, Long> {
+public interface BrandPointConfigJpaRepository extends JpaRepository<BrandPointConfigEntity, Long> {
 
 }

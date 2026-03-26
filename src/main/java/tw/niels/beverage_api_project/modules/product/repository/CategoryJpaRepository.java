@@ -8,24 +8,27 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Repository;
 
-import tw.niels.beverage_api_project.modules.product.entity.Category;
+import tw.niels.beverage_api_project.modules.product.entity.CategoryEntity;
 
 @Repository
-public interface CategoryRepository extends JpaRepository<Category, Long> {
-    Optional<Category> findByBrand_IdAndNameIgnoreCase(Long brandId, String name);
+public interface CategoryJpaRepository extends JpaRepository<CategoryEntity, Long> {
+    Optional<CategoryEntity> findByBrand_IdAndNameIgnoreCase(Long brandId, String name);
 
-    List<Category> findByBrand_Id(Long brandId);
+    List<CategoryEntity> findByBrand_IdAndIsActive(Long brandId, Boolean isActive);
+
+    List<CategoryEntity> findByBrand_Id(Long brandId);
+    Optional<CategoryEntity> findByBrand_IdAndId(Long brandId, Long id);
     /**
      * 提供一個安全的 "findAllById" 替代方案
      */
-    Set<Category> findByBrand_IdAndIdIn(Long brandId, Set<Long> categoryIds);
+    Set<CategoryEntity> findByBrand_IdAndIdIn(Long brandId, Set<Long> categoryIds);
     /**
      * 禁用預設的 findById，強迫使用 findByBrand_BrandIdAndCategoryId()。
      */
     @Deprecated
     @Override
     @NonNull
-    default Optional<Category> findById(@NonNull Long id) {
+    default Optional<CategoryEntity> findById(@NonNull Long id) {
         throw new UnsupportedOperationException("禁止呼叫預設的 findById()，請改用 findByBrand_BrandIdAndCategoryId() 以確保資料隔離");
     }
 
@@ -35,7 +38,7 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
     @Deprecated
     @Override
     @NonNull
-    default List<Category> findAll() {
+    default List<CategoryEntity> findAll() {
         throw new UnsupportedOperationException("禁止呼叫預設的 findAll()，請改用 findByBrand_BrandId() 以確保資料隔離");
     }
 

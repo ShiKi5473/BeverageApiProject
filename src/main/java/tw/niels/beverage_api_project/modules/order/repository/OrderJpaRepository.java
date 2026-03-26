@@ -13,7 +13,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Repository;
 
-import tw.niels.beverage_api_project.modules.order.entity.Order;
+import tw.niels.beverage_api_project.modules.order.entity.OrderEntity;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
 import tw.niels.beverage_api_project.modules.report.dto.OrderStatusStatsDto;
 import tw.niels.beverage_api_project.modules.report.dto.PaymentStatsDto;
@@ -21,44 +21,28 @@ import tw.niels.beverage_api_project.modules.report.dto.ProductSalesStatsDto;
 
 /**
  * ============================================================
- * Bounded Context: Order
+ * Bounded Context: OrderEntity
  * Layer: Infrastructure - Spring Data JPA Repository
- * ============================================================
- *
- * 「訂單」JPA 倉儲介面（Spring Data）
- *
- * 直接操作 JPA Entity（Order），由 OrderRepositoryImpl 委派至此。
- * 注意：此介面直接暴露 JPA Entity，不是 Domain Repository Interface。
- * Domain Layer 依賴的是 domain/repository/OrderRepository，
- * 而此類是 Infrastructure 層的 JPA 實現。
- *
- * 多租戶安全策略：
- * - 所有查詢方法都強制使用 brandId 參數，確保資料隔離
- * - 禁用 findById()、findAll()、deleteById() 等危險方法
- *
  * ============================================================
  */
 @Repository
-public interface OrderJpaRepository extends JpaRepository<Order, Long> {
-    // 查詢特定品牌和店家的所有訂單 (依狀態篩選)
-    @EntityGraph(attributePaths = {"items", "items.product", "items.options"})
-    @Query("SELECT DISTINCT o FROM Order o WHERE o.brand.id = :brandId AND o.store.id = :storeId AND o.status = :status")
-    List<Order> findAllByBrand_IdAndStore_IdAndStatus(Long brandId, Long storeId, OrderStatus status);
+public interface OrderJpaRepository extends JpaRepository<OrderEntity, Long> {
+    
+    @EntityGraph(attributePaths = {"items", "items.product", "items.productVariant", "items.options"})
+    @Query("SELECT DISTINCT o FROM OrderEntity o WHERE o.brand.id = :brandId AND o.store.id = :storeId AND o.status = :status")
+    List<OrderEntity> findAllByBrand_IdAndStore_IdAndStatus(Long brandId, Long storeId, OrderStatus status);
 
-    @EntityGraph(attributePaths = {"items", "items.product", "items.options"})
-    @Query("SELECT DISTINCT o FROM Order o WHERE o.brand.id = :brandId AND o.store.id = :storeId")
-    List<Order> findAllByBrand_IdAndStore_Id(Long brandId, Long storeId);
+    @EntityGraph(attributePaths = {"items", "items.product", "items.productVariant", "items.options"})
+    @Query("SELECT DISTINCT o FROM OrderEntity o WHERE o.brand.id = :brandId AND o.store.id = :storeId")
+    List<OrderEntity> findAllByBrand_IdAndStore_Id(Long brandId, Long storeId);
 
-    @EntityGraph(attributePaths = {"items", "items.product", "items.options"})
-    @Query("SELECT o FROM Order o WHERE o.brand.id = :brandId AND o.id = :orderId")
-    Optional<Order> findByBrand_IdAndId(Long brandId, Long orderId);
+    @EntityGraph(attributePaths = {"items", "items.product", "items.productVariant", "items.options"})
+    @Query("SELECT o FROM OrderEntity o WHERE o.brand.id = :brandId AND o.id = :orderId")
+    Optional<OrderEntity> findByBrand_IdAndId(Long brandId, Long orderId);
 
-    /**
-     * 統計 1: 訂單狀態統計 (改用 DTO)
-     */
     @Query("SELECT new tw.niels.beverage_api_project.modules.report.dto.OrderStatusStatsDto(" +
             "o.status, COUNT(o), SUM(o.totalAmount), SUM(o.discountAmount), SUM(o.finalAmount)) " +
-            "FROM Order o " +
+            "FROM OrderEntity o " +
             "WHERE o.store.id = :storeId " +
             "AND o.completedTime BETWEEN :start AND :end " +
             "GROUP BY o.status")
@@ -66,12 +50,9 @@ public interface OrderJpaRepository extends JpaRepository<Order, Long> {
                                                                       @Param("start") LocalDateTime start,
                                                                       @Param("end") LocalDateTime end);
 
-    /**
-     * 統計 2: 付款方式統計 (改用 DTO)
-     */
     @Query("SELECT new tw.niels.beverage_api_project.modules.report.dto.PaymentStatsDto(" +
             "pm.code, SUM(o.finalAmount)) " +
-            "FROM Order o " +
+            "FROM OrderEntity o " +
             "LEFT JOIN o.paymentMethod pm " +
             "WHERE o.store.id = :storeId " +
             "AND o.status = 'CLOSED' " +
@@ -81,12 +62,9 @@ public interface OrderJpaRepository extends JpaRepository<Order, Long> {
                                                               @Param("start") LocalDateTime start,
                                                               @Param("end") LocalDateTime end);
 
-    /**
-     * 統計 3: 商品銷售統計 (改用 DTO)
-     */
     @Query("SELECT new tw.niels.beverage_api_project.modules.report.dto.ProductSalesStatsDto(" +
             "i.product.id, i.product.name, SUM(i.quantity), SUM(i.subtotal)) " +
-            "FROM OrderItem i " +
+            "FROM OrderItemEntity i " +
             "JOIN i.order o " +
             "WHERE o.store.id = :storeId " +
             "AND o.status = 'CLOSED' " +
@@ -95,10 +73,8 @@ public interface OrderJpaRepository extends JpaRepository<Order, Long> {
     List<ProductSalesStatsDto> findProductStatsByStoreAndDateRange(@Param("storeId") Long storeId,
                                                                    @Param("start") LocalDateTime start,
                                                                    @Param("end") LocalDateTime end);
-    /**
-     * 計算指定分店在指定時間內，處於特定狀態的訂單數量
-     */
-    @Query("SELECT COUNT(o) FROM Order o WHERE o.store.id = :storeId AND o.orderTime BETWEEN :start AND :end AND o.status IN :statuses")
+
+    @Query("SELECT COUNT(o) FROM OrderEntity o WHERE o.store.id = :storeId AND o.orderTime BETWEEN :start AND :end AND o.status IN :statuses")
     long countOrdersByStoreIdAndOrderTimeBetweenAndStatusIn(
             @Param("storeId") Long storeId,
             @Param("start") Date start,
@@ -106,43 +82,29 @@ public interface OrderJpaRepository extends JpaRepository<Order, Long> {
             @Param("statuses") Collection<OrderStatus> statuses
     );
 
-    /**
-     * 禁用預設的 findById，強迫使用 findByBrand_BrandIdAndOrderId()。
-     */
     @Deprecated
     @Override
     @NonNull
-    default Optional<Order> findById(@NonNull Long id) {
+    default Optional<OrderEntity> findById(@NonNull Long id) {
         throw new UnsupportedOperationException("禁止呼叫預設的 findById()，請改用 findByBrand_BrandIdAndOrderId() 以確保資料隔離");
     }
 
-    /**
-     * 禁用預設的 findAll。
-     */
     @Deprecated
     @Override
     @NonNull
-    default List<Order> findAll() {
+    default List<OrderEntity> findAll() {
         throw new UnsupportedOperationException("禁止呼叫預設的 findAll()，請改用包含 brandId 的自訂查詢");
     }
 
-    /**
-     * 禁用預設的 deleteById。
-     */
     @Deprecated
     @Override
     default void deleteById(@NonNull Long id) {
         throw new UnsupportedOperationException("禁止呼叫預設的 deleteById()，請先驗證 BrandId 再進行刪除");
     }
 
-    /**
-     * 禁用預設的 existsById。
-     */
     @Deprecated
     @Override
     default boolean existsById(@NonNull Long id) {
         throw new UnsupportedOperationException("禁止呼叫預設的 existsById()，請改用包含 brandId 的自訂查詢");
     }
-
-
 }

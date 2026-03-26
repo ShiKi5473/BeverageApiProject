@@ -8,7 +8,7 @@ import org.springframework.stereotype.Repository;
 import tw.niels.beverage_api_project.modules.order.entity.PaymentMethodEntity;
 
 @Repository
-public interface PaymentMethodRepository extends JpaRepository<PaymentMethodEntity, Integer> {
+public interface PaymentMethodJpaRepository extends JpaRepository<PaymentMethodEntity, Integer> {
 
     // 根據 code 查找支付方式 (常用的查找方式)
     Optional<PaymentMethodEntity> findByCode(String code);

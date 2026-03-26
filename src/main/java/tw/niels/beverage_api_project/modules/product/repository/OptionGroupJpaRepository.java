@@ -7,16 +7,16 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Repository;
 
-import tw.niels.beverage_api_project.modules.product.entity.OptionGroup;
+import tw.niels.beverage_api_project.modules.product.entity.OptionGroupEntity;
 
 @Repository
-public interface OptionGroupRepository extends JpaRepository<OptionGroup, Long> {
-    List<OptionGroup> findByBrand_Id(Long brandId);
+public interface OptionGroupJpaRepository extends JpaRepository<OptionGroupEntity, Long> {
+    List<OptionGroupEntity> findByBrand_Id(Long brandId);
 
-    Optional<OptionGroup> findByBrand_IdAndId(Long brandId, Long groupId);
+    Optional<OptionGroupEntity> findByBrand_IdAndId(Long brandId, Long groupId);
 
     // 根據品牌 ID 與名稱查詢 (用於 DataSeeder 防呆)
-    Optional<OptionGroup> findByBrand_IdAndName(Long brandId, String name);
+    Optional<OptionGroupEntity> findByBrand_IdAndName(Long brandId, String name);
 
     /**
      * 禁用預設的 findById，強迫使用 findByBrand_BrandIdAndGroupId()。
@@ -24,7 +24,7 @@ public interface OptionGroupRepository extends JpaRepository<OptionGroup, Long> 
     @Deprecated
     @Override
     @NonNull
-    default Optional<OptionGroup> findById(@NonNull Long id) {
+    default Optional<OptionGroupEntity> findById(@NonNull Long id) {
         throw new UnsupportedOperationException("禁止呼叫預設的 findById()，請改用 findByBrand_BrandIdAndGroupId() 以確保資料隔離");
     }
 
@@ -34,7 +34,7 @@ public interface OptionGroupRepository extends JpaRepository<OptionGroup, Long> 
     @Deprecated
     @Override
     @NonNull
-    default List<OptionGroup> findAll() {
+    default List<OptionGroupEntity> findAll() {
         throw new UnsupportedOperationException("禁止呼叫預設的 findAll()，請改用 findByBrand_BrandId() 以確保資料隔離");
     }
 

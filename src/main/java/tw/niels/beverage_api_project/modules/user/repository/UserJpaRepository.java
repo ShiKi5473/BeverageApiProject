@@ -8,29 +8,29 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Repository;
 
-import tw.niels.beverage_api_project.modules.user.entity.User;
+import tw.niels.beverage_api_project.modules.user.entity.UserEntity;
 
 @Repository
-public interface UserRepository extends JpaRepository<User, Long> {
+public interface UserJpaRepository extends JpaRepository<UserEntity, Long> {
 
     // 使用手機號碼和品牌ID來尋找使用者，確保多租戶下的帳號唯一性
-    @Query("SELECT u FROM User u WHERE u.primaryPhone = :phone AND u.brand.id = :brandId")
-    Optional<User> findByPrimaryPhoneAndBrandId(String phone, Long brandId);
+    @Query("SELECT u FROM UserEntity u WHERE u.primaryPhone = :phone AND u.brand.id = :brandId")
+    Optional<UserEntity> findByPrimaryPhoneAndBrandId(String phone, Long brandId);
 
 
     /**
      * 根據品牌ID和使用者ID查找
      */
-    @Query("SELECT u FROM User u WHERE u.brand.id = :brandId AND u.id = :userId")
-    Optional<User> findByBrand_IdAndId(Long brandId, Long userId);
+    @Query("SELECT u FROM UserEntity u WHERE u.brand.id = :brandId AND u.id = :userId")
+    Optional<UserEntity> findByBrand_IdAndId(Long brandId, Long userId);
 
     /**
-     * 禁用預設的 findById，強迫使用 findByBrand_BrandIdAndUserId()。
+     * 禁用預設的 findById，強迫使用 findByBrand_BrandIdAndUserEntityId()。
      */
     @Deprecated
     @Override
     @NonNull
-    default Optional<User> findById(@NonNull Long brandId) {
+    default Optional<UserEntity> findById(@NonNull Long brandId) {
         throw new UnsupportedOperationException("禁止呼叫預設的 findById()，請改用 findByBrand_BrandIdAndUserId() 以確保資料隔離");
     }
 
@@ -40,7 +40,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Deprecated
     @Override
     @NonNull
-    default List<User> findAll() {
+    default List<UserEntity> findAll() {
         throw new UnsupportedOperationException("禁止呼叫預設的 findAll()，請改用包含 brandId 的自訂查詢");
     }
 

@@ -5,13 +5,13 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import tw.niels.beverage_api_project.modules.report.dto.ProductSalesStatsDto;
-import tw.niels.beverage_api_project.modules.report.entity.DailyProductStats;
+import tw.niels.beverage_api_project.modules.report.entity.DailyProductStatsEntity;
 
 import java.time.LocalDate;
 import java.util.List;
 
 @Repository
-public interface DailyProductStatsRepository extends JpaRepository<DailyProductStats, Long> {
+public interface DailyProductStatsJpaRepository extends JpaRepository<DailyProductStatsEntity, Long> {
 
     /**
      * 系統用：刪除某店某日的商品統計 (重跑用)
@@ -24,7 +24,7 @@ public interface DailyProductStatsRepository extends JpaRepository<DailyProductS
      */
     @Query("SELECT new tw.niels.beverage_api_project.modules.report.dto.ProductSalesStatsDto(" +
             "d.productId, d.productName, SUM(d.quantitySold), SUM(d.totalSalesAmount)) " +
-            "FROM DailyProductStats d " +
+            "FROM DailyProductStatsEntity d " +
             "WHERE d.storeId = :storeId AND d.date BETWEEN :startDate AND :endDate " +
             "GROUP BY d.productId, d.productName " +
             "ORDER BY SUM(d.totalSalesAmount) DESC")

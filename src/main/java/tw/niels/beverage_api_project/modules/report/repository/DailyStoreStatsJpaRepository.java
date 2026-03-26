@@ -6,19 +6,19 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import tw.niels.beverage_api_project.modules.report.dto.BrandSalesSummaryDto;
 import tw.niels.beverage_api_project.modules.report.dto.StoreRankingDto;
-import tw.niels.beverage_api_project.modules.report.entity.DailyStoreStats;
+import tw.niels.beverage_api_project.modules.report.entity.DailyStoreStatsEntity;
 
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface DailyStoreStatsRepository extends JpaRepository<DailyStoreStats, Long> {
+public interface DailyStoreStatsJpaRepository extends JpaRepository<DailyStoreStatsEntity, Long> {
 
     /**
      * 分店端：查詢指定日期區間的日結表 (依日期排序)
      */
-    List<DailyStoreStats> findByStoreIdAndDateBetweenOrderByDateAsc(Long storeId, LocalDate startDate, LocalDate endDate);
+    List<DailyStoreStatsEntity> findByStoreIdAndDateBetweenOrderByDateAsc(Long storeId, LocalDate startDate, LocalDate endDate);
 
     /**
      * 品牌端：查詢全品牌在指定區間的總業績 (聚合查詢)
@@ -26,7 +26,7 @@ public interface DailyStoreStatsRepository extends JpaRepository<DailyStoreStats
      */
     @Query("SELECT new tw.niels.beverage_api_project.modules.report.dto.BrandSalesSummaryDto(" +
             "SUM(d.totalOrders), SUM(d.totalRevenue), SUM(d.totalDiscount), SUM(d.cancelledOrders)) " +
-            "FROM DailyStoreStats d " +
+            "FROM DailyStoreStatsEntity d " +
             "WHERE d.brandId = :brandId AND d.date BETWEEN :startDate AND :endDate")
     BrandSalesSummaryDto aggregateBrandSales(@Param("brandId") Long brandId,
                                              @Param("startDate") LocalDate startDate,
@@ -38,7 +38,7 @@ public interface DailyStoreStatsRepository extends JpaRepository<DailyStoreStats
      */
     @Query("SELECT new tw.niels.beverage_api_project.modules.report.dto.StoreRankingDto(" +
             "d.storeId, SUM(d.finalRevenue)) " +
-            "FROM DailyStoreStats d " +
+            "FROM DailyStoreStatsEntity d " +
             "WHERE d.brandId = :brandId AND d.date BETWEEN :startDate AND :endDate " +
             "GROUP BY d.storeId " +
             "ORDER BY SUM(d.finalRevenue) DESC")
@@ -50,7 +50,7 @@ public interface DailyStoreStatsRepository extends JpaRepository<DailyStoreStats
      * 系統用：取得資料庫中「日期最新」的一筆紀錄
      * 用途：判斷最後一次成功結算是哪一天
      */
-    Optional<DailyStoreStats> findTopByOrderByDateDesc();
+    Optional<DailyStoreStatsEntity> findTopByOrderByDateDesc();
 
     /**
      * 系統用：檢查是否已存在該日報表 (避免重複執行)

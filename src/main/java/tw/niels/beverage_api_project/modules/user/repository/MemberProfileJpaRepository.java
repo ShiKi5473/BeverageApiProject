@@ -4,15 +4,15 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import org.springframework.data.jpa.repository.Query;
-import tw.niels.beverage_api_project.modules.user.entity.profile.MemberProfile;
+import tw.niels.beverage_api_project.modules.user.entity.profile.MemberProfileEntity;
 
 import java.util.Optional;
 
-public interface MemberProfileRepository extends JpaRepository<MemberProfile, Long> {
+public interface MemberProfileJpaRepository extends JpaRepository<MemberProfileEntity, Long> {
     /**
      * 根據 userId 查找並使用 PESSIMISTIC_WRITE 鎖定該筆資料
      */
-    @Query("SELECT mp FROM MemberProfile mp WHERE mp.userId = :userId")
+    @Query("SELECT mp FROM MemberProfileEntity mp WHERE mp.userId = :userId")
     @NotNull
-    Optional<MemberProfile> findById(@NotNull Long userId);
+    Optional<MemberProfileEntity> findById(@NotNull Long userId);
 }
