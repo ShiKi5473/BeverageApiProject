@@ -7,7 +7,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
-import tw.niels.beverage_api_project.modules.brand.entity.Brand;
+import tw.niels.beverage_api_project.modules.brand.entity.BrandEntity;
 import tw.niels.beverage_api_project.modules.product.enums.SelectionType;
 
 @Entity
@@ -17,14 +17,14 @@ import tw.niels.beverage_api_project.modules.product.enums.SelectionType;
         @UniqueConstraint(columnNames = { "brand_id", "name" })
 })
 @AttributeOverride(name = "id", column = @Column(name = "group_id"))
-public class OptionGroup extends BaseTsidEntity {
+public class OptionGroupEntity extends BaseTsidEntity {
 
-    public OptionGroup() {
+    public OptionGroupEntity() {
     }
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "brand_id", nullable = false)
-    private Brand brand;
+    private BrandEntity brand;
 
     @Column(name = "name", nullable = false, length = 50)
     private String name;
@@ -37,6 +37,9 @@ public class OptionGroup extends BaseTsidEntity {
     private Integer sortOrder;
 
     @OneToMany(mappedBy = "optionGroup", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private Set<ProductOption> options = new HashSet<>();
+    private Set<ProductOptionEntity> options = new HashSet<>();
+
+    @ManyToMany(mappedBy = "optionGroups")
+    private Set<ProductEntity> products = new HashSet<>();
 
 }

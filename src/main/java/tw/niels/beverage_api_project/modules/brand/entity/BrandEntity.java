@@ -14,7 +14,7 @@ import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
 @Setter
 @Table(name = "brands")
 @AttributeOverride(name = "id", column = @Column(name = "brand_id"))
-public class Brand extends BaseTsidEntity {
+public class BrandEntity extends BaseTsidEntity {
 
     @Column(nullable = false, unique = true)
     private String name;

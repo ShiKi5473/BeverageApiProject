@@ -4,6 +4,7 @@ import java.util.Date;
 
 import lombok.Getter;
 import lombok.Setter;
+
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -18,17 +19,17 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MapsId;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
-import tw.niels.beverage_api_project.modules.store.entity.Store;
-import tw.niels.beverage_api_project.modules.user.entity.User;
+import tw.niels.beverage_api_project.modules.store.entity.StoreEntity;
+import tw.niels.beverage_api_project.modules.user.entity.UserEntity;
 import tw.niels.beverage_api_project.modules.user.enums.StaffRole;
 
 @Entity
 @Getter
 @Setter
 @Table(name = "staff_profiles")
-public class StaffProfile {
+public class StaffProfileEntity {
 
-    public StaffProfile() {
+    public StaffProfileEntity() {
     }
 
     @Id
@@ -38,11 +39,11 @@ public class StaffProfile {
     @OneToOne(fetch = FetchType.LAZY)
     @MapsId
     @JoinColumn(name = "user_id")
-    private User user;
+    private UserEntity user;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "store_id")
-    private Store store;
+    private StoreEntity store;
 
     @Column(name = "employee_number")
     private String employeeNumber;

@@ -7,6 +7,7 @@ import java.util.Set;
 
 import lombok.Getter;
 import lombok.Setter;
+
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -26,34 +27,34 @@ import jakarta.persistence.Version;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
 import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
-import tw.niels.beverage_api_project.modules.brand.entity.Brand;
+import tw.niels.beverage_api_project.modules.brand.entity.BrandEntity;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
 import tw.niels.beverage_api_project.modules.order.vo.MemberSnapshot;
-import tw.niels.beverage_api_project.modules.store.entity.Store;
-import tw.niels.beverage_api_project.modules.user.entity.User;
+import tw.niels.beverage_api_project.modules.store.entity.StoreEntity;
+import tw.niels.beverage_api_project.modules.user.entity.UserEntity;
 
 @Entity
 @Table(name = "orders")
 @AttributeOverride(name = "id", column = @Column(name = "order_id"))
 @Getter
 @Setter
-public class Order extends BaseTsidEntity {
+public class OrderEntity extends BaseTsidEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "brand_id", nullable = false)
-    private Brand brand;
+    private BrandEntity brand;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "store_id", nullable = false)
-    private Store store;
+    private StoreEntity store;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "member_user_id")
-    private User member;
+    private UserEntity member;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "staff_user_id")
-    private User staff;
+    private UserEntity staff;
 
     @Column(name = "order_number", nullable = false, length = 50)
     private String orderNumber;
@@ -99,7 +100,7 @@ public class Order extends BaseTsidEntity {
     private Date completedTime;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
-    private Set<OrderItem> items = new HashSet<>();
+    private Set<OrderItemEntity> items = new HashSet<>();
 
     // 樂觀鎖版本號，防止多人同時修改訂單狀態造成 race condition
     @Version
@@ -111,7 +112,7 @@ public class Order extends BaseTsidEntity {
     @Column(name = "member_snapshot")
     private MemberSnapshot memberSnapshot;
 
-    public Order() {
+    public OrderEntity() {
     }
 
 }

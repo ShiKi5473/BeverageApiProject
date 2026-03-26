@@ -8,7 +8,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
-import tw.niels.beverage_api_project.modules.brand.entity.Brand;
+import tw.niels.beverage_api_project.modules.brand.entity.BrandEntity;
 import tw.niels.beverage_api_project.modules.product.enums.ProductStatus;
 
 @Entity
@@ -16,15 +16,15 @@ import tw.niels.beverage_api_project.modules.product.enums.ProductStatus;
 @Setter
 @Table(name = "products")
 @AttributeOverride(name = "id", column = @Column(name = "product_id"))
-public class Product extends BaseTsidEntity {
+public class ProductEntity extends BaseTsidEntity {
 
-    public Product() {
+    public ProductEntity() {
     }
 
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "brand_id", nullable = false)
-    private Brand brand;
+    private BrandEntity brand;
 
     @Column(name = "name", nullable = false, length = 100)
     private String name;
@@ -45,18 +45,18 @@ public class Product extends BaseTsidEntity {
 
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(name = "product_category_mappings", joinColumns = @JoinColumn(name = "product_id"), inverseJoinColumns = @JoinColumn(name = "category_id"))
-    private Set<Category> categories = new HashSet<>();
+    private Set<CategoryEntity> categories = new HashSet<>();
 
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(name = "product_option_group_mappings", joinColumns = @JoinColumn(name = "product_id"), inverseJoinColumns = @JoinColumn(name = "group_id"))
-    private Set<OptionGroup> optionGroups = new HashSet<>();
+    private Set<OptionGroupEntity> optionGroups = new HashSet<>();
 
     // 規格列表關聯
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private Set<ProductVariant> variants = new HashSet<>();
+    private Set<ProductVariantEntity> variants = new HashSet<>();
 
     // Helper Method：方便加入 Variant 並維持雙向關聯
-    public void addVariant(ProductVariant variant) {
+    public void addVariant(ProductVariantEntity variant) {
         variants.add(variant);
         variant.setProduct(this);
     }

@@ -1,16 +1,17 @@
 package tw.niels.beverage_api_project.modules.audit.entity;
 
-import lombok.Getter;
-import lombok.Setter;
+import java.time.Instant;
+
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-import java.time.Instant;
+import lombok.Getter;
+import lombok.Setter;
 
 @Getter
 @Setter
 @Document(collection = "audit_logs") // 對應 MongoDB 的 Collection
-public class AuditLog {
+public class AuditLogEntity {
 
     @Id
     private String id;
@@ -26,7 +27,7 @@ public class AuditLog {
     private Instant timestamp;    // 發生時間
 
     // Constructors
-    public AuditLog() {}
+    public AuditLogEntity() {}
 
 
 }

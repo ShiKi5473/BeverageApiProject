@@ -12,7 +12,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 @Getter
 @Setter
 @Table(name = "brand_point_configs")
-public class BrandPointConfig {
+public class BrandPointConfigEntity {
 
     @Id
     @Column(name = "brand_id")
@@ -22,7 +22,7 @@ public class BrandPointConfig {
     @OneToOne
     @MapsId
     @JoinColumn(name = "brand_id")
-    private Brand brand;
+    private BrandEntity brand;
 
     // 累積匯率：每消費多少元獲得 1 點 (預設 1.0 元)
     @Column(name = "earn_rate", nullable = false, precision = 5, scale = 2)
@@ -41,9 +41,9 @@ public class BrandPointConfig {
     private Instant updatedAt;
 
 
-    public BrandPointConfig() {}
+    public BrandPointConfigEntity() {}
 
-    public BrandPointConfig(Brand brand) {
+    public BrandPointConfigEntity(BrandEntity brand) {
         this.brand = brand;
     }
 

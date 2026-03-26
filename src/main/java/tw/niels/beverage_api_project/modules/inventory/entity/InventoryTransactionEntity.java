@@ -4,8 +4,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
-import tw.niels.beverage_api_project.modules.store.entity.Store;
-import tw.niels.beverage_api_project.modules.user.entity.User;
+import tw.niels.beverage_api_project.modules.store.entity.StoreEntity;
+import tw.niels.beverage_api_project.modules.user.entity.UserEntity;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -15,15 +15,15 @@ import java.time.Instant;
 @AttributeOverride(name = "id", column = @Column(name = "transaction_id"))
 @Getter
 @Setter
-public class InventoryTransaction extends BaseTsidEntity {
+public class InventoryTransactionEntity extends BaseTsidEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "inventory_item_id", nullable = false)
-    private InventoryItem inventoryItem;
+    private InventoryItemEntity inventoryItem;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "store_id", nullable = false)
-    private Store store;
+    private StoreEntity store;
 
     @Column(name = "change_amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal changeAmount;
@@ -34,7 +34,7 @@ public class InventoryTransaction extends BaseTsidEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "operator_id")
-    private User operator;
+    private UserEntity operator;
 
     @Column()
     private String note;

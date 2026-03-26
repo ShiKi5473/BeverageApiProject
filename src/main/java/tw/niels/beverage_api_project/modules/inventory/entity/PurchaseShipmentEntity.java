@@ -4,8 +4,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
-import tw.niels.beverage_api_project.modules.store.entity.Store;
-import tw.niels.beverage_api_project.modules.user.entity.User;
+import tw.niels.beverage_api_project.modules.store.entity.StoreEntity;
+import tw.niels.beverage_api_project.modules.user.entity.UserEntity;
 
 import java.time.LocalDateTime;
 
@@ -14,15 +14,15 @@ import java.time.LocalDateTime;
 @AttributeOverride(name = "id", column = @Column(name = "shipment_id"))
 @Getter
 @Setter
-public class PurchaseShipment extends BaseTsidEntity {
+public class PurchaseShipmentEntity extends BaseTsidEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "store_id", nullable = false)
-    private Store store;
+    private StoreEntity store;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "staff_user_id")
-    private User staff;
+    private UserEntity staff;
 
     @Column(name = "shipment_date", nullable = false)
     private LocalDateTime shipmentDate;

@@ -18,7 +18,7 @@ import java.time.LocalDate;
         @Index(name = "idx_daily_brand_date", columnList = "brand_id, date")
 })
 @AttributeOverride(name = "id", column = @Column(name = "daily_store_stats_id"))
-public class DailyStoreStats extends BaseTsidEntity {
+public class DailyStoreStatsEntity extends BaseTsidEntity {
 
 
     @Column(name = "store_id", nullable = false)
@@ -59,7 +59,7 @@ public class DailyStoreStats extends BaseTsidEntity {
     @Column(name = "created_at", updatable = false)
     private Instant createdAt;
 
-    public DailyStoreStats() {}
+    public DailyStoreStatsEntity() {}
 
     // --- Getters and Setters ---
 

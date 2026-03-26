@@ -4,8 +4,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
-import tw.niels.beverage_api_project.modules.brand.entity.Brand;
-import tw.niels.beverage_api_project.modules.product.entity.Product;
+import tw.niels.beverage_api_project.modules.brand.entity.BrandEntity;
+import tw.niels.beverage_api_project.modules.product.entity.ProductEntity;
 import tw.niels.beverage_api_project.modules.promotion.enums.PromotionType;
 
 import java.math.BigDecimal;
@@ -18,11 +18,11 @@ import java.util.Set;
 @Setter
 @Table(name = "promotions")
 @AttributeOverride(name = "id", column = @Column(name = "promotion_id"))
-public class Promotion extends BaseTsidEntity {
+public class PromotionEntity extends BaseTsidEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "brand_id", nullable = false)
-    private Brand brand;
+    private BrandEntity brand;
 
     @Column(nullable = false)
     private String name;
@@ -59,6 +59,6 @@ public class Promotion extends BaseTsidEntity {
             joinColumns = @JoinColumn(name = "promotion_id"),
             inverseJoinColumns = @JoinColumn(name = "product_id")
     )
-    private Set<Product> applicableProducts = new HashSet<>();
+    private Set<ProductEntity> applicableProducts = new HashSet<>();
 
 }

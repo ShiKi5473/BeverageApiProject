@@ -12,9 +12,9 @@ import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
 @Setter
 @Table(name = "product_options")
 @AttributeOverride(name = "id", column = @Column(name = "option_id"))
-public class ProductOption extends BaseTsidEntity {
+public class ProductOptionEntity extends BaseTsidEntity {
 
-    public ProductOption() {
+    public ProductOptionEntity() {
     }
 
     @Column(name = "name", nullable = false, length = 50)
@@ -28,7 +28,7 @@ public class ProductOption extends BaseTsidEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "group_id", nullable = false)
-    private OptionGroup optionGroup;
+    private OptionGroupEntity optionGroup;
 
 
 }

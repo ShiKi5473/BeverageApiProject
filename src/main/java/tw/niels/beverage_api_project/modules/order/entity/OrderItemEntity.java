@@ -14,33 +14,33 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
 import tw.niels.beverage_api_project.modules.order.vo.ProductSnapshot;
-import tw.niels.beverage_api_project.modules.product.entity.Product;
-import tw.niels.beverage_api_project.modules.product.entity.ProductOption;
-import tw.niels.beverage_api_project.modules.product.entity.ProductVariant; // Import
+import tw.niels.beverage_api_project.modules.product.entity.ProductEntity;
+import tw.niels.beverage_api_project.modules.product.entity.ProductOptionEntity;
+import tw.niels.beverage_api_project.modules.product.entity.ProductVariantEntity;
 
 @Entity
 @Table(name = "order_items")
 @AttributeOverride(name = "id", column = @Column(name = "order_item_id"))
 @Getter
 @Setter
-public class OrderItem extends BaseTsidEntity {
+public class OrderItemEntity extends BaseTsidEntity {
 
-    public OrderItem() {
+    public OrderItemEntity() {
     }
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", nullable = false)
-    private Order order;
+    private OrderEntity order;
 
-    // 保留 Product 關聯以方便統計，但在 Service 層會自動從 Variant 帶入
+    // 保留 ProductEntity 關聯以方便統計，但在 Service 層會自動從 Variant 帶入
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)
-    private Product product;
+    private ProductEntity product;
 
     // 【新增】關聯到具體的規格 (例如：大杯)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "variant_id", nullable = false)
-    private ProductVariant productVariant;
+    private ProductVariantEntity productVariant;
 
     @Column(name = "quantity", nullable = false)
     @NotNull
@@ -62,7 +62,7 @@ public class OrderItem extends BaseTsidEntity {
 
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(name = "order_item_options", joinColumns = @JoinColumn(name = "order_item_id"), inverseJoinColumns = @JoinColumn(name = "option_id"))
-    private Set<ProductOption> options = new HashSet<>();
+    private Set<ProductOptionEntity> options = new HashSet<>();
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "product_snapshot")

@@ -9,7 +9,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
-import tw.niels.beverage_api_project.modules.brand.entity.Brand;
+import tw.niels.beverage_api_project.modules.brand.entity.BrandEntity;
 
 @EntityListeners(AuditingEntityListener.class)
 @Entity
@@ -17,15 +17,15 @@ import tw.niels.beverage_api_project.modules.brand.entity.Brand;
 @Setter
 @Table(name = "stores")
 @AttributeOverride(name = "id", column = @Column(name = "store_id"))
-public class Store extends BaseTsidEntity {
+public class StoreEntity extends BaseTsidEntity {
 
-    public Store() {
+    public StoreEntity() {
     }
 
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "brand_id", nullable = false)
-    private Brand brand;
+    private BrandEntity brand;
 
     @Column(name = "name", nullable = false, length = 100)
     private String name;
@@ -39,5 +39,8 @@ public class Store extends BaseTsidEntity {
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+
+    @Column(name = "is_active", nullable = false)
+    private Boolean isActive = true;
 
 }

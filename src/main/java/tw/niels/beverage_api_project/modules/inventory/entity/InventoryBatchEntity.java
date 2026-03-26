@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
-import tw.niels.beverage_api_project.modules.store.entity.Store;
+import tw.niels.beverage_api_project.modules.store.entity.StoreEntity;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -17,20 +17,20 @@ import java.time.LocalDate;
 @AttributeOverride(name = "id", column = @Column(name = "batch_id"))
 @Getter
 @Setter
-public class InventoryBatch extends BaseTsidEntity {
+public class InventoryBatchEntity extends BaseTsidEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "shipment_id") // 允許為 null (支援非採購來源)
-    private PurchaseShipment shipment;
+    private PurchaseShipmentEntity shipment;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "inventory_item_id", nullable = false)
-    private InventoryItem inventoryItem;
+    private InventoryItemEntity inventoryItem;
 
     // --- V9 新增欄位 ---
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "store_id", nullable = false)
-    private Store store;
+    private StoreEntity store;
 
     @Column(name = "quantity_received", nullable = false, precision = 10, scale = 2)
     private BigDecimal quantityReceived;

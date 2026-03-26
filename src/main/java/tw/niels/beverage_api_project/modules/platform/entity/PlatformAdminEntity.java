@@ -13,7 +13,7 @@ import java.util.Date;
 @Setter
 @Table(name = "platform_admins")
 @AttributeOverride(name = "id", column = @Column(name = "admin_id"))
-public class PlatformAdmin extends BaseTsidEntity {
+public class PlatformAdminEntity extends BaseTsidEntity {
 
     @Column(nullable = false, unique = true)
     private String username;

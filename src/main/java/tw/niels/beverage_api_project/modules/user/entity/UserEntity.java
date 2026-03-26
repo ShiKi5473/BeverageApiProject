@@ -9,24 +9,24 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import tw.niels.beverage_api_project.common.entity.BaseTsidEntity;
-import tw.niels.beverage_api_project.modules.brand.entity.Brand;
-import tw.niels.beverage_api_project.modules.user.entity.profile.MemberProfile;
-import tw.niels.beverage_api_project.modules.user.entity.profile.StaffProfile;
+import tw.niels.beverage_api_project.modules.brand.entity.BrandEntity;
+import tw.niels.beverage_api_project.modules.user.entity.profile.MemberProfileEntity;
+import tw.niels.beverage_api_project.modules.user.entity.profile.StaffProfileEntity;
 
 @Entity
 @Getter
 @Setter
 @Table(name = "users")
 @AttributeOverride(name = "id", column = @Column(name = "user_id"))
-public class User extends BaseTsidEntity {
+public class UserEntity extends BaseTsidEntity {
 
-    public User() {
+    public UserEntity() {
     }
 
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "brand_id", nullable = false)
-    private Brand brand;
+    private BrandEntity brand;
 
     @Column(name = "primary_phone")
     private String primaryPhone;
@@ -45,13 +45,13 @@ public class User extends BaseTsidEntity {
     @Column(name = "updated_at")
     private Date updatedAt;
 
-    // 雙向關聯到 StaffProfile
+    // 雙向關聯到 StaffProfileEntity
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private StaffProfile staffProfile;
+    private StaffProfileEntity staffProfile;
 
-    // 雙向關聯到 MemberProfile
+    // 雙向關聯到 MemberProfileEntity
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private MemberProfile memberProfile;
+    private MemberProfileEntity memberProfile;
 
     // Getters and Setters
     public Long getUserId() {
@@ -63,14 +63,14 @@ public class User extends BaseTsidEntity {
     }
 
 
-    public void setStaffProfile(StaffProfile staffProfile) {
+    public void setStaffProfile(StaffProfileEntity staffProfile) {
         this.staffProfile = staffProfile;
         if (staffProfile != null) {
             staffProfile.setUser(this);
         }
     }
 
-    public void setMemberProfile(MemberProfile memberProfile) {
+    public void setMemberProfile(MemberProfileEntity memberProfile) {
         this.memberProfile = memberProfile;
         if (memberProfile != null) {
             memberProfile.setUser(this);

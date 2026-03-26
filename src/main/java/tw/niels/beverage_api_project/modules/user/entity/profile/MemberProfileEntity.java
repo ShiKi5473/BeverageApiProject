@@ -8,16 +8,16 @@ import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-import tw.niels.beverage_api_project.modules.user.entity.User;
+import tw.niels.beverage_api_project.modules.user.entity.UserEntity;
 import tw.niels.beverage_api_project.modules.user.enums.Gender;
 
 @Entity
 @Getter
 @Setter
 @Table(name = "member_profiles")
-public class MemberProfile {
+public class MemberProfileEntity {
 
-    public MemberProfile() {
+    public MemberProfileEntity() {
     }
 
     @Id
@@ -27,7 +27,7 @@ public class MemberProfile {
     @OneToOne(fetch = FetchType.LAZY)
     @MapsId
     @JoinColumn(name = "user_id")
-    private User user;
+    private UserEntity user;
 
     @Column(name = "full_name")
     private String fullName;
