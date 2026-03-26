@@ -9,10 +9,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 import tw.niels.beverage_api_project.modules.order.dto.OrderNotificationDto;
-import tw.niels.beverage_api_project.modules.order.entity.Order;
+import tw.niels.beverage_api_project.modules.order.entity.OrderEntity;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
 import tw.niels.beverage_api_project.modules.order.event.OrderStateChangedEvent;
-import tw.niels.beverage_api_project.modules.user.entity.User;
+import tw.niels.beverage_api_project.modules.user.entity.UserEntity;
 
 /**
  * 訂單通知服務：監聽訂單狀態變更事件，並透過各個管道（當前為 WebSocket）發送通知。
@@ -31,31 +31,31 @@ public class OrderNotificationService {
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleOrderStateChanged(OrderStateChangedEvent event) {
-        Order order = event.order();
-        User member = order.getMember();
+        OrderEntity OrderEntity = event.OrderEntity();
+        UserEntity member = OrderEntity.getMember();
 
-        // 如果沒有關聯會員，則是 POS 直接點餐或訪客模式中未正確關聯 User 的情況
-        // 訪客模式的 User 其 username 為 "GUEST:UUID"
+        // 如果沒有關聯會員，則是 POS 直接點餐或訪客模式中未正確關聯 UserEntity 的情況
+        // 訪客模式的 UserEntity 其 username 為 "GUEST:UUID"
         if (member == null) {
-            logger.debug("訂單 {} 無關聯會員，跳過點對點通知", order.getOrderNumber());
+            logger.debug("訂單 {} 無關聯會員，跳過點對點通知", OrderEntity.getOrderNumber());
             return;
         }
 
         String username = member.getPrimaryPhone();
         if (username == null) {
-            logger.warn("訂單 {} 的會員 {} 無手機/使用者帳號，無法發送通知", order.getOrderNumber(), member.getId());
+            logger.warn("訂單 {} 的會員 {} 無手機/使用者帳號，無法發送通知", OrderEntity.getOrderNumber(), member.getId());
             return;
         }
 
-        logger.info("發送訂單狀態通知給使用者 {}: {} -> {}", username, order.getOrderNumber(), event.newStatus());
+        logger.info("發送訂單狀態通知給使用者 {}: {} -> {}", username, OrderEntity.getOrderNumber(), event.newStatus());
 
         OrderNotificationDto notification = new OrderNotificationDto(
-                order.getOrderNumber(),
+                OrderEntity.getOrderNumber(),
                 event.newStatus().name(),
-                formatMessage(order.getOrderNumber(), event.newStatus())
+                formatMessage(OrderEntity.getOrderNumber(), event.newStatus())
         );
 
-        // 推送到 STOMP 私人頻道：/user/{username}/queue/orders
+        // 推送到 STOMP 私人頻道：/UserEntity/{username}/queue/orders
         messagingTemplate.convertAndSendToUser(username, "/queue/orders", notification);
     }
 

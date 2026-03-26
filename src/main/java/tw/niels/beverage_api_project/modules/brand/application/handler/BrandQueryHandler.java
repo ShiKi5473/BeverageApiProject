@@ -3,7 +3,7 @@ package tw.niels.beverage_api_project.modules.brand.application.handler;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import tw.niels.beverage_api_project.modules.brand.application.query.*;
-import tw.niels.beverage_api_project.modules.brand.entity.Brand;
+import tw.niels.beverage_api_project.modules.brand.entity.BrandEntity;
 import tw.niels.beverage_api_project.modules.brand.service.BrandService;
 
 import java.util.List;
@@ -15,7 +15,7 @@ import java.util.Optional;
  * 處理流程：
  * 1. 接收查詢條件（全部品牌列表 或 單一品牌）
  * 2. 委派 BrandService 執行查詢
- * 3. 回傳 Brand 實體列表或 Optional
+ * 3. 回傳 BrandEntity 實體列表或 Optional
  */
 @Component
 public class BrandQueryHandler {
@@ -27,12 +27,12 @@ public class BrandQueryHandler {
     }
 
     @Transactional(readOnly = true)
-    public List<Brand> handle(GetAllBrandsQuery query) {
+    public List<BrandEntity> handle(GetAllBrandsQuery query) {
         return brandService.getAllBrandsForAdmin();
     }
 
     @Transactional(readOnly = true)
-    public Optional<Brand> handle(GetBrandByIdQuery query) {
+    public Optional<BrandEntity> handle(GetBrandByIdQuery query) {
         return brandService.getBrandById(query.brandId());
     }
 }

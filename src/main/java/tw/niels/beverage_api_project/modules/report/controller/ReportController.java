@@ -2,23 +2,25 @@ package tw.niels.beverage_api_project.modules.report.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
 import tw.niels.beverage_api_project.common.constants.ApiPaths;
 import tw.niels.beverage_api_project.common.service.ControllerHelperService;
 import tw.niels.beverage_api_project.modules.report.dto.BrandSalesSummaryDto;
 import tw.niels.beverage_api_project.modules.report.dto.InventoryVarianceReportDto;
 import tw.niels.beverage_api_project.modules.report.dto.ProductSalesStatsDto;
 import tw.niels.beverage_api_project.modules.report.dto.StoreRankingDto;
-import tw.niels.beverage_api_project.modules.report.entity.DailyStoreStats;
-import tw.niels.beverage_api_project.modules.report.repository.DailyProductStatsRepository;
-import tw.niels.beverage_api_project.modules.report.repository.DailyStoreStatsRepository;
+import tw.niels.beverage_api_project.modules.report.entity.DailyStoreStatsEntity;
+import tw.niels.beverage_api_project.modules.report.repository.DailyProductStatsJpaRepository;
+import tw.niels.beverage_api_project.modules.report.repository.DailyStoreStatsJpaRepository;
 import tw.niels.beverage_api_project.modules.report.service.InventoryReportService;
 import tw.niels.beverage_api_project.modules.report.service.ReportAggregationService;
-import tw.niels.beverage_api_project.modules.store.entity.Store;
-import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
+import tw.niels.beverage_api_project.modules.store.entity.StoreEntity;
+import tw.niels.beverage_api_project.modules.store.repository.StoreJpaRepository;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -31,21 +33,21 @@ import java.util.stream.Collectors;
 @Tag(name = "Report APIs", description = "報表與統計數據查詢介面")
 public class ReportController {
 
-    private final DailyStoreStatsRepository dailyStoreStatsRepository;
-    private final DailyProductStatsRepository dailyProductStatsRepository; //
+    private final DailyStoreStatsJpaRepository DailyStoreStatsJpaRepository;
+    private final DailyProductStatsJpaRepository DailyProductStatsJpaRepository; //
     private final ReportAggregationService reportAggregationService;
     private final ControllerHelperService helperService;
-    private final StoreRepository storeRepository;
+    private final StoreJpaRepository storeRepository;
     private final InventoryReportService inventoryReportService;
 
-    public ReportController(DailyStoreStatsRepository dailyStoreStatsRepository,
-                            DailyProductStatsRepository dailyProductStatsRepository,
+    public ReportController(DailyStoreStatsJpaRepository DailyStoreStatsJpaRepository,
+                            DailyProductStatsJpaRepository DailyProductStatsJpaRepository,
                             ReportAggregationService reportAggregationService,
                             ControllerHelperService helperService,
-                            StoreRepository storeRepository,
+                            StoreJpaRepository storeRepository,
                             InventoryReportService inventoryReportService) {
-        this.dailyStoreStatsRepository = dailyStoreStatsRepository;
-        this.dailyProductStatsRepository = dailyProductStatsRepository;
+        this.DailyStoreStatsJpaRepository = DailyStoreStatsJpaRepository;
+        this.DailyProductStatsJpaRepository = DailyProductStatsJpaRepository;
         this.reportAggregationService = reportAggregationService;
         this.helperService = helperService;
         this.storeRepository = storeRepository;
@@ -63,7 +65,7 @@ public class ReportController {
             summary = "查詢分店日結明細",
             description = "取得指定分店在特定日期區間內的每日營收統計 (權限: 該分店員工或品牌管理員)"
     )
-    public ResponseEntity<List<DailyStoreStats>> getStoreDailyStats(
+    public ResponseEntity<List<DailyStoreStatsEntity>> getStoreDailyStats(
             @RequestParam Long storeId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
@@ -71,7 +73,7 @@ public class ReportController {
         // 驗證權限：確保該員工有權限查看此分店
         helperService.validateStoreAccess(storeId);
 
-        List<DailyStoreStats> stats = dailyStoreStatsRepository
+        List<DailyStoreStatsEntity> stats = DailyStoreStatsJpaRepository
                 .findByStoreIdAndDateBetweenOrderByDateAsc(storeId, startDate, endDate);
 
         return ResponseEntity.ok(stats);
@@ -97,7 +99,7 @@ public class ReportController {
             helperService.validateStoreAccess(storeId);
 
             // 2. 查詢資料庫
-            List<ProductSalesStatsDto> stats = dailyProductStatsRepository
+            List<ProductSalesStatsDto> stats = DailyProductStatsJpaRepository
                     .findProductSalesRanking(storeId, startDate, endDate);
 
             return ResponseEntity.ok(stats);
@@ -120,7 +122,7 @@ public class ReportController {
 
         Long brandId = helperService.getCurrentBrandId();
 
-        BrandSalesSummaryDto summary = dailyStoreStatsRepository
+        BrandSalesSummaryDto summary = DailyStoreStatsJpaRepository
                 .aggregateBrandSales(brandId, startDate, endDate);
 
         return ResponseEntity.ok(summary);
@@ -143,7 +145,7 @@ public class ReportController {
 
         Long brandId = helperService.getCurrentBrandId();
 
-        List<StoreRankingDto> ranking = dailyStoreStatsRepository
+        List<StoreRankingDto> ranking = DailyStoreStatsJpaRepository
                 .findTopStoresByRevenue(brandId, startDate, endDate);
 
         Set<Long> storeIds = ranking.stream()
@@ -152,7 +154,7 @@ public class ReportController {
 
         if (!storeIds.isEmpty()) {
             Map<Long, String> storeNameMap = storeRepository.findByBrand_IdAndIdIn(brandId, storeIds).stream()
-                    .collect(Collectors.toMap(Store::getId, Store::getName));
+                    .collect(Collectors.toMap(StoreEntity::getId, StoreEntity::getName));
 
             ranking.forEach(dto -> {
                 String name = storeNameMap.getOrDefault(dto.getStoreId(), "未知分店 (ID: " + dto.getStoreId() + ")");

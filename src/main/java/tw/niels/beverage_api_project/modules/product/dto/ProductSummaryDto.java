@@ -4,7 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import tw.niels.beverage_api_project.modules.product.entity.Product;
+import tw.niels.beverage_api_project.modules.product.entity.ProductEntity;
 
 import java.math.BigDecimal;
 
@@ -29,13 +29,13 @@ public class ProductSummaryDto {
     @Schema(description = "商品描述")
     private String description;
 
-    public static ProductSummaryDto fromEntity(Product product) {
-        if (product == null) return null;
+    public static ProductSummaryDto fromEntity(ProductEntity ProductEntity) {
+        if (ProductEntity == null) return null;
         return new ProductSummaryDto(
-                product.getId(),
-                product.getName(),
-                product.getBasePrice(),
-                product.getImageUrl(),
-                product.getDescription());
+                ProductEntity.getId(),
+                ProductEntity.getName(),
+                ProductEntity.getBasePrice(),
+                ProductEntity.getImageUrl(),
+                ProductEntity.getDescription());
     }
 }

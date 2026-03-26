@@ -16,7 +16,7 @@ import tw.niels.beverage_api_project.modules.product.application.query.GetCatego
 import tw.niels.beverage_api_project.modules.product.application.query.GetProductForPosQuery;
 import tw.niels.beverage_api_project.modules.product.application.query.GetProductSummariesQuery;
 import tw.niels.beverage_api_project.modules.product.dto.*;
-import tw.niels.beverage_api_project.modules.product.entity.Category;
+import tw.niels.beverage_api_project.modules.product.entity.CategoryEntity;
 
 import java.util.List;
 import java.util.Set;
@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping(ApiPaths.API_V1 + ApiPaths.BRANDS)
-@Tag(name = "Product Management", description = "商品與分類管理 API")
+@Tag(name = "ProductEntity Management", description = "商品與分類管理 API")
 public class ProductController {
 
     private final ProductCommandHandler commandHandler;
@@ -87,7 +87,7 @@ public class ProductController {
     @Operation(summary = "取得分類列表")
     public ResponseEntity<List<CategoryResponseDto>> getCategoriesByBrand() {
         Long brandId = helperService.getCurrentBrandId();
-        List<Category> categories = queryHandler.handle(new GetCategoriesQuery(brandId));
+        List<CategoryEntity> categories = queryHandler.handle(new GetCategoriesQuery(brandId));
         List<CategoryResponseDto> dtos = categories.stream()
                 .map(CategoryResponseDto::fromEntity)
                 .collect(Collectors.toList());

@@ -4,16 +4,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import tw.niels.beverage_api_project.modules.audit.entity.AuditLog;
-import tw.niels.beverage_api_project.modules.audit.repository.AuditLogRepository;
+import tw.niels.beverage_api_project.modules.audit.entity.AuditLogEntity;
+import tw.niels.beverage_api_project.modules.audit.repository.AuditLogJpaRepository;
 
 @Service
 public class AuditLogService {
 
     private static final Logger logger = LoggerFactory.getLogger(AuditLogService.class);
-    private final AuditLogRepository auditLogRepository;
+    private final AuditLogJpaRepository auditLogRepository;
 
-    public AuditLogService(AuditLogRepository auditLogRepository) {
+    public AuditLogService(AuditLogJpaRepository auditLogRepository) {
         this.auditLogRepository = auditLogRepository;
     }
 
@@ -21,7 +21,7 @@ public class AuditLogService {
      * 非同步儲存日誌，避免阻塞主執行緒
      */
     @Async
-    public void saveLog(AuditLog log) {
+    public void saveLog(AuditLogEntity log) {
         try {
             auditLogRepository.save(log);
             logger.debug("Audit log saved: {}", log.getAction());

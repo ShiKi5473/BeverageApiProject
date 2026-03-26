@@ -2,8 +2,9 @@ package tw.niels.beverage_api_project.modules.store.application.handler;
 
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+
 import tw.niels.beverage_api_project.modules.store.application.command.CreateStoreCommand;
-import tw.niels.beverage_api_project.modules.store.entity.Store;
+import tw.niels.beverage_api_project.modules.store.entity.StoreEntity;
 import tw.niels.beverage_api_project.modules.store.service.StoreService;
 
 /**
@@ -38,7 +39,7 @@ public class StoreCommandHandler {
     public Long handle(CreateStoreCommand command) {
         // 設定 brandId（由 Controller 從 SecurityContext 取得）
         command.requestDto().setBrandId(command.brandId());
-        Store store = storeService.createStore(command.requestDto());
+        StoreEntity store = storeService.createStore(command.requestDto());
         return store.getId();
     }
 }

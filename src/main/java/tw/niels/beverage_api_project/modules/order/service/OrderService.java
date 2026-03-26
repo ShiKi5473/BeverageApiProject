@@ -3,25 +3,27 @@ package tw.niels.beverage_api_project.modules.order.service;
 
 // 保留給 processPayment 等狀態機用
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import tw.niels.beverage_api_project.common.exception.BadRequestException;
 import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
 import tw.niels.beverage_api_project.modules.order.dto.CreateOrderRequestDto;
 import tw.niels.beverage_api_project.modules.order.dto.ProcessPaymentRequestDto;
-import tw.niels.beverage_api_project.modules.order.entity.Order;
+import tw.niels.beverage_api_project.modules.order.entity.OrderEntity;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
 import tw.niels.beverage_api_project.modules.order.repository.OrderJpaRepository;
 import tw.niels.beverage_api_project.modules.order.state.OrderState;
 import tw.niels.beverage_api_project.modules.order.state.OrderStateFactory;
 import tw.niels.beverage_api_project.modules.order.vo.MemberSnapshot;
-import tw.niels.beverage_api_project.modules.store.entity.Store;
-import tw.niels.beverage_api_project.modules.user.entity.User;
+import tw.niels.beverage_api_project.modules.store.entity.StoreEntity;
+import tw.niels.beverage_api_project.modules.user.entity.UserEntity;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.util.List;
 
 @Service
 public class OrderService {
@@ -40,8 +42,9 @@ public class OrderService {
     /**
      * 初始化一個空的訂單實體 (包含流水號生成)
      */
-    public Order initOrder(User staff, Store store) {
-        Order order = new Order();
+    public OrderEntity initOrder(UserEntity staff, StoreEntity store) {
+
+        OrderEntity order = new OrderEntity();
         order.setBrand(staff.getBrand());
         order.setStore(store);
         order.setStaff(staff);
@@ -64,17 +67,17 @@ public class OrderService {
      * 單純的儲存操作
      */
     @Transactional
-    public Order saveOrder(Order order) {
+    public OrderEntity saveOrder(OrderEntity order) {
         return orderRepository.save(order);
     }
 
     /**
      * 【重構後】建立會員快照
      */
-    public void snapshotMember(Order order, User member) {
+    public void snapshotMember(OrderEntity order, UserEntity member) {
         if (member != null && member.getMemberProfile() != null) {
             MemberSnapshot snapshot = new MemberSnapshot(
-                    member.getUserId(),
+                    member.getId(),
                     member.getMemberProfile().getFullName(),
                     member.getPrimaryPhone(),
                     member.getMemberProfile().getEmail()
@@ -93,7 +96,7 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
-    public List<Order> getOrders(Long brandId, Long storeId, OrderStatus status) {
+    public List<OrderEntity> getOrders(Long brandId, Long storeId, OrderStatus status) {
         if (status != null) {
             return orderRepository.findAllByBrand_IdAndStore_IdAndStatus(brandId, storeId, status);
         } else {
@@ -102,14 +105,14 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
-    public Order getOrderDetails(Long brandId, Long orderId) {
+    public OrderEntity getOrderDetails(Long brandId, Long orderId) {
         return orderRepository.findByBrand_IdAndId(brandId, orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("找不到訂單，ID：" + orderId));
     }
 
     @Transactional
-    public Order updateOrderStatus(Long brandId, Long orderId, OrderStatus newStatus) {
-        Order order = getOrderDetails(brandId, orderId);
+    public OrderEntity updateOrderStatus(Long brandId, Long orderId, OrderStatus newStatus) {
+        OrderEntity order = getOrderDetails(brandId, orderId);
         OrderState currentState = orderStateFactory.getState(order.getStatus());
 
         if (newStatus == OrderStatus.READY_FOR_PICKUP) {
@@ -125,24 +128,24 @@ public class OrderService {
     }
 
     @Transactional
-    public Order updateHeldOrder(Long brandId, Long orderId, CreateOrderRequestDto dto) {
-        Order order = getOrderDetails(brandId, orderId);
+    public OrderEntity updateHeldOrder(Long brandId, Long orderId, CreateOrderRequestDto dto) {
+        OrderEntity order = getOrderDetails(brandId, orderId);
         OrderState currentState = orderStateFactory.getState(order.getStatus());
         currentState.update(order, dto);
         return orderRepository.save(order);
     }
 
     @Transactional
-    public Order acceptOrder(Long brandId, Long orderId) {
-        Order order = getOrderDetails(brandId, orderId);
+    public OrderEntity acceptOrder(Long brandId, Long orderId) {
+        OrderEntity order = getOrderDetails(brandId, orderId);
         OrderState currentState = orderStateFactory.getState(order.getStatus());
         currentState.accept(order);
         return orderRepository.save(order);
     }
 
     @Transactional
-    public Order processPayment(Long brandId, Long orderId, ProcessPaymentRequestDto requestDto) {
-        Order order = getOrderDetails(brandId, orderId);
+    public OrderEntity processPayment(Long brandId, Long orderId, ProcessPaymentRequestDto requestDto) {
+        OrderEntity order = getOrderDetails(brandId, orderId);
         OrderState currentState = orderStateFactory.getState(order.getStatus());
         currentState.processPayment(order, requestDto);
         return orderRepository.save(order);

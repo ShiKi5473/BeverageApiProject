@@ -23,12 +23,12 @@ import tw.niels.beverage_api_project.modules.brand.application.handler.BrandQuer
 import tw.niels.beverage_api_project.modules.brand.application.query.GetAllBrandsQuery;
 import tw.niels.beverage_api_project.modules.brand.application.query.GetBrandByIdQuery;
 import tw.niels.beverage_api_project.modules.brand.dto.UpdatePointConfigDto;
-import tw.niels.beverage_api_project.modules.brand.entity.Brand;
-import tw.niels.beverage_api_project.modules.brand.entity.BrandPointConfig;
+import tw.niels.beverage_api_project.modules.brand.entity.BrandEntity;
+import tw.niels.beverage_api_project.modules.brand.entity.BrandPointConfigEntity;
 
 @RestController
 @RequestMapping(ApiPaths.API_V1 + ApiPaths.BRANDS)
-@Tag(name = "Brand Management", description = "品牌資訊與設定 API")
+@Tag(name = "BrandEntity Management", description = "品牌資訊與設定 API")
 public class BrandController {
 
     private final BrandCommandHandler commandHandler;
@@ -46,13 +46,13 @@ public class BrandController {
     @GetMapping
     @Operation(summary = "取得所有品牌列表 (僅限平台管理員)")
     @PreAuthorize("hasRole('PLATFORM_ADMIN')")
-    public ResponseEntity<List<Brand>> getAllBrands() {
+    public ResponseEntity<List<BrandEntity>> getAllBrands() {
         return ResponseEntity.ok(queryHandler.handle(new GetAllBrandsQuery()));
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "查詢單一品牌")
-    public ResponseEntity<Brand> getBrandById(@PathVariable Long id) {
+    public ResponseEntity<BrandEntity> getBrandById(@PathVariable Long id) {
         return queryHandler.handle(new GetBrandByIdQuery(id))
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
@@ -66,10 +66,10 @@ public class BrandController {
     @PreAuthorize("hasRole('BRAND_ADMIN')")
     @Operation(summary = "更新會員點數規則")
     @Audit(action = "UPDATE_POINT_CONFIG")
-    public ResponseEntity<BrandPointConfig> updatePointConfig(
+    public ResponseEntity<BrandPointConfigEntity> updatePointConfig(
             @Valid @RequestBody UpdatePointConfigDto requestDto) {
         Long currentBrandId = helperService.getCurrentBrandId();
-        BrandPointConfig updatedConfig = commandHandler.handle(new UpdatePointConfigCommand(currentBrandId, requestDto));
+        BrandPointConfigEntity updatedConfig = commandHandler.handle(new UpdatePointConfigCommand(currentBrandId, requestDto));
         return ResponseEntity.ok(updatedConfig);
     }
 }

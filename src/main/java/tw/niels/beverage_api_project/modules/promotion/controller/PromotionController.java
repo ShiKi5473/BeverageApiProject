@@ -12,7 +12,7 @@ import tw.niels.beverage_api_project.common.constants.ApiPaths;
 import tw.niels.beverage_api_project.common.service.ControllerHelperService;
 import tw.niels.beverage_api_project.modules.promotion.dto.CreatePromotionRequestDto;
 import tw.niels.beverage_api_project.modules.promotion.dto.PromotionResponseDto;
-import tw.niels.beverage_api_project.modules.promotion.entity.Promotion;
+import tw.niels.beverage_api_project.modules.promotion.entity.PromotionEntity;
 import tw.niels.beverage_api_project.modules.promotion.service.PromotionService;
 
 import java.util.List;
@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping(ApiPaths.API_V1 + "/brands/promotions")
-@Tag(name = "Promotion Management", description = "促銷活動管理 API")
+@Tag(name = "PromotionEntity Management", description = "促銷活動管理 API")
 public class PromotionController {
 
     private final PromotionService promotionService;
@@ -39,7 +39,7 @@ public class PromotionController {
             @Valid @RequestBody CreatePromotionRequestDto requestDto) {
 
         Long brandId = helperService.getCurrentBrandId();
-        Promotion promotion = promotionService.createPromotion(brandId, requestDto);
+        PromotionEntity promotion = promotionService.createPromotion(brandId, requestDto);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(PromotionResponseDto.fromEntity(promotion));
     }
@@ -49,7 +49,7 @@ public class PromotionController {
     @Operation(summary = "查詢促銷活動列表", description = "列出該品牌所有活動 (含已過期/停用)")
     public ResponseEntity<List<PromotionResponseDto>> getPromotions() {
         Long brandId = helperService.getCurrentBrandId();
-        List<Promotion> list = promotionService.getPromotionsByBrand(brandId);
+        List<PromotionEntity> list = promotionService.getPromotionsByBrand(brandId);
 
         List<PromotionResponseDto> dtos = list.stream()
                 .map(PromotionResponseDto::fromEntity)

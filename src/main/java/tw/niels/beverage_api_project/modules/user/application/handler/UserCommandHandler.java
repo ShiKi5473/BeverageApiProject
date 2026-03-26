@@ -4,7 +4,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import tw.niels.beverage_api_project.modules.user.application.command.*;
 import tw.niels.beverage_api_project.modules.user.dto.StaffDto;
-import tw.niels.beverage_api_project.modules.user.entity.User;
+import tw.niels.beverage_api_project.modules.user.entity.UserEntity;
 import tw.niels.beverage_api_project.modules.user.service.UserService;
 
 /**
@@ -33,8 +33,8 @@ public class UserCommandHandler {
 
     @Transactional
     public Long handle(RegisterStaffCommand command) {
-        User user = userService.createUser(command.requestDto());
-        return user.getId();
+        UserEntity UserEntity = userService.createUser(command.requestDto());
+        return UserEntity.getId();
     }
 
     @Transactional

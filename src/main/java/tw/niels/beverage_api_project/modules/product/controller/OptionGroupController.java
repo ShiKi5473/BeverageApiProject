@@ -23,13 +23,13 @@ import tw.niels.beverage_api_project.modules.product.dto.CreateOptionGroupReques
 import tw.niels.beverage_api_project.modules.product.dto.CreateProductOptionRequestDto;
 import tw.niels.beverage_api_project.modules.product.dto.OptionGroupResponseDto;
 import tw.niels.beverage_api_project.modules.product.dto.ProductOptionResponseDto;
-import tw.niels.beverage_api_project.modules.product.entity.OptionGroup;
-import tw.niels.beverage_api_project.modules.product.entity.ProductOption;
+import tw.niels.beverage_api_project.modules.product.entity.OptionGroupEntity;
+import tw.niels.beverage_api_project.modules.product.entity.ProductOptionEntity;
 import tw.niels.beverage_api_project.modules.product.service.OptionGroupService;
 
 @RestController
 @RequestMapping(value = ApiPaths.API_V1 + ApiPaths.BRANDS, produces = MediaType.APPLICATION_JSON_VALUE)
-@Tag(name = "Product Options", description = "商品客製化選項管理 (甜度、冰塊、加料)")
+@Tag(name = "ProductEntity Options", description = "商品客製化選項管理 (甜度、冰塊、加料)")
 public class OptionGroupController {
 
     private final OptionGroupService optionGroupService;
@@ -48,7 +48,7 @@ public class OptionGroupController {
     public ResponseEntity<OptionGroupResponseDto> createOptionGroup(
             @Valid @RequestBody CreateOptionGroupRequestDto requestDto) {
         Long brandId = this.helperService.getCurrentBrandId();
-        OptionGroup newGroup = optionGroupService.createOptionGroup(brandId, requestDto);
+        OptionGroupEntity newGroup = optionGroupService.createOptionGroup(brandId, requestDto);
         return new ResponseEntity<>(OptionGroupResponseDto.fromEntity(newGroup), HttpStatus.CREATED);
     }
 
@@ -57,7 +57,7 @@ public class OptionGroupController {
     @Operation(summary = "取得品牌所有選項群組", description = "列出該品牌下定義的所有客製化選項群組及其內容")
     public ResponseEntity<List<OptionGroupResponseDto>> getOptionGroupsByBrand() {
         Long brandId = this.helperService.getCurrentBrandId();
-        List<OptionGroup> groups = optionGroupService.getOptionGroupsByBrand(brandId);
+        List<OptionGroupEntity> groups = optionGroupService.getOptionGroupsByBrand(brandId);
         List<OptionGroupResponseDto> dtos = groups.stream()
                 .map(OptionGroupResponseDto::fromEntity)
                 .collect(Collectors.toList());
@@ -71,7 +71,7 @@ public class OptionGroupController {
             @PathVariable Long groupId,
             @Valid @RequestBody CreateProductOptionRequestDto requestDto) {
         Long brandId = this.helperService.getCurrentBrandId();
-        ProductOption newOption = optionGroupService.createProductOption(groupId, brandId, requestDto);
+        ProductOptionEntity newOption = optionGroupService.createProductOption(groupId, brandId, requestDto);
         return new ResponseEntity<>(ProductOptionResponseDto.fromEntity(newOption), HttpStatus.CREATED);
     }
 }

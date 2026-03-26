@@ -1,12 +1,14 @@
 package tw.niels.beverage_api_project.integration;
 
 import io.hypersistence.utils.jdbc.validator.SQLStatementCountValidator;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+
 import tw.niels.beverage_api_project.AbstractIntegrationTest;
 import tw.niels.beverage_api_project.config.DataSeeder;
 import tw.niels.beverage_api_project.config.TestDataSourceConfig;
@@ -22,7 +24,7 @@ import tw.niels.beverage_api_project.modules.product.enums.ProductStatus;
 import tw.niels.beverage_api_project.modules.product.repository.ProductRepository;
 import tw.niels.beverage_api_project.modules.report.schedule.ReportRecoveryRunner;
 import tw.niels.beverage_api_project.modules.report.schedule.ReportScheduler;
-import tw.niels.beverage_api_project.modules.store.entity.Store;
+import tw.niels.beverage_api_project.modules.store.entity.StoreEntity;
 import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
 
 import java.math.BigDecimal;
@@ -77,7 +79,7 @@ public class OrderNPlusOneIntegrationTest extends AbstractIntegrationTest {
         brand = brandRepository.save(brand);
         this.brandId = brand.getId();
 
-        Store store = new Store();
+        StoreEntity store = new StoreEntity();
         store.setName("Test Store");
         store.setBrand(brand);
         store = storeRepository.save(store);
@@ -133,7 +135,7 @@ public class OrderNPlusOneIntegrationTest extends AbstractIntegrationTest {
         }
     }
 
-    private void createOrder(Brand brand, Store store, Product product, String orderNumber) {
+    private void createOrder(Brand brand, StoreEntity store, Product product, String orderNumber) {
         Order order = new Order();
         order.setBrand(brand);
         order.setStore(store);

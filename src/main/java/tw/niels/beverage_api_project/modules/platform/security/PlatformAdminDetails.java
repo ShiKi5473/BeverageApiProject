@@ -3,7 +3,7 @@ package tw.niels.beverage_api_project.modules.platform.security;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
-import tw.niels.beverage_api_project.modules.platform.entity.PlatformAdmin;
+import tw.niels.beverage_api_project.modules.platform.entity.PlatformAdminEntity;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -16,7 +16,7 @@ public record PlatformAdminDetails(
 ) implements UserDetails {
 
     // 靜態工廠方法 (維持原有的 build 邏輯)
-    public static PlatformAdminDetails build(PlatformAdmin admin) {
+    public static PlatformAdminDetails build(PlatformAdminEntity admin) {
         return new PlatformAdminDetails(
                 admin.getAdminId(),
                 admin.getUsername(),

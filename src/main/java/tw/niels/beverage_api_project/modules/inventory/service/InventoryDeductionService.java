@@ -6,11 +6,11 @@ import tw.niels.beverage_api_project.common.exception.ApplicationException;
 import tw.niels.beverage_api_project.common.exception.BadRequestException;
 import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
 import tw.niels.beverage_api_project.modules.inventory.dao.InventoryBatchDAO;
-import tw.niels.beverage_api_project.modules.inventory.entity.InventoryBatch;
-import tw.niels.beverage_api_project.modules.inventory.entity.InventoryItem;
-import tw.niels.beverage_api_project.modules.inventory.repository.InventoryBatchRepository;
-import tw.niels.beverage_api_project.modules.inventory.repository.InventoryItemRepository;
-import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
+import tw.niels.beverage_api_project.modules.inventory.entity.InventoryBatchEntity;
+import tw.niels.beverage_api_project.modules.inventory.entity.InventoryItemEntity;
+import tw.niels.beverage_api_project.modules.inventory.repository.InventoryBatchJpaRepository;
+import tw.niels.beverage_api_project.modules.inventory.repository.InventoryItemJpaRepository;
+import tw.niels.beverage_api_project.modules.store.repository.StoreJpaRepository;
 
 import java.math.BigDecimal;
 import java.util.*;
@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
  * <h3>FIFO 演算法說明：</h3>
  * <p>扣庫存時依照批次的到期日 (expiryDate) 由近到遠排序，優先扣減即將過期的批次。</p>
  * <ol>
- *   <li>先鎖定 InventoryItem (悲觀鎖)，檢查總庫存是否足夠 (Fast Fail)。</li>
+ *   <li>先鎖定 InventoryItemEntity (悲觀鎖)，檢查總庫存是否足夠 (Fast Fail)。</li>
  *   <li>查詢該品項在該分店的所有可用批次，依到期日升序排列。</li>
  *   <li>從最早到期的批次開始扣減：若該批次數量 >= 剩餘待扣量，直接扣除；否則扣光該批次，繼續扣下一批。</li>
  *   <li>使用 JDBC Batch Update 一次性寫入所有批次的新數量，減少資料庫交互。</li>
@@ -40,15 +40,15 @@ public class InventoryDeductionService {
 
     private static final String MSG_INSUFFICIENT_STOCK = "error.inventory.insufficient";
 
-    private final InventoryItemRepository itemRepository;
-    private final InventoryBatchRepository batchRepository;
+    private final InventoryItemJpaRepository itemRepository;
+    private final InventoryBatchJpaRepository batchRepository;
     private final InventoryBatchDAO inventoryBatchDAO;
-    private final StoreRepository storeRepository;
+    private final StoreJpaRepository storeRepository;
 
-    public InventoryDeductionService(InventoryItemRepository itemRepository,
-                                     InventoryBatchRepository batchRepository,
+    public InventoryDeductionService(InventoryItemJpaRepository itemRepository,
+                                     InventoryBatchJpaRepository batchRepository,
                                      InventoryBatchDAO inventoryBatchDAO,
-                                     StoreRepository storeRepository) {
+                                     StoreJpaRepository storeRepository) {
         this.itemRepository = itemRepository;
         this.batchRepository = batchRepository;
         this.inventoryBatchDAO = inventoryBatchDAO;
@@ -66,7 +66,7 @@ public class InventoryDeductionService {
         }
 
         // 1. 鎖定原物料 (Item Level Lock)
-        InventoryItem item = itemRepository.findByBrandIdAndIdForUpdate(brandId, itemId)
+        InventoryItemEntity item = itemRepository.findByBrandIdAndIdForUpdate(brandId, itemId)
                 .orElseThrow(() -> new ResourceNotFoundException("error.resource.not_found", "Item ID: " + itemId));
 
         // 2. 檢查總庫存 (Fast Fail)
@@ -84,12 +84,12 @@ public class InventoryDeductionService {
         itemRepository.save(item);
 
         // 4. FIFO 批次扣減計算（依到期日升序，優先扣減即將過期的批次）
-        List<InventoryBatch> batches = batchRepository.findAvailableBatchesForUpdate(storeId, itemId);
+        List<InventoryBatchEntity> batches = batchRepository.findAvailableBatchesForUpdate(storeId, itemId);
 
         List<InventoryBatchDAO.BatchUpdateTuple> batchUpdates = new ArrayList<>();
         BigDecimal remainingToDeduct = quantityToDeduct;
 
-        for (InventoryBatch batch : batches) {
+        for (InventoryBatchEntity batch : batches) {
             if (remainingToDeduct.compareTo(BigDecimal.ZERO) <= 0) break;
 
             BigDecimal currentQty = batch.getCurrentQuantity();
@@ -142,14 +142,14 @@ public class InventoryDeductionService {
     public void processBatchDeductions(Long brandId, Long storeId, Map<Long, BigDecimal> deductionMap) {
         Set<Long> itemIds = deductionMap.keySet();
 
-        // A. 批次鎖定 InventoryItem (防止並發修改總量)
-        List<InventoryItem> itemsToUpdate = itemRepository.findByBrandIdAndIdInForUpdate(brandId, itemIds);
-        Map<Long, InventoryItem> lockedItemMap = itemsToUpdate.stream()
-                .collect(Collectors.toMap(InventoryItem::getId, Function.identity()));
+        // A. 批次鎖定 InventoryItemEntity (防止並發修改總量)
+        List<InventoryItemEntity> itemsToUpdate = itemRepository.findByBrandIdAndIdInForUpdate(brandId, itemIds);
+        Map<Long, InventoryItemEntity> lockedItemMap = itemsToUpdate.stream()
+                .collect(Collectors.toMap(InventoryItemEntity::getId, Function.identity()));
 
         // B. 更新 Item 總庫存 (檢查 + 扣減)
         for (Long itemId : itemIds) {
-            InventoryItem item = lockedItemMap.get(itemId);
+            InventoryItemEntity item = lockedItemMap.get(itemId);
             BigDecimal qtyToDeduct = deductionMap.get(itemId);
 
             if (item == null) {
@@ -171,10 +171,10 @@ public class InventoryDeductionService {
         itemRepository.saveAll(itemsToUpdate);
 
         // C. 批次查詢所有相關的可用 Batches
-        List<InventoryBatch> allBatches = batchRepository.findAvailableBatchesForItems(storeId, itemIds);
+        List<InventoryBatchEntity> allBatches = batchRepository.findAvailableBatchesForItems(storeId, itemIds);
 
         // 將 Batches 依照 Item 分組
-        Map<Long, List<InventoryBatch>> batchesByItem = allBatches.stream()
+        Map<Long, List<InventoryBatchEntity>> batchesByItem = allBatches.stream()
                 .collect(Collectors.groupingBy(b -> b.getInventoryItem().getId()));
 
         // 準備 JDBC Batch Update 列表
@@ -183,9 +183,9 @@ public class InventoryDeductionService {
         // D. 記憶體內計算 FIFO 扣減（每個品項各自依到期日順序扣減）
         for (Long itemId : itemIds) {
             BigDecimal remainingToDeduct = deductionMap.get(itemId);
-            List<InventoryBatch> itemBatches = batchesByItem.getOrDefault(itemId, Collections.emptyList());
+            List<InventoryBatchEntity> itemBatches = batchesByItem.getOrDefault(itemId, Collections.emptyList());
 
-            for (InventoryBatch batch : itemBatches) {
+            for (InventoryBatchEntity batch : itemBatches) {
                 if (remainingToDeduct.compareTo(BigDecimal.ZERO) <= 0) break;
 
                 BigDecimal currentQty = batch.getCurrentQuantity();

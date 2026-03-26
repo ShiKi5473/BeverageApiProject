@@ -4,7 +4,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import tw.niels.beverage_api_project.common.exception.BadRequestException;
 import tw.niels.beverage_api_project.modules.member.service.MemberPointService;
-import tw.niels.beverage_api_project.modules.order.entity.Order;
+import tw.niels.beverage_api_project.modules.order.entity.OrderEntity;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
 import tw.niels.beverage_api_project.modules.order.event.OrderStateChangedEvent;
 
@@ -28,42 +28,42 @@ public class ReadyForPickupState extends AbstractOrderState {
     }
 
     @Override
-    public void complete(Order order) {
+    public void complete(OrderEntity OrderEntity) {
         // 【注意】此 "complete" 動作由 POS 觸發，代表「顧客取餐」
 
-        OrderStatus oldStatus = order.getStatus();
+        OrderStatus oldStatus = OrderEntity.getStatus();
 
         // 【移入】這是從 PreparingState 搬過來的邏輯
-        order.setCompletedTime(new Date()); // 設定訂單的最終完成時間
-        if (order.getMember() != null) {
-            Long pointsEarned = memberPointService.calculatePointsEarned(order.getFinalAmount(), order);
-            order.setPointsEarned(pointsEarned);
+        OrderEntity.setCompletedTime(new Date()); // 設定訂單的最終完成時間
+        if (OrderEntity.getMember() != null) {
+            Long pointsEarned = memberPointService.calculatePointsEarned(OrderEntity.getFinalAmount(), OrderEntity);
+            OrderEntity.setPointsEarned(pointsEarned);
             if (pointsEarned > 0) {
-                memberPointService.earnPoints(order.getMember(), order, pointsEarned);
+                memberPointService.earnPoints(OrderEntity.getMember(), OrderEntity, pointsEarned);
             }
         }
         // --- 邏輯結束 ---
 
-        order.setStatus(OrderStatus.CLOSED); // 【修改】狀態轉換至最終態
+        OrderEntity.setStatus(OrderStatus.CLOSED); // 【修改】狀態轉換至最終態
 
-        eventPublisher.publishEvent(new OrderStateChangedEvent(order, oldStatus, OrderStatus.CLOSED));
+        eventPublisher.publishEvent(new OrderStateChangedEvent(OrderEntity, oldStatus, OrderStatus.CLOSED));
     }
 
     @Override
-    public void cancel(Order order) {
+    public void cancel(OrderEntity OrderEntity) {
         // (待取餐狀態也可以被取消，例如顧客久未取餐)
-        OrderStatus oldStatus = order.getStatus();
+        OrderStatus oldStatus = OrderEntity.getStatus();
 
         // 同樣需要退還點數
-        if (order.getMember() != null && order.getPointsUsed() > 0) {
-            memberPointService.refundPoints(order.getMember(), order);
+        if (OrderEntity.getMember() != null && OrderEntity.getPointsUsed() > 0) {
+            memberPointService.refundPoints(OrderEntity.getMember(), OrderEntity);
         }
 
-        order.setStatus(OrderStatus.CANCELLED);
-        eventPublisher.publishEvent(new OrderStateChangedEvent(order, oldStatus, OrderStatus.CANCELLED));
+        OrderEntity.setStatus(OrderStatus.CANCELLED);
+        eventPublisher.publishEvent(new OrderStateChangedEvent(OrderEntity, oldStatus, OrderStatus.CANCELLED));
     }
     @Override
-    public void accept(Order order) {
+    public void accept(OrderEntity OrderEntity) {
         throw new BadRequestException("訂單狀態為 " + getStatus() + "，無法執行接單動作。");
     }
 }

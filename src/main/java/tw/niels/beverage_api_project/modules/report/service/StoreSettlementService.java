@@ -7,15 +7,15 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
 import tw.niels.beverage_api_project.modules.order.repository.OrderJpaRepository;
-import tw.niels.beverage_api_project.modules.product.entity.Product;
-import tw.niels.beverage_api_project.modules.product.repository.ProductRepository;
+import tw.niels.beverage_api_project.modules.product.entity.ProductEntity;
+import tw.niels.beverage_api_project.modules.product.repository.ProductJpaRepository;
 import tw.niels.beverage_api_project.modules.report.dto.OrderStatusStatsDto;
 import tw.niels.beverage_api_project.modules.report.dto.PaymentStatsDto;
 import tw.niels.beverage_api_project.modules.report.dto.ProductSalesStatsDto;
-import tw.niels.beverage_api_project.modules.report.entity.DailyProductStats;
-import tw.niels.beverage_api_project.modules.report.entity.DailyStoreStats;
-import tw.niels.beverage_api_project.modules.report.repository.DailyProductStatsRepository;
-import tw.niels.beverage_api_project.modules.report.repository.DailyStoreStatsRepository;
+import tw.niels.beverage_api_project.modules.report.entity.DailyProductStatsEntity;
+import tw.niels.beverage_api_project.modules.report.entity.DailyStoreStatsEntity;
+import tw.niels.beverage_api_project.modules.report.repository.DailyProductStatsJpaRepository;
+import tw.niels.beverage_api_project.modules.report.repository.DailyStoreStatsJpaRepository;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -38,18 +38,18 @@ public class StoreSettlementService {
     private static final Logger logger = LoggerFactory.getLogger(StoreSettlementService.class);
 
     private final OrderJpaRepository orderRepository;
-    private final ProductRepository productRepository;
-    private final DailyStoreStatsRepository dailyStoreStatsRepository;
-    private final DailyProductStatsRepository dailyProductStatsRepository;
+    private final ProductJpaRepository productRepository;
+    private final DailyStoreStatsJpaRepository DailyStoreStatsJpaRepository;
+    private final DailyProductStatsJpaRepository DailyProductStatsJpaRepository;
 
-    public StoreSettlementService(OrderRepository orderRepository,
-                                  ProductRepository productRepository,
-                                  DailyStoreStatsRepository dailyStoreStatsRepository,
-                                  DailyProductStatsRepository dailyProductStatsRepository) {
+    public StoreSettlementService(OrderJpaRepository orderRepository,
+                                  ProductJpaRepository productRepository,
+                                  DailyStoreStatsJpaRepository DailyStoreStatsJpaRepository,
+                                  DailyProductStatsJpaRepository DailyProductStatsJpaRepository) {
         this.orderRepository = orderRepository;
         this.productRepository = productRepository;
-        this.dailyStoreStatsRepository = dailyStoreStatsRepository;
-        this.dailyProductStatsRepository = dailyProductStatsRepository;
+        this.DailyStoreStatsJpaRepository = DailyStoreStatsJpaRepository;
+        this.DailyProductStatsJpaRepository = DailyProductStatsJpaRepository;
     }
 
     /**
@@ -62,15 +62,15 @@ public class StoreSettlementService {
     public void processStoreStats(Long storeId, Long brandId, LocalDate date, LocalDateTime start, LocalDateTime end) {
 
         // --- 步驟 0: 冪等性檢查 ---
-        if (dailyStoreStatsRepository.existsByStoreIdAndDate(storeId, date)) {
+        if (DailyStoreStatsJpaRepository.existsByStoreIdAndDate(storeId, date)) {
             logger.debug("分店 {} 在 {} 的報表已存在，正在刪除舊資料...", storeId, date);
-            dailyStoreStatsRepository.deleteByStoreIdAndDate(storeId, date);
-            dailyProductStatsRepository.deleteByStoreIdAndDate(storeId, date);
-            dailyStoreStatsRepository.flush();
+            DailyStoreStatsJpaRepository.deleteByStoreIdAndDate(storeId, date);
+            DailyProductStatsJpaRepository.deleteByStoreIdAndDate(storeId, date);
+            DailyStoreStatsJpaRepository.flush();
         }
 
         // --- 步驟 1: 準備分店統計物件 ---
-        DailyStoreStats storeStats = new DailyStoreStats();
+        DailyStoreStatsEntity storeStats = new DailyStoreStatsEntity();
         storeStats.setStoreId(storeId);
         storeStats.setBrandId(brandId);
         storeStats.setDate(date);
@@ -103,13 +103,13 @@ public class StoreSettlementService {
             }
         }
 
-        dailyStoreStatsRepository.save(storeStats);
+        DailyStoreStatsJpaRepository.save(storeStats);
 
         // --- 步驟 4: 計算並儲存商品銷售統計 ---
         List<ProductSalesStatsDto> productStats = orderRepository.findProductStatsByStoreAndDateRange(storeId, start, end);
 
         for (ProductSalesStatsDto dto : productStats) {
-            DailyProductStats prodStat = new DailyProductStats();
+            DailyProductStatsEntity prodStat = new DailyProductStatsEntity();
             prodStat.setStoreId(storeId);
             prodStat.setBrandId(brandId);
             prodStat.setProductId(dto.getProductId());
@@ -118,7 +118,7 @@ public class StoreSettlementService {
             prodStat.setQuantitySold(dto.getTotalQuantity().intValue());
             prodStat.setTotalSalesAmount(dto.getTotalSalesAmount());
 
-            Optional<Product> productOpt = productRepository.findByBrand_IdAndId(brandId, dto.getProductId());
+            Optional<ProductEntity> productOpt = productRepository.findByBrand_IdAndId(brandId, dto.getProductId());
 
             if (productOpt.isPresent() && !productOpt.get().getCategories().isEmpty()) {
                 String categoryName = productOpt.get().getCategories().iterator().next().getName();
@@ -142,7 +142,7 @@ public class StoreSettlementService {
                         storeId, date, unclosedCount);
             }
 
-            dailyProductStatsRepository.save(prodStat);
+            DailyProductStatsJpaRepository.save(prodStat);
         }
     }
 }

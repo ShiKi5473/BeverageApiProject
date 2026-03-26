@@ -3,8 +3,8 @@ package tw.niels.beverage_api_project.security;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
-import tw.niels.beverage_api_project.modules.user.entity.User;
-import tw.niels.beverage_api_project.modules.user.entity.profile.StaffProfile;
+import tw.niels.beverage_api_project.modules.user.entity.UserEntity;
+import tw.niels.beverage_api_project.modules.user.entity.profile.StaffProfileEntity;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -25,12 +25,12 @@ public record AppUserDetails(
 ) implements UserDetails {
 
     // --- 靜態建構方法 (Factory Method) ---
-    public static AppUserDetails build(User user) {
+    public static AppUserDetails build(UserEntity user) {
         Set<GrantedAuthority> authorities = new HashSet<>();
         Long storeId = null;
 
         // 檢查是否有員工角色資料
-        StaffProfile staffProfile = user.getStaffProfile();
+        StaffProfileEntity staffProfile = user.getStaffProfile();
         if (staffProfile != null) {
             authorities.add(new SimpleGrantedAuthority("ROLE_" + staffProfile.getRole().name()));
 

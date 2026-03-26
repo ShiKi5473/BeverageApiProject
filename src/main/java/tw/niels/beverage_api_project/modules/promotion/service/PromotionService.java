@@ -1,5 +1,11 @@
 package tw.niels.beverage_api_project.modules.promotion.service;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CacheEvict;
@@ -9,40 +15,34 @@ import org.springframework.transaction.annotation.Transactional;
 
 import tw.niels.beverage_api_project.common.exception.BadRequestException;
 import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
-import tw.niels.beverage_api_project.modules.brand.entity.Brand;
-import tw.niels.beverage_api_project.modules.brand.repository.BrandRepository;
-import tw.niels.beverage_api_project.modules.order.entity.Order;
-import tw.niels.beverage_api_project.modules.product.entity.Product;
-import tw.niels.beverage_api_project.modules.product.repository.ProductRepository;
+import tw.niels.beverage_api_project.modules.brand.entity.BrandEntity;
+import tw.niels.beverage_api_project.modules.brand.repository.BrandJpaRepository;
+import tw.niels.beverage_api_project.modules.order.entity.OrderEntity;
+import tw.niels.beverage_api_project.modules.product.entity.ProductEntity;
+import tw.niels.beverage_api_project.modules.product.repository.ProductJpaRepository;
 import tw.niels.beverage_api_project.modules.promotion.dto.CreatePromotionRequestDto;
-import tw.niels.beverage_api_project.modules.promotion.entity.Promotion;
-import tw.niels.beverage_api_project.modules.promotion.repository.PromotionRepository;
+import tw.niels.beverage_api_project.modules.promotion.entity.PromotionEntity;
+import tw.niels.beverage_api_project.modules.promotion.repository.PromotionJpaRepository;
 import tw.niels.beverage_api_project.modules.promotion.strategy.PromotionCalculator;
 import tw.niels.beverage_api_project.modules.promotion.strategy.PromotionStrategyFactory;
-
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
 
 @Service
 public class PromotionService {
 
     private static final Logger logger = LoggerFactory.getLogger(PromotionService.class);
 
-    private final PromotionRepository promotionRepository;
+    private final PromotionJpaRepository PromotionJpaRepository;
     private final PromotionStrategyFactory strategyFactory;
-    private final BrandRepository brandRepository;
-    private final ProductRepository productRepository;
+    private final BrandJpaRepository brandRepository;
+    private final ProductJpaRepository productRepository;
     private final PromotionCacheService promotionCacheService;
 
-    public PromotionService(PromotionRepository promotionRepository,
+    public PromotionService(PromotionJpaRepository PromotionJpaRepository,
                             PromotionStrategyFactory strategyFactory,
-                            BrandRepository brandRepository,
-                            ProductRepository productRepository,
+                            BrandJpaRepository brandRepository,
+                            ProductJpaRepository productRepository,
                             PromotionCacheService promotionCacheService) {
-        this.promotionRepository = promotionRepository;
+        this.PromotionJpaRepository = PromotionJpaRepository;
         this.strategyFactory = strategyFactory;
         this.brandRepository = brandRepository;
         this.productRepository = productRepository;
@@ -56,27 +56,27 @@ public class PromotionService {
      */
     @Cacheable(value = "promotions", key = "#brandId")
     @Transactional(readOnly = true)
-    public List<Promotion> getActivePromotions(Long brandId) {
-        return promotionRepository.findActivePromotionsByBrand(brandId, LocalDateTime.now());
+    public List<PromotionEntity> getActivePromotions(Long brandId) {
+        return PromotionJpaRepository.findActivePromotionEntitysByBrand(brandId, LocalDateTime.now());
     }
 
     /**
      * 計算訂單的最佳促銷折扣
      */
-    public BigDecimal calculateBestDiscount(Order order) {
-        if (order.getBrand() == null) return BigDecimal.ZERO;
+    public BigDecimal calculateBestDiscount(OrderEntity OrderEntity) {
+        if (OrderEntity.getBrand() == null) return BigDecimal.ZERO;
 
-        Long brandId = order.getBrand().getId();
+        Long brandId = OrderEntity.getBrand().getId();
 
         // 改為呼叫外部 Cache Service，無需 Self-Injection
-        List<Promotion> activePromotions = promotionCacheService.getActivePromotions(brandId);
+        List<PromotionEntity> activePromotions = promotionCacheService.getActivePromotions(brandId);
 
         BigDecimal maxDiscount = BigDecimal.ZERO;
 
-        for (Promotion promotion : activePromotions) {
+        for (PromotionEntity promotion : activePromotions) {
             try {
                 PromotionCalculator calculator = strategyFactory.getCalculator(promotion.getType());
-                BigDecimal discount = calculator.calculateDiscount(order, promotion);
+                BigDecimal discount = calculator.calculateDiscount(OrderEntity, promotion);
 
                 if (discount.compareTo(maxDiscount) > 0) {
                     maxDiscount = discount;
@@ -96,16 +96,16 @@ public class PromotionService {
      */
     @CacheEvict(value = "promotions", key = "#brandId") // 【新增】清除快取
     @Transactional
-    public Promotion createPromotion(Long brandId, CreatePromotionRequestDto request) {
-        Brand brand = brandRepository.findById(brandId)
+    public PromotionEntity createPromotion(Long brandId, CreatePromotionRequestDto request) {
+        BrandEntity BrandEntity = brandRepository.findById(brandId)
                 .orElseThrow(() -> new ResourceNotFoundException("找不到品牌 ID: " + brandId));
 
         if (request.getEndDate().isBefore(request.getStartDate())) {
             throw new BadRequestException("結束時間必須晚於開始時間");
         }
 
-        Promotion promotion = new Promotion();
-        promotion.setBrand(brand);
+        PromotionEntity promotion = new PromotionEntity();
+        promotion.setBrand(BrandEntity);
         promotion.setName(request.getName());
         promotion.setDescription(request.getDescription());
         promotion.setType(request.getType());
@@ -116,24 +116,24 @@ public class PromotionService {
         promotion.setIsActive(true);
 
         if (request.getApplicableProductIds() != null && !request.getApplicableProductIds().isEmpty()) {
-            Set<Product> products = new HashSet<>();
+            Set<ProductEntity> products = new HashSet<>();
             for (Long pid : request.getApplicableProductIds()) {
-                Product p = productRepository.findByBrand_IdAndId(brandId, pid)
+                ProductEntity p = productRepository.findByBrand_IdAndId(brandId, pid)
                         .orElseThrow(() -> new BadRequestException("商品 ID " + pid + " 無效或不屬於此品牌"));
                 products.add(p);
             }
             promotion.setApplicableProducts(products);
         }
 
-        return promotionRepository.save(promotion);
+        return PromotionJpaRepository.save(promotion);
     }
 
     /**
      * 查詢品牌的所有活動
      */
     @Transactional(readOnly = true)
-    public List<Promotion> getPromotionsByBrand(Long brandId) {
-        return promotionRepository.findByBrand_Id(brandId);
+    public List<PromotionEntity> getPromotionsByBrand(Long brandId) {
+        return PromotionJpaRepository.findByBrand_Id(brandId);
     }
 
 
@@ -143,10 +143,10 @@ public class PromotionService {
     @CacheEvict(value = "promotions", key = "#brandId") // 【新增】清除快取
     @Transactional
     public void deactivatePromotion(Long brandId, Long promotionId) {
-        Promotion promotion = promotionRepository.findByBrand_IdAndId(brandId, promotionId)
+        PromotionEntity promotion = PromotionJpaRepository.findByBrand_IdAndId(brandId, promotionId)
                 .orElseThrow(() -> new ResourceNotFoundException("找不到促銷活動 ID: " + promotionId));
 
         promotion.setIsActive(false);
-        promotionRepository.save(promotion);
+        PromotionJpaRepository.save(promotion);
     }
 }

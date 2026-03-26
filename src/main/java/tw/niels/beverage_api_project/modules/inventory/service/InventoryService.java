@@ -2,14 +2,15 @@ package tw.niels.beverage_api_project.modules.inventory.service;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
 import tw.niels.beverage_api_project.modules.inventory.dto.AddShipmentRequestDto;
 import tw.niels.beverage_api_project.modules.inventory.entity.*;
 import tw.niels.beverage_api_project.modules.inventory.repository.*;
-import tw.niels.beverage_api_project.modules.store.entity.Store;
-import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
-import tw.niels.beverage_api_project.modules.user.entity.User;
-import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
+import tw.niels.beverage_api_project.modules.store.entity.StoreEntity;
+import tw.niels.beverage_api_project.modules.store.repository.StoreJpaRepository;
+import tw.niels.beverage_api_project.modules.user.entity.UserEntity;
+import tw.niels.beverage_api_project.modules.user.repository.UserJpaRepository;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -27,28 +28,28 @@ public class InventoryService {
 
     private static final String REASON_TYPE_RESTOCK = "RESTOCK";
     private static final String SHIPMENT_NOTE_PREFIX = "進貨單號: ";
-    private static final String MSG_STORE_NOT_FOUND = "Store not found";
+    private static final String MSG_STORE_NOT_FOUND = "StoreEntity not found";
 
-    private final InventoryItemRepository itemRepository;
-    private final InventoryBatchRepository batchRepository;
-    private final PurchaseShipmentRepository shipmentRepository;
-    private final StoreRepository storeRepository;
-    private final UserRepository userRepository;
-    private final InventorySnapshotRepository snapshotRepository;
-    private final InventoryTransactionRepository transactionRepository;
+    private final InventoryItemJpaRepository itemRepository;
+    private final InventoryBatchJpaRepository batchRepository;
+    private final PurchaseShipmentJpaRepository shipmentRepository;
+    private final StoreJpaRepository storeRepository;
+    private final UserJpaRepository UserJpaRepository;
+    private final InventorySnapshotJpaRepository snapshotRepository;
+    private final InventoryTransactionJpaRepository transactionRepository;
 
-    public InventoryService(InventoryItemRepository itemRepository,
-                            InventoryBatchRepository batchRepository,
-                            PurchaseShipmentRepository shipmentRepository,
-                            StoreRepository storeRepository,
-                            UserRepository userRepository,
-                            InventorySnapshotRepository snapshotRepository,
-                            InventoryTransactionRepository transactionRepository) {
+    public InventoryService(InventoryItemJpaRepository itemRepository,
+                            InventoryBatchJpaRepository batchRepository,
+                            PurchaseShipmentJpaRepository shipmentRepository,
+                            StoreJpaRepository storeRepository,
+                            UserJpaRepository UserJpaRepository,
+                            InventorySnapshotJpaRepository snapshotRepository,
+                            InventoryTransactionJpaRepository transactionRepository) {
         this.itemRepository = itemRepository;
         this.batchRepository = batchRepository;
         this.shipmentRepository = shipmentRepository;
         this.storeRepository = storeRepository;
-        this.userRepository = userRepository;
+        this.UserJpaRepository = UserJpaRepository;
         this.snapshotRepository = snapshotRepository;
         this.transactionRepository = transactionRepository;
     }
@@ -57,16 +58,16 @@ public class InventoryService {
      * 員工執行進貨操作 (Add Stock)
      */
     @Transactional
-    public PurchaseShipment addShipment(Long brandId, Long storeId, Long userId, AddShipmentRequestDto request) {
-        Store store = storeRepository.findByBrand_IdAndId(brandId, storeId)
+    public PurchaseShipmentEntity addShipment(Long brandId, Long storeId, Long userId, AddShipmentRequestDto request) {
+        StoreEntity StoreEntity = storeRepository.findByBrand_IdAndId(brandId, storeId)
                 .orElseThrow(() -> new ResourceNotFoundException(MSG_STORE_NOT_FOUND));
 
-        User staff = userRepository.findByBrand_IdAndId(brandId, userId)
+        UserEntity staff = UserJpaRepository.findByBrand_IdAndId(brandId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Staff not found: " + userId));
 
         // 1. 建立進貨單主檔
-        PurchaseShipment shipment = new PurchaseShipment();
-        shipment.setStore(store);
+        PurchaseShipmentEntity shipment = new PurchaseShipmentEntity();
+        shipment.setStore(StoreEntity);
         shipment.setStaff(staff);
         shipment.setShipmentDate(LocalDateTime.now());
         shipment.setSupplier(request.getSupplier());
@@ -83,32 +84,32 @@ public class InventoryService {
                 .map(AddShipmentRequestDto.BatchItemDto::getInventoryItemId)
                 .collect(Collectors.toSet());
 
-        // 3. [優化] 批次查詢 InventoryItem (Map<ItemId, Item>)
-        Map<Long, InventoryItem> itemMap = itemRepository.findByBrand_IdAndIdIn(brandId, itemIds)
+        // 3. [優化] 批次查詢 InventoryItemEntity (Map<ItemId, Item>)
+        Map<Long, InventoryItemEntity> itemMap = itemRepository.findByBrand_IdAndIdIn(brandId, itemIds)
                 .stream()
-                .collect(Collectors.toMap(InventoryItem::getId, Function.identity()));
+                .collect(Collectors.toMap(InventoryItemEntity::getId, Function.identity()));
 
         if (itemMap.size() != itemIds.size()) {
             throw new ResourceNotFoundException("部分原物料 ID 不存在或不屬於該品牌");
         }
 
-        // 4. [優化] 批次查詢 InventorySnapshot (Map<ItemId, Snapshot>)
+        // 4. [優化] 批次查詢 InventorySnapshotEntity (Map<ItemId, Snapshot>)
         // 這一步直接查出所有現有的 Snapshot，避免迴圈內 Select
-        Map<Long, InventorySnapshot> snapshotMap = snapshotRepository.findByStore_IdAndInventoryItem_IdIn(storeId, itemIds)
+        Map<Long, InventorySnapshotEntity> snapshotMap = snapshotRepository.findByStore_IdAndInventoryItem_IdIn(storeId, itemIds)
                 .stream()
                 .collect(Collectors.toMap(s -> s.getInventoryItem().getId(), Function.identity()));
 
         // 準備批次儲存的 List
-        List<InventoryBatch> batchesToSave = new ArrayList<>();
-        List<InventoryTransaction> transactionsToSave = new ArrayList<>();
+        List<InventoryBatchEntity> batchesToSave = new ArrayList<>();
+        List<InventoryTransactionEntity> transactionsToSave = new ArrayList<>();
 
         // 5. 記憶體內處理邏輯
         for (AddShipmentRequestDto.BatchItemDto itemDto : request.getItems()) {
-            InventoryItem item = itemMap.get(itemDto.getInventoryItemId());
+            InventoryItemEntity item = itemMap.get(itemDto.getInventoryItemId());
 
             // 建立 Batch
-            InventoryBatch batch = new InventoryBatch();
-            batch.setStore(store); // [修正] 記得設定 Store
+            InventoryBatchEntity batch = new InventoryBatchEntity();
+            batch.setStore(StoreEntity); // [修正] 記得設定 StoreEntity
             batch.setShipment(shipment);
             batch.setInventoryItem(item);
             batch.setQuantityReceived(itemDto.getQuantity());
@@ -117,9 +118,9 @@ public class InventoryService {
             batchesToSave.add(batch);
 
             // 更新或建立 Snapshot (從 Map 取得，如果沒有則建立新的並放入 Map)
-            InventorySnapshot snapshot = snapshotMap.computeIfAbsent(item.getId(), k -> {
-                InventorySnapshot newSnap = new InventorySnapshot();
-                newSnap.setStore(store);
+            InventorySnapshotEntity snapshot = snapshotMap.computeIfAbsent(item.getId(), k -> {
+                InventorySnapshotEntity newSnap = new InventorySnapshotEntity();
+                newSnap.setStore(StoreEntity);
                 newSnap.setInventoryItem(item);
                 newSnap.setQuantity(BigDecimal.ZERO);
                 return newSnap;
@@ -131,8 +132,8 @@ public class InventoryService {
             // snapshot.setLastCheckedAt(Instant.now()); // 若業務需要可更新時間
 
             // 建立 Transaction
-            InventoryTransaction trx = new InventoryTransaction();
-            trx.setStore(store);
+            InventoryTransactionEntity trx = new InventoryTransactionEntity();
+            trx.setStore(StoreEntity);
             trx.setInventoryItem(item);
             trx.setChangeAmount(itemDto.getQuantity());
             trx.setBalanceAfter(newQuantity);
@@ -157,7 +158,7 @@ public class InventoryService {
     @Transactional(readOnly = true)
     public BigDecimal getCurrentStock(Long storeId, Long itemId) {
         return snapshotRepository.findByStore_IdAndInventoryItem_Id(storeId, itemId)
-                .map(InventorySnapshot::getQuantity)
+                .map(InventorySnapshotEntity::getQuantity)
                 .orElse(BigDecimal.ZERO);
     }
 }

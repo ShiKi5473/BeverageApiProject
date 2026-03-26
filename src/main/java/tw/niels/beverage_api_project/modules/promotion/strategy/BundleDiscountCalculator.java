@@ -1,10 +1,10 @@
 package tw.niels.beverage_api_project.modules.promotion.strategy;
 
 import org.springframework.stereotype.Component;
-import tw.niels.beverage_api_project.modules.order.entity.Order;
-import tw.niels.beverage_api_project.modules.order.entity.OrderItem;
-import tw.niels.beverage_api_project.modules.product.entity.Product;
-import tw.niels.beverage_api_project.modules.promotion.entity.Promotion;
+import tw.niels.beverage_api_project.modules.order.entity.OrderEntity;
+import tw.niels.beverage_api_project.modules.order.entity.OrderItemEntity;
+import tw.niels.beverage_api_project.modules.product.entity.ProductEntity;
+import tw.niels.beverage_api_project.modules.promotion.entity.PromotionEntity;
 import tw.niels.beverage_api_project.modules.promotion.enums.PromotionType;
 
 import java.math.BigDecimal;
@@ -22,9 +22,9 @@ public class BundleDiscountCalculator implements PromotionCalculator {
     }
 
     @Override
-    public BigDecimal calculateDiscount(Order order, Promotion promotion) {
+    public BigDecimal calculateDiscount(OrderEntity OrderEntity, PromotionEntity promotion) {
         Set<Long> requiredProductIds = promotion.getApplicableProducts().stream()
-                .map(Product::getId)
+                .map(ProductEntity::getId)
                 .collect(Collectors.toSet());
 
         if (requiredProductIds.isEmpty()) return BigDecimal.ZERO;
@@ -33,7 +33,7 @@ public class BundleDiscountCalculator implements PromotionCalculator {
         Map<Long, Integer> cartCounts = new HashMap<>();
         Map<Long, BigDecimal> cartPrices = new HashMap<>();
 
-        for (OrderItem item : order.getItems()) {
+        for (OrderItemEntity item : OrderEntity.getItems()) {
             Long pid = item.getProduct().getId();
             cartCounts.put(pid, cartCounts.getOrDefault(pid, 0) + item.getQuantity());
             // 簡化：假設同商品單價相同 (忽略選項差異，或者取第一個)

@@ -43,6 +43,11 @@ public class OptionGroup {
         return new OptionGroup(null, brandId, name, rule, true, new ArrayList<>());
     }
 
+    /**
+     * 由 Infrastructure Layer 在持久化後回填 ID。
+     */
+    void setId(Long id) { this.id = id; }
+
     // ─── Getters ───────────────────────────────────────────────────────────
 
     public Long getId() { return id; }

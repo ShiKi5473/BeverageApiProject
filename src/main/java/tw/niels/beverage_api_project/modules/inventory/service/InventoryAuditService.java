@@ -2,22 +2,23 @@ package tw.niels.beverage_api_project.modules.inventory.service;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
 import tw.niels.beverage_api_project.common.service.ControllerHelperService;
 import tw.niels.beverage_api_project.modules.inventory.dto.InventoryAuditItemResponseDto;
 import tw.niels.beverage_api_project.modules.inventory.dto.InventoryAuditRequestDto;
-import tw.niels.beverage_api_project.modules.inventory.entity.InventoryBatch;
-import tw.niels.beverage_api_project.modules.inventory.entity.InventoryItem;
-import tw.niels.beverage_api_project.modules.inventory.entity.InventorySnapshot;
-import tw.niels.beverage_api_project.modules.inventory.entity.InventoryTransaction;
-import tw.niels.beverage_api_project.modules.inventory.repository.InventoryBatchRepository;
-import tw.niels.beverage_api_project.modules.inventory.repository.InventoryItemRepository;
-import tw.niels.beverage_api_project.modules.inventory.repository.InventorySnapshotRepository;
-import tw.niels.beverage_api_project.modules.inventory.repository.InventoryTransactionRepository;
-import tw.niels.beverage_api_project.modules.store.entity.Store;
-import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
-import tw.niels.beverage_api_project.modules.user.entity.User;
-import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
+import tw.niels.beverage_api_project.modules.inventory.entity.InventoryBatchEntity;
+import tw.niels.beverage_api_project.modules.inventory.entity.InventoryItemEntity;
+import tw.niels.beverage_api_project.modules.inventory.entity.InventorySnapshotEntity;
+import tw.niels.beverage_api_project.modules.inventory.entity.InventoryTransactionEntity;
+import tw.niels.beverage_api_project.modules.inventory.repository.InventoryBatchJpaRepository;
+import tw.niels.beverage_api_project.modules.inventory.repository.InventoryItemJpaRepository;
+import tw.niels.beverage_api_project.modules.inventory.repository.InventorySnapshotJpaRepository;
+import tw.niels.beverage_api_project.modules.inventory.repository.InventoryTransactionJpaRepository;
+import tw.niels.beverage_api_project.modules.store.entity.StoreEntity;
+import tw.niels.beverage_api_project.modules.store.repository.StoreJpaRepository;
+import tw.niels.beverage_api_project.modules.user.entity.UserEntity;
+import tw.niels.beverage_api_project.modules.user.repository.UserJpaRepository;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -34,23 +35,23 @@ import java.util.stream.Collectors;
 public class InventoryAuditService {
 
     private static final String REASON_TYPE_AUDIT = "AUDIT";
-    private static final String MSG_STORE_NOT_FOUND = "Store not found";
+    private static final String MSG_STORE_NOT_FOUND = "StoreEntity not found";
 
-    private final InventoryItemRepository itemRepository;
-    private final InventoryBatchRepository batchRepository;
-    private final InventorySnapshotRepository snapshotRepository;
-    private final InventoryTransactionRepository transactionRepository;
-    private final StoreRepository storeRepository;
-    private final UserRepository userRepository;
+    private final InventoryItemJpaRepository itemRepository;
+    private final InventoryBatchJpaRepository batchRepository;
+    private final InventorySnapshotJpaRepository snapshotRepository;
+    private final InventoryTransactionJpaRepository transactionRepository;
+    private final StoreJpaRepository storeRepository;
+    private final UserJpaRepository UserJpaRepository;
     private final ControllerHelperService helperService;
     private final InventoryDeductionService deductionService;
 
-    public InventoryAuditService(InventoryItemRepository itemRepository,
-                                 InventoryBatchRepository batchRepository,
-                                 InventorySnapshotRepository snapshotRepository,
-                                 InventoryTransactionRepository transactionRepository,
-                                 StoreRepository storeRepository,
-                                 UserRepository userRepository,
+    public InventoryAuditService(InventoryItemJpaRepository itemRepository,
+                                 InventoryBatchJpaRepository batchRepository,
+                                 InventorySnapshotJpaRepository snapshotRepository,
+                                 InventoryTransactionJpaRepository transactionRepository,
+                                 StoreJpaRepository storeRepository,
+                                 UserJpaRepository UserJpaRepository,
                                  ControllerHelperService helperService,
                                  InventoryDeductionService deductionService) {
         this.itemRepository = itemRepository;
@@ -58,7 +59,7 @@ public class InventoryAuditService {
         this.snapshotRepository = snapshotRepository;
         this.transactionRepository = transactionRepository;
         this.storeRepository = storeRepository;
-        this.userRepository = userRepository;
+        this.UserJpaRepository = UserJpaRepository;
         this.helperService = helperService;
         this.deductionService = deductionService;
     }
@@ -73,9 +74,9 @@ public class InventoryAuditService {
     @Transactional
     public void performAudit(Long brandId, Long storeId, InventoryAuditRequestDto request) {
         // 1. 準備基礎資料
-        Store store = storeRepository.findByBrand_IdAndId(brandId, storeId)
+        StoreEntity StoreEntity = storeRepository.findByBrand_IdAndId(brandId, storeId)
                 .orElseThrow(() -> new ResourceNotFoundException(MSG_STORE_NOT_FOUND));
-        User operator = userRepository.findByBrand_IdAndId(brandId, helperService.getCurrentUserId())
+        UserEntity operator = UserJpaRepository.findByBrand_IdAndId(brandId, helperService.getCurrentUserId())
                 .orElse(null);
 
         Set<Long> itemIds = request.getItems().stream()
@@ -85,23 +86,23 @@ public class InventoryAuditService {
         if (itemIds.isEmpty()) return;
 
         // 2. 批次查詢 Items 與 Snapshots
-        Map<Long, InventoryItem> itemMap = itemRepository.findByBrand_IdAndIdIn(brandId, itemIds)
-                .stream().collect(Collectors.toMap(InventoryItem::getId, Function.identity()));
+        Map<Long, InventoryItemEntity> itemMap = itemRepository.findByBrand_IdAndIdIn(brandId, itemIds)
+                .stream().collect(Collectors.toMap(InventoryItemEntity::getId, Function.identity()));
 
         if (itemMap.size() != itemIds.size()) {
             throw new ResourceNotFoundException("部分原物料 ID 無效或不屬於此品牌");
         }
 
-        Map<Long, InventorySnapshot> snapshotMap = snapshotRepository.findByStore_IdAndInventoryItem_IdIn(storeId, itemIds)
+        Map<Long, InventorySnapshotEntity> snapshotMap = snapshotRepository.findByStore_IdAndInventoryItem_IdIn(storeId, itemIds)
                 .stream().collect(Collectors.toMap(s -> s.getInventoryItem().getId(), Function.identity()));
 
         // 準備集合
-        List<InventoryTransaction> transactionsToSave = new ArrayList<>();
-        List<InventorySnapshot> snapshotsToSave = new ArrayList<>();
+        List<InventoryTransactionEntity> transactionsToSave = new ArrayList<>();
+        List<InventorySnapshotEntity> snapshotsToSave = new ArrayList<>();
         Map<Long, BigDecimal> pendingDeductions = new HashMap<>(); // 收集需要扣庫存的項目 (ItemId -> Qty)
 
         // 3. 記憶體內計算差異 (包含盤盈/盤損判斷)
-        calculateAuditDifferences(request, store, operator, itemMap, snapshotMap,
+        calculateAuditDifferences(request, StoreEntity, operator, itemMap, snapshotMap,
                 transactionsToSave, snapshotsToSave, pendingDeductions);
 
         // 4. 批次寫入 Transaction 與 Snapshot
@@ -117,18 +118,18 @@ public class InventoryAuditService {
     /**
      * 計算盤點差異：比較實際數量與系統數量，分流處理盤盈與盤損
      */
-    private void calculateAuditDifferences(InventoryAuditRequestDto request, Store store, User operator,
-                                           Map<Long, InventoryItem> itemMap, Map<Long, InventorySnapshot> snapshotMap,
-                                           List<InventoryTransaction> transactionsToSave, List<InventorySnapshot> snapshotsToSave,
+    private void calculateAuditDifferences(InventoryAuditRequestDto request, StoreEntity StoreEntity, UserEntity operator,
+                                           Map<Long, InventoryItemEntity> itemMap, Map<Long, InventorySnapshotEntity> snapshotMap,
+                                           List<InventoryTransactionEntity> transactionsToSave, List<InventorySnapshotEntity> snapshotsToSave,
                                            Map<Long, BigDecimal> pendingDeductions) {
         for (InventoryAuditRequestDto.AuditItemDto itemDto : request.getItems()) {
             Long itemId = itemDto.getInventoryItemId();
-            InventoryItem item = itemMap.get(itemId);
-            InventorySnapshot snapshot = snapshotMap.getOrDefault(itemId, new InventorySnapshot());
+            InventoryItemEntity item = itemMap.get(itemId);
+            InventorySnapshotEntity snapshot = snapshotMap.getOrDefault(itemId, new InventorySnapshotEntity());
 
             // 處理新 Snapshot
             if (snapshot.getStore() == null) {
-                snapshot.setStore(store);
+                snapshot.setStore(StoreEntity);
                 snapshot.setInventoryItem(item);
                 snapshot.setQuantity(BigDecimal.ZERO);
             }
@@ -139,8 +140,8 @@ public class InventoryAuditService {
 
             // 只有當數量有變化時才產生 Transaction
             if (diff.compareTo(BigDecimal.ZERO) != 0) {
-                InventoryTransaction trx = new InventoryTransaction();
-                trx.setStore(store);
+                InventoryTransactionEntity trx = new InventoryTransactionEntity();
+                trx.setStore(StoreEntity);
                 trx.setInventoryItem(item);
                 trx.setChangeAmount(diff);
                 trx.setBalanceAfter(actualQty);
@@ -158,7 +159,7 @@ public class InventoryAuditService {
             // 分流處理：盤盈 vs 盤損
             if (diff.compareTo(BigDecimal.ZERO) > 0) {
                 // 盤盈 (Gain): 立即建立新批次
-                handleInventoryGain(store, item, diff, itemDto.getGainedItemExpiryDate());
+                handleInventoryGain(StoreEntity, item, diff, itemDto.getGainedItemExpiryDate());
             } else if (diff.compareTo(BigDecimal.ZERO) < 0) {
                 // 盤損 (Loss): 收集起來，稍後批次扣減
                 pendingDeductions.put(itemId, diff.abs());
@@ -173,16 +174,16 @@ public class InventoryAuditService {
     @Transactional(readOnly = true)
     public List<InventoryAuditItemResponseDto> getAuditList(Long brandId, Long storeId) {
         // 1. 查詢該品牌所有定義的原物料 (Master Data)
-        List<InventoryItem> allItems = itemRepository.findByBrand_Id(brandId);
+        List<InventoryItemEntity> allItems = itemRepository.findByBrand_Id(brandId);
 
         // 2. 查詢該分店目前的庫存快照 (Transaction Data)
-        List<InventorySnapshot> snapshots = snapshotRepository.findByStore_Id(storeId);
+        List<InventorySnapshotEntity> snapshots = snapshotRepository.findByStore_Id(storeId);
 
         // 轉為 Map<ItemId, Quantity> 以便快速查找
         Map<Long, BigDecimal> stockMap = snapshots.stream()
                 .collect(Collectors.toMap(
                         s -> s.getInventoryItem().getId(),
-                        InventorySnapshot::getQuantity
+                        InventorySnapshotEntity::getQuantity
                 ));
 
         // 3. 組合結果
@@ -218,12 +219,12 @@ public class InventoryAuditService {
     }
 
     /**
-     * 處理盤盈：建立新批次並更新 InventoryItem 的 TotalQuantity
+     * 處理盤盈：建立新批次並更新 InventoryItemEntity 的 TotalQuantity
      */
-    private void handleInventoryGain(Store store, InventoryItem item, BigDecimal quantityToGain, LocalDate manualExpiryDate) {
+    private void handleInventoryGain(StoreEntity StoreEntity, InventoryItemEntity item, BigDecimal quantityToGain, LocalDate manualExpiryDate) {
         // 1. 建立新批次
-        InventoryBatch newBatch = new InventoryBatch();
-        newBatch.setStore(store);
+        InventoryBatchEntity newBatch = new InventoryBatchEntity();
+        newBatch.setStore(StoreEntity);
         newBatch.setInventoryItem(item);
         newBatch.setQuantityReceived(quantityToGain);
         newBatch.setCurrentQuantity(quantityToGain);
@@ -235,14 +236,14 @@ public class InventoryAuditService {
         } else {
             // 若未指定到期日，取最近一筆批次的到期日作為預設值
             LocalDate estimatedExpiry = batchRepository
-                    .findTopByStore_IdAndInventoryItem_IdOrderByExpiryDateDesc(store.getId(), item.getId())
-                    .map(InventoryBatch::getExpiryDate)
+                    .findTopByStore_IdAndInventoryItem_IdOrderByExpiryDateDesc(StoreEntity.getId(), item.getId())
+                    .map(InventoryBatchEntity::getExpiryDate)
                     .orElse(LocalDate.now().plusDays(7)); // TODO: 建議改讀取 Item 的預設效期設定
             newBatch.setExpiryDate(estimatedExpiry);
         }
         batchRepository.save(newBatch);
 
-        // 2. 更新 InventoryItem 總量以保持一致性
+        // 2. 更新 InventoryItemEntity 總量以保持一致性
         itemRepository.increaseTotalQuantity(item.getId(), quantityToGain);
     }
 }

@@ -2,6 +2,7 @@ package tw.niels.beverage_api_project.modules.order.infrastructure.mapper;
 
 import tw.niels.beverage_api_project.common.domain.vo.Money;
 import tw.niels.beverage_api_project.modules.order.domain.model.OrderItem;
+import tw.niels.beverage_api_project.modules.order.entity.OrderItemEntity;
 
 import java.util.Collections;
 import java.util.stream.Collectors;
@@ -20,7 +21,8 @@ import java.util.stream.Collectors;
  * 映射規則：
  * - JPA entity.getProduct().getId() → Domain productId（product 關聯非 null）
  * - JPA entity.getProductVariant().getId() → Domain variantId
- * - JPA vo.ProductSnapshot ↔ Domain domain.model.ProductSnapshot 委派 OrderMapper 轉換
+ * - JPA vo.ProductSnapshot ↔ Domain domain.model.ProductSnapshot 委派 OrderMapper
+ * 轉換
  * - Money.of(BigDecimal) 轉換 JPA BigDecimal → Domain Money VO
  * - money.amount() 轉換 Domain Money VO → JPA BigDecimal
  * - toEntity() 透過 Proxy 物件設定 Product / ProductVariant 關聯（僅帶入 ID）
@@ -35,26 +37,26 @@ public class OrderItemMapper {
      * @param entity JPA OrderItem Entity
      * @return Domain OrderItem，若 entity 為 null 返回 null
      */
-    public static OrderItem toDomain(tw.niels.beverage_api_project.modules.order.entity.OrderItem entity) {
-        if (entity == null) return null;
+    public static OrderItem toDomain(OrderItemEntity entity) {
+        if (entity == null)
+            return null;
 
         // 使用 Domain OrderItem 的靜態工廠方法建立
         OrderItem item = OrderItem.create(
-            // JPA entity 使用關聯欄位，需取出 ID
-            entity.getProduct() != null ? entity.getProduct().getId() : null,
-            entity.getProductVariant() != null ? entity.getProductVariant().getId() : null,
-            entity.getQuantity(),
-            Money.of(entity.getUnitPrice()),
-            entity.getNotes(),
-            // 轉換選項 ID 集合（ProductOption 繼承 BaseTsidEntity，有 getId()）
-            entity.getOptions() != null
-                ? entity.getOptions().stream()
-                    .map(opt -> opt.getId())
-                    .collect(Collectors.toList())
-                : Collections.emptyList(),
-            // vo.ProductSnapshot → domain.model.ProductSnapshot（委派 OrderMapper 轉換）
-            OrderMapper.toProductSnapshotDomain(entity.getProductSnapshot())
-        );
+                // JPA entity 使用關聯欄位，需取出 ID
+                entity.getProduct() != null ? entity.getProduct().getId() : null,
+                entity.getProductVariant() != null ? entity.getProductVariant().getId() : null,
+                entity.getQuantity(),
+                Money.of(entity.getUnitPrice()),
+                entity.getNotes(),
+                // 轉換選項 ID 集合（ProductOption 繼承 BaseTsidEntity，有 getId()）
+                entity.getOptions() != null
+                        ? entity.getOptions().stream()
+                                .map(opt -> opt.getId())
+                                .collect(Collectors.toList())
+                        : Collections.emptyList(),
+                // vo.ProductSnapshot → domain.model.ProductSnapshot（委派 OrderMapper 轉換）
+                OrderMapper.toProductSnapshotDomain(entity.getProductSnapshot()));
 
         // 設定 OrderItem 的 ID（由 Infrastructure 設定，setId 是 package-private，使用反射）
         if (entity.getId() != null) {
@@ -62,8 +64,8 @@ public class OrderItemMapper {
                 var setIdMethod = OrderItem.class.getDeclaredMethod("setId", Long.class);
                 setIdMethod.setAccessible(true);
                 setIdMethod.invoke(item, entity.getId());
-            } catch (NoSuchMethodException | IllegalAccessException |
-                     java.lang.reflect.InvocationTargetException | SecurityException e) {
+            } catch (NoSuchMethodException | IllegalAccessException | java.lang.reflect.InvocationTargetException
+                    | SecurityException e) {
                 // 若反射失敗，日誌記錄但不中斷
                 System.err.println("警告：無法設定 OrderItem ID：" + e.getMessage());
             }
@@ -81,11 +83,11 @@ public class OrderItemMapper {
      * @param domain Domain OrderItem
      * @return JPA OrderItem Entity，若 domain 為 null 返回 null
      */
-    public static tw.niels.beverage_api_project.modules.order.entity.OrderItem toEntity(OrderItem domain) {
-        if (domain == null) return null;
+    public static tw.niels.beverage_api_project.modules.order.entity.OrderItemEntity toEntity(OrderItem domain) {
+        if (domain == null)
+            return null;
 
-        tw.niels.beverage_api_project.modules.order.entity.OrderItem entity =
-            new tw.niels.beverage_api_project.modules.order.entity.OrderItem();
+        tw.niels.beverage_api_project.modules.order.entity.OrderItemEntity entity = new tw.niels.beverage_api_project.modules.order.entity.OrderItemEntity();
 
         // 設定 ID（若已有 ID 則為更新操作）
         if (domain.getId() != null) {
@@ -94,14 +96,14 @@ public class OrderItemMapper {
 
         // 設定 Product 關聯（透過 Proxy 僅帶入 ID，避免額外查詢）
         if (domain.getProductId() != null) {
-            var product = new tw.niels.beverage_api_project.modules.product.entity.Product();
+            var product = new tw.niels.beverage_api_project.modules.product.entity.ProductEntity();
             product.setId(domain.getProductId());
             entity.setProduct(product);
         }
 
         // 設定 ProductVariant 關聯（透過 Proxy 僅帶入 ID）
         if (domain.getVariantId() != null) {
-            var variant = new tw.niels.beverage_api_project.modules.product.entity.ProductVariant();
+            var variant = new tw.niels.beverage_api_project.modules.product.entity.ProductVariantEntity();
             variant.setId(domain.getVariantId());
             entity.setProductVariant(variant);
         }

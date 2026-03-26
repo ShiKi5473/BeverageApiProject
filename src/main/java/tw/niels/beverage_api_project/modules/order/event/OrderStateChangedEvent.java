@@ -1,7 +1,7 @@
-// 建議放在：tw/niels/beverage_api_project/modules/order/event/
+// 建議放在：tw/niels/beverage_api_project/modules/OrderEntity/event/
 package tw.niels.beverage_api_project.modules.order.event;
 
-import tw.niels.beverage_api_project.modules.order.entity.Order;
+import tw.niels.beverage_api_project.modules.order.entity.OrderEntity;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
 
 /**
@@ -12,7 +12,7 @@ import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
  * @param newStatus 變更後的狀態
  */
 public record OrderStateChangedEvent(
-        Order order,
+        OrderEntity OrderEntity,
         OrderStatus oldStatus,
         OrderStatus newStatus
 ) {

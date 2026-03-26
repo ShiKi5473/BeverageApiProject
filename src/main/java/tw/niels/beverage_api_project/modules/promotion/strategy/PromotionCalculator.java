@@ -1,7 +1,7 @@
 package tw.niels.beverage_api_project.modules.promotion.strategy;
 
-import tw.niels.beverage_api_project.modules.order.entity.Order;
-import tw.niels.beverage_api_project.modules.promotion.entity.Promotion;
+import tw.niels.beverage_api_project.modules.order.entity.OrderEntity;
+import tw.niels.beverage_api_project.modules.promotion.entity.PromotionEntity;
 import tw.niels.beverage_api_project.modules.promotion.enums.PromotionType;
 
 import java.math.BigDecimal;
@@ -16,5 +16,5 @@ public interface PromotionCalculator {
      * 計算折扣金額 (只回傳計算結果，不修改訂單)
      * @return 折扣金額 (必須 >= 0)
      */
-    BigDecimal calculateDiscount(Order order, Promotion promotion);
+    BigDecimal calculateDiscount(OrderEntity OrderEntity, PromotionEntity promotion);
 }

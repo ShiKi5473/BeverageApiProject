@@ -2,10 +2,11 @@ package tw.niels.beverage_api_project.modules.store.application.handler;
 
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+
 import tw.niels.beverage_api_project.modules.store.application.query.GetStoresByBrandQuery;
 import tw.niels.beverage_api_project.modules.store.dto.StoreResponseDto;
-import tw.niels.beverage_api_project.modules.store.entity.Store;
-import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
+import tw.niels.beverage_api_project.modules.store.entity.StoreEntity;
+import tw.niels.beverage_api_project.modules.store.repository.StoreJpaRepository;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -15,17 +16,17 @@ import java.util.stream.Collectors;
  *
  * 處理流程：
  * 1. 接收 GetStoresByBrandQuery
- * 2. 透過 StoreRepository 查詢品牌下所有分店
+ * 2. 透過 StoreJpaRepository 查詢品牌下所有分店
  * 3. 轉換為 StoreResponseDto 回傳
  *
- * 備註：過渡期直接使用 JPA StoreRepository，待 Phase 3 改用 Domain Repository。
+ * 備註：過渡期直接使用 JPA StoreJpaRepository，待 Phase 3 改用 Domain Repository。
  */
 @Component
 public class StoreQueryHandler {
 
-    private final StoreRepository storeRepository;
+    private final StoreJpaRepository storeRepository;
 
-    public StoreQueryHandler(StoreRepository storeRepository) {
+    public StoreQueryHandler(StoreJpaRepository storeRepository) {
         this.storeRepository = storeRepository;
     }
 
@@ -38,7 +39,7 @@ public class StoreQueryHandler {
      */
     @Transactional(readOnly = true)
     public List<StoreResponseDto> handle(GetStoresByBrandQuery query) {
-        List<Store> stores = storeRepository.findByBrand_Id(query.brandId());
+        List<StoreEntity> stores = storeRepository.findByBrand_Id(query.brandId());
         return stores.stream()
             .map(StoreResponseDto::fromEntity)
             .collect(Collectors.toList());

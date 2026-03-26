@@ -3,7 +3,7 @@ package tw.niels.beverage_api_project.modules.brand.application.handler;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import tw.niels.beverage_api_project.modules.brand.application.command.*;
-import tw.niels.beverage_api_project.modules.brand.entity.BrandPointConfig;
+import tw.niels.beverage_api_project.modules.brand.entity.BrandPointConfigEntity;
 import tw.niels.beverage_api_project.modules.brand.service.BrandService;
 
 /**
@@ -12,7 +12,7 @@ import tw.niels.beverage_api_project.modules.brand.service.BrandService;
  * 處理流程（UpdatePointConfig）：
  * 1. 接收 UpdatePointConfigCommand（含 brandId 與積點設定 DTO）
  * 2. 委派 BrandService 更新積點規則（累積率、折抵率）
- * 3. 回傳更新後的 BrandPointConfig
+ * 3. 回傳更新後的 BrandPointConfigEntity
  */
 @Component
 public class BrandCommandHandler {
@@ -24,7 +24,7 @@ public class BrandCommandHandler {
     }
 
     @Transactional
-    public BrandPointConfig handle(UpdatePointConfigCommand command) {
+    public BrandPointConfigEntity handle(UpdatePointConfigCommand command) {
         return brandService.updatePointConfig(command.brandId(), command.requestDto());
     }
 }

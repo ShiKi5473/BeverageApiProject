@@ -6,7 +6,7 @@ import java.util.stream.Collectors;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
-import tw.niels.beverage_api_project.modules.product.entity.Product;
+import tw.niels.beverage_api_project.modules.product.entity.ProductEntity;
 import tw.niels.beverage_api_project.modules.product.enums.ProductStatus;
 
 @Data
@@ -37,24 +37,24 @@ public class ProductResponseDto {
     @Schema(description = "關聯的客製化選項群組")
     private Set<OptionGroupResponseDto> optionGroups;
 
-    public static ProductResponseDto fromEntity(Product product) {
-        if (product == null) return null;
+    public static ProductResponseDto fromEntity(ProductEntity ProductEntity) {
+        if (ProductEntity == null) return null;
         ProductResponseDto dto = new ProductResponseDto();
-        dto.setProductId(product.getId());
-        dto.setName(product.getName());
-        dto.setDescription(product.getDescription());
-        dto.setBasePrice(product.getBasePrice());
-        dto.setImageUrl(product.getImageUrl());
-        dto.setStatus(product.getStatus());
+        dto.setProductId(ProductEntity.getId());
+        dto.setName(ProductEntity.getName());
+        dto.setDescription(ProductEntity.getDescription());
+        dto.setBasePrice(ProductEntity.getBasePrice());
+        dto.setImageUrl(ProductEntity.getImageUrl());
+        dto.setStatus(ProductEntity.getStatus());
 
-        if (product.getCategories() != null) {
-            dto.setCategories(product.getCategories().stream()
+        if (ProductEntity.getCategories() != null) {
+            dto.setCategories(ProductEntity.getCategories().stream()
                     .map(CategoryBasicDto::fromEntity)
                     .collect(Collectors.toSet()));
         }
 
-        if (product.getOptionGroups() != null) {
-            dto.setOptionGroups(product.getOptionGroups().stream()
+        if (ProductEntity.getOptionGroups() != null) {
+            dto.setOptionGroups(ProductEntity.getOptionGroups().stream()
                     .map(OptionGroupResponseDto::fromEntity)
                     .collect(Collectors.toSet()));
         }

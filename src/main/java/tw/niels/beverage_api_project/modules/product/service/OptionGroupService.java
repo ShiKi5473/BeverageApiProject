@@ -6,66 +6,66 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
-import tw.niels.beverage_api_project.modules.brand.entity.Brand;
-import tw.niels.beverage_api_project.modules.brand.repository.BrandRepository;
+import tw.niels.beverage_api_project.modules.brand.entity.BrandEntity;
+import tw.niels.beverage_api_project.modules.brand.repository.BrandJpaRepository;
 import tw.niels.beverage_api_project.modules.product.dto.CreateOptionGroupRequestDto;
 import tw.niels.beverage_api_project.modules.product.dto.CreateProductOptionRequestDto;
-import tw.niels.beverage_api_project.modules.product.entity.OptionGroup;
-import tw.niels.beverage_api_project.modules.product.entity.ProductOption;
-import tw.niels.beverage_api_project.modules.product.repository.OptionGroupRepository;
-import tw.niels.beverage_api_project.modules.product.repository.ProductOptionRepository;
+import tw.niels.beverage_api_project.modules.product.entity.OptionGroupEntity;
+import tw.niels.beverage_api_project.modules.product.entity.ProductOptionEntity;
+import tw.niels.beverage_api_project.modules.product.repository.OptionGroupJpaRepository;
+import tw.niels.beverage_api_project.modules.product.repository.ProductOptionJpaRepository;
 
 @Service
 public class OptionGroupService {
 
-    private final OptionGroupRepository optionGroupRepository;
-    private final ProductOptionRepository productOptionRepository;
-    private final BrandRepository brandRepository;
+    private final OptionGroupJpaRepository OptionGroupJpaRepository;
+    private final ProductOptionJpaRepository ProductOptionJpaRepository;
+    private final BrandJpaRepository brandRepository;
 
-    public OptionGroupService(OptionGroupRepository optionGroupRepository,
-            ProductOptionRepository productOptionRepository,
-            BrandRepository brandRepository) {
-        this.optionGroupRepository = optionGroupRepository;
-        this.productOptionRepository = productOptionRepository;
+    public OptionGroupService(OptionGroupJpaRepository OptionGroupJpaRepository,
+            ProductOptionJpaRepository ProductOptionJpaRepository,
+            BrandJpaRepository brandRepository) {
+        this.OptionGroupJpaRepository = OptionGroupJpaRepository;
+        this.ProductOptionJpaRepository = ProductOptionJpaRepository;
         this.brandRepository = brandRepository;
     }
 
     @Transactional
-    public OptionGroup createOptionGroup(Long brandId, CreateOptionGroupRequestDto requestDto) {
-        Brand brand = brandRepository.findById(brandId)
+    public OptionGroupEntity createOptionGroup(Long brandId, CreateOptionGroupRequestDto requestDto) {
+        BrandEntity BrandEntity = brandRepository.findById(brandId)
                 .orElseThrow(() -> new ResourceNotFoundException("找不到品牌，ID：" + brandId));
 
-        OptionGroup optionGroup = new OptionGroup();
-        optionGroup.setBrand(brand);
-        optionGroup.setName(requestDto.getName());
-        optionGroup.setSelectionType(requestDto.getSelectionType());
-        optionGroup.setSortOrder(requestDto.getSortOrder());
+        OptionGroupEntity OptionGroupEntity = new OptionGroupEntity();
+        OptionGroupEntity.setBrand(BrandEntity);
+        OptionGroupEntity.setName(requestDto.getName());
+        OptionGroupEntity.setSelectionType(requestDto.getSelectionType());
+        OptionGroupEntity.setSortOrder(requestDto.getSortOrder());
 
-        return optionGroupRepository.save(optionGroup);
+        return OptionGroupJpaRepository.save(OptionGroupEntity);
     }
 
     @Transactional
-    public ProductOption createProductOption(Long groupId, Long brandId, CreateProductOptionRequestDto requestDto) {
-        OptionGroup optionGroup = optionGroupRepository.findByBrand_IdAndId(brandId, groupId)
+    public ProductOptionEntity createProductOption(Long groupId, Long brandId, CreateProductOptionRequestDto requestDto) {
+        OptionGroupEntity OptionGroupEntity = OptionGroupJpaRepository.findByBrand_IdAndId(brandId, groupId)
                 .orElseThrow(() -> new ResourceNotFoundException("找不到選項群組，ID：" + groupId));
 
-        ProductOption productOption = new ProductOption();
-        productOption.setOptionGroup(optionGroup);
-        productOption.setOptionName(requestDto.getOptionName());
-        productOption.setPriceAdjustment(requestDto.getPriceAdjustment());
-        productOption.setDefault(requestDto.isDefault());
+        ProductOptionEntity ProductOptionEntity = new ProductOptionEntity();
+        ProductOptionEntity.setOptionGroup(OptionGroupEntity);
+        ProductOptionEntity.setOptionName(requestDto.getOptionName());
+        ProductOptionEntity.setPriceAdjustment(requestDto.getPriceAdjustment());
+        ProductOptionEntity.setDefault(requestDto.isDefault());
 
-        return productOptionRepository.save(productOption);
+        return ProductOptionJpaRepository.save(ProductOptionEntity);
     }
 
     @Transactional(readOnly = true)
-    public List<OptionGroup> getOptionGroupsByBrand(Long brandId) {
-        return optionGroupRepository.findByBrand_Id(brandId);
+    public List<OptionGroupEntity> getOptionGroupsByBrand(Long brandId) {
+        return OptionGroupJpaRepository.findByBrand_Id(brandId);
     }
 
     @Transactional(readOnly = true)
-    public OptionGroup getOptionGroupById(Long groupId, Long brandId) {
-        return optionGroupRepository.findByBrand_IdAndId(brandId, groupId)
+    public OptionGroupEntity getOptionGroupById(Long groupId, Long brandId) {
+        return OptionGroupJpaRepository.findByBrand_IdAndId(brandId, groupId)
                 .orElseThrow(() -> new ResourceNotFoundException("找不到選項群組，ID：" + groupId));
     }
 }

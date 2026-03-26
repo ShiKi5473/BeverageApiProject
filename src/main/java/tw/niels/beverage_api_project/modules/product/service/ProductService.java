@@ -13,53 +13,53 @@ import org.springframework.transaction.annotation.Transactional;
 
 import tw.niels.beverage_api_project.common.exception.BadRequestException;
 import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
-import tw.niels.beverage_api_project.modules.brand.entity.Brand;
-import tw.niels.beverage_api_project.modules.brand.repository.BrandRepository;
+import tw.niels.beverage_api_project.modules.brand.entity.BrandEntity;
+import tw.niels.beverage_api_project.modules.brand.repository.BrandJpaRepository;
 import tw.niels.beverage_api_project.modules.product.dto.*;
-import tw.niels.beverage_api_project.modules.product.entity.Category;
-import tw.niels.beverage_api_project.modules.product.entity.OptionGroup;
-import tw.niels.beverage_api_project.modules.product.entity.Product;
-import tw.niels.beverage_api_project.modules.product.entity.ProductVariant;
+import tw.niels.beverage_api_project.modules.product.entity.CategoryEntity;
+import tw.niels.beverage_api_project.modules.product.entity.OptionGroupEntity;
+import tw.niels.beverage_api_project.modules.product.entity.ProductEntity;
+import tw.niels.beverage_api_project.modules.product.entity.ProductVariantEntity;
 import tw.niels.beverage_api_project.modules.product.enums.ProductStatus;
-import tw.niels.beverage_api_project.modules.product.repository.CategoryRepository;
-import tw.niels.beverage_api_project.modules.product.repository.OptionGroupRepository;
-import tw.niels.beverage_api_project.modules.product.repository.ProductRepository;
-import tw.niels.beverage_api_project.modules.product.repository.ProductVariantRepository;
+import tw.niels.beverage_api_project.modules.product.repository.CategoryJpaRepository;
+import tw.niels.beverage_api_project.modules.product.repository.OptionGroupJpaRepository;
+import tw.niels.beverage_api_project.modules.product.repository.ProductJpaRepository;
+import tw.niels.beverage_api_project.modules.product.repository.ProductVariantJpaRepository;
 
 @Service
 public class ProductService {
-    private final ProductRepository productRepository;
-    private final BrandRepository brandRepository;
-    private final CategoryRepository categoryRepository;
-    private final OptionGroupRepository optionGroupRepository;
-    private final ProductVariantRepository productVariantRepository;
+    private final ProductJpaRepository productRepository;
+    private final BrandJpaRepository brandRepository;
+    private final CategoryJpaRepository CategoryJpaRepository;
+    private final OptionGroupJpaRepository OptionGroupJpaRepository;
+    private final ProductVariantJpaRepository ProductVariantJpaRepository;
 
-    public ProductService(ProductRepository productRepository,
-                          BrandRepository brandRepository,
-                          CategoryRepository categoryRepository,
-                          OptionGroupRepository optionGroupRepository,
-                          ProductVariantRepository productVariantRepository) {
+    public ProductService(ProductJpaRepository productRepository,
+                          BrandJpaRepository brandRepository,
+                          CategoryJpaRepository CategoryJpaRepository,
+                          OptionGroupJpaRepository OptionGroupJpaRepository,
+                          ProductVariantJpaRepository ProductVariantJpaRepository) {
         this.productRepository = productRepository;
         this.brandRepository = brandRepository;
-        this.categoryRepository = categoryRepository;
-        this.optionGroupRepository = optionGroupRepository;
-        this.productVariantRepository = productVariantRepository;
+        this.CategoryJpaRepository = CategoryJpaRepository;
+        this.OptionGroupJpaRepository = OptionGroupJpaRepository;
+        this.ProductVariantJpaRepository = ProductVariantJpaRepository;
     }
 
     /**
      * 建立商品，並自動建立預設規格 (Default Variant)
      */
     @Transactional
-    @CacheEvict(value = {"product-summary", "product-pos"}, key = "#brandId")
+    @CacheEvict(value = {"ProductEntity-summary", "ProductEntity-pos"}, key = "#brandId")
     public ProductResponseDto createProduct(Long brandId, CreateProductRequestDto request) {
         // 修正：使用 ResourceNotFoundException 取代 RuntimeException，使 GlobalExceptionHandler 回傳 HTTP 404
-        Brand brand = brandRepository.findById(brandId)
+        BrandEntity BrandEntity = brandRepository.findById(brandId)
                 .orElseThrow(() -> new ResourceNotFoundException("找不到品牌，ID：" + brandId));
 
-        Set<Category> categories = validateAndGetCategories(brandId, request.getCategoryIds());
-        Set<OptionGroup> optionGroups = validateAndGetOptionGroups(brandId, request.getOptionGroupIds());
+        Set<CategoryEntity> categories = validateAndGetCategories(brandId, request.getCategoryIds());
+        Set<OptionGroupEntity> optionGroups = validateAndGetOptionGroups(brandId, request.getOptionGroupIds());
 
-        Product newProduct = buildProductEntity(brand, request, categories, optionGroups);
+        ProductEntity newProduct = buildProductEntity(BrandEntity, request, categories, optionGroups);
 
         if (request.getVariants() != null && !request.getVariants().isEmpty()) {
             buildVariantsAndCalculateBasePrice(newProduct, request.getVariants());
@@ -67,12 +67,12 @@ public class ProductService {
             buildDefaultVariantAndBasePrice(newProduct, request.getBasePrice());
         }
 
-        Product savedProduct = productRepository.save(newProduct);
+        ProductEntity savedProduct = productRepository.save(newProduct);
         return convertToDto(savedProduct);
     }
 
-    private Set<Category> validateAndGetCategories(Long brandId, Set<Long> categoryIds) {
-        Set<Category> categories = categoryRepository.findByBrand_IdAndIdIn(brandId, categoryIds);
+    private Set<CategoryEntity> validateAndGetCategories(Long brandId, Set<Long> categoryIds) {
+        Set<CategoryEntity> categories = CategoryJpaRepository.findByBrand_IdAndIdIn(brandId, categoryIds);
         if (categories.size() != categoryIds.size()) {
             // 修正：使用 BadRequestException 取代 RuntimeException，使 GlobalExceptionHandler 回傳 HTTP 400
             throw new BadRequestException("部分分類 ID 無效");
@@ -80,21 +80,21 @@ public class ProductService {
         return categories;
     }
 
-    private Set<OptionGroup> validateAndGetOptionGroups(Long brandId, Set<Long> optionGroupIds) {
+    private Set<OptionGroupEntity> validateAndGetOptionGroups(Long brandId, Set<Long> optionGroupIds) {
         if (optionGroupIds == null || optionGroupIds.isEmpty()) {
             return new HashSet<>();
         }
         return optionGroupIds.stream()
-                .map(groupId -> optionGroupRepository
+                .map(groupId -> OptionGroupJpaRepository
                         .findByBrand_IdAndId(brandId, groupId)
                         .orElseThrow(() -> new BadRequestException(
                                 "無效的選項群組 ID：" + groupId + " 或不屬於此品牌")))
                 .collect(Collectors.toSet());
     }
 
-    private Product buildProductEntity(Brand brand, CreateProductRequestDto request, Set<Category> categories, Set<OptionGroup> optionGroups) {
-        Product newProduct = new Product();
-        newProduct.setBrand(brand);
+    private ProductEntity buildProductEntity(BrandEntity BrandEntity, CreateProductRequestDto request, Set<CategoryEntity> categories, Set<OptionGroupEntity> optionGroups) {
+        ProductEntity newProduct = new ProductEntity();
+        newProduct.setBrand(BrandEntity);
         newProduct.setName(request.getName());
         newProduct.setDescription(request.getDescription());
         newProduct.setBasePrice(request.getBasePrice());
@@ -105,60 +105,60 @@ public class ProductService {
         return newProduct;
     }
 
-    private void buildVariantsAndCalculateBasePrice(Product product, List<CreateProductVariantDto> variantDtos) {
+    private void buildVariantsAndCalculateBasePrice(ProductEntity ProductEntity, List<CreateProductVariantDto> variantDtos) {
         BigDecimal minPrice = null;
         for (CreateProductVariantDto variantDto : variantDtos) {
-            ProductVariant variant = new ProductVariant();
+            ProductVariantEntity variant = new ProductVariantEntity();
             variant.setName(variantDto.name());
             variant.setPrice(variantDto.price());
             variant.setSkuCode(variantDto.skuCode());
-            product.addVariant(variant);
+            ProductEntity.addVariant(variant);
 
             if (minPrice == null || variant.getPrice().compareTo(minPrice) < 0) {
                 minPrice = variant.getPrice();
             }
         }
-        product.setBasePrice(minPrice);
+        ProductEntity.setBasePrice(minPrice);
     }
 
-    private void buildDefaultVariantAndBasePrice(Product product, BigDecimal basePrice) {
+    private void buildDefaultVariantAndBasePrice(ProductEntity ProductEntity, BigDecimal basePrice) {
         if (basePrice == null) {
             throw new BadRequestException("若未指定規格，則必須填寫基本售價");
         }
-        ProductVariant defaultVariant = new ProductVariant();
+        ProductVariantEntity defaultVariant = new ProductVariantEntity();
         defaultVariant.setName("常規");
         defaultVariant.setPrice(basePrice);
         defaultVariant.setSkuCode(null);
-        product.addVariant(defaultVariant);
-        product.setBasePrice(basePrice);
+        ProductEntity.addVariant(defaultVariant);
+        ProductEntity.setBasePrice(basePrice);
     }
 
     /**
      * 連結選項群組，並清除快取
      */
     @Transactional
-    @CacheEvict(value = {"product-summary", "product-pos"}, key = "#brandId") // 【新增】清除快取
-    public Product linkOptionGroupsToProduct(Long brandId, Long productId, Set<Long> groupIds) {
-        Product product = productRepository.findByBrand_IdAndId(brandId, productId)
+    @CacheEvict(value = {"ProductEntity-summary", "ProductEntity-pos"}, key = "#brandId") // 【新增】清除快取
+    public ProductEntity linkOptionGroupsToProduct(Long brandId, Long productId, Set<Long> groupIds) {
+        ProductEntity ProductEntity = productRepository.findByBrand_IdAndId(brandId, productId)
                 .orElseThrow(() -> new ResourceNotFoundException("找不到商品，ID：" + productId));
 
-        Set<OptionGroup> groupsToLink = groupIds.stream()
-                .map(groupId -> optionGroupRepository.findByBrand_IdAndId(brandId, groupId)
+        Set<OptionGroupEntity> groupsToLink = groupIds.stream()
+                .map(groupId -> OptionGroupJpaRepository.findByBrand_IdAndId(brandId, groupId)
                         .orElseThrow(() -> new ResourceNotFoundException(
                                 "找不到選項群組，ID：" + groupId)))
                 .collect(Collectors.toSet());
 
-        product.setOptionGroups(groupsToLink);
-        return productRepository.save(product);
+        ProductEntity.setOptionGroups(groupsToLink);
+        return productRepository.save(ProductEntity);
     }
 
     /**
      * 取得商品摘要列表 (快取)
      */
     @Transactional(readOnly = true)
-    @Cacheable(value = "product-summary", key = "#brandId") // 【新增】啟用快取
+    @Cacheable(value = "ProductEntity-summary", key = "#brandId") // 【新增】啟用快取
     public List<ProductSummaryDto> getAvailableSummaries(Long brandId) {
-        List<Product> products = productRepository.findByBrand_IdAndStatus(brandId, ProductStatus.ACTIVE);
+        List<ProductEntity> products = productRepository.findByBrand_IdAndStatus(brandId, ProductStatus.ACTIVE);
         return products.stream()
                 .map(ProductSummaryDto::fromEntity)
                 .collect(Collectors.toList());
@@ -169,44 +169,44 @@ public class ProductService {
      * 這是 POS 載入時最重的查詢，快取後能大幅提升速度
      */
     @Transactional(readOnly = true)
-    @Cacheable(value = "product-pos", key = "#brandId") // 【新增】啟用快取
+    @Cacheable(value = "ProductEntity-pos", key = "#brandId") // 【新增】啟用快取
     public List<ProductPosDto> getAvailableProductsForPos(Long brandId) {
-        List<Product> products = productRepository.findByBrand_IdAndStatus(brandId, ProductStatus.ACTIVE);
+        List<ProductEntity> products = productRepository.findByBrand_IdAndStatus(brandId, ProductStatus.ACTIVE);
         return products.stream()
                 .map(ProductPosDto::fromEntity)
                 .collect(Collectors.toList());
     }
 
-    private ProductResponseDto convertToDto(Product product) {
-        return ProductResponseDto.fromEntity(product);
+    private ProductResponseDto convertToDto(ProductEntity ProductEntity) {
+        return ProductResponseDto.fromEntity(ProductEntity);
     }
 
     /**
      * 新增單一規格
      */
     @Transactional
-    @CacheEvict(value = {"product-summary", "product-pos"}, key = "#brandId")
+    @CacheEvict(value = {"ProductEntity-summary", "ProductEntity-pos"}, key = "#brandId")
     public ProductResponseDto addProductVariant(Long brandId, Long productId, CreateProductVariantDto requestDto) {
-        Product product = productRepository.findByBrand_IdAndId(brandId, productId)
+        ProductEntity ProductEntity = productRepository.findByBrand_IdAndId(brandId, productId)
                 .orElseThrow(() -> new ResourceNotFoundException("找不到商品，ID：" + productId));
 
-        ProductVariant variant = new ProductVariant();
+        ProductVariantEntity variant = new ProductVariantEntity();
         variant.setName(requestDto.name());
         variant.setPrice(requestDto.price());
         variant.setSkuCode(requestDto.skuCode());
         variant.setDeleted(false); // 確保預設為未刪除
 
         // 建立關聯
-        product.addVariant(variant);
+        ProductEntity.addVariant(variant);
 
         // 更新商品 Base Price (若新規格價格更低)
-        if (product.getBasePrice() == null || variant.getPrice().compareTo(product.getBasePrice()) < 0) {
-            product.setBasePrice(variant.getPrice());
+        if (ProductEntity.getBasePrice() == null || variant.getPrice().compareTo(ProductEntity.getBasePrice()) < 0) {
+            ProductEntity.setBasePrice(variant.getPrice());
         }
 
-        productRepository.save(product); // 會 Cascade save variant
+        productRepository.save(ProductEntity); // 會 Cascade save variant
 
-        return ProductResponseDto.fromEntity(product);
+        return ProductResponseDto.fromEntity(ProductEntity);
     }
 
     /**
@@ -214,9 +214,9 @@ public class ProductService {
      * 修改：更新後自動重新計算商品 BasePrice
      */
     @Transactional
-    @CacheEvict(value = {"product-summary", "product-pos"}, key = "#brandId")
+    @CacheEvict(value = {"ProductEntity-summary", "ProductEntity-pos"}, key = "#brandId")
     public void updateProductVariant(Long brandId, Long variantId, UpdateProductVariantDto requestDto) {
-        ProductVariant variant = productVariantRepository.findByProduct_Brand_IdAndIdAndIsDeletedFalse(brandId, variantId)
+        ProductVariantEntity variant = ProductVariantJpaRepository.findByProduct_Brand_IdAndIdAndIsDeletedFalse(brandId, variantId)
                 .orElseThrow(() -> new ResourceNotFoundException("找不到規格或已刪除，ID：" + variantId));
 
         boolean priceChanged = false;
@@ -230,7 +230,7 @@ public class ProductService {
 
         variant.setSkuCode(requestDto.skuCode());
 
-        productVariantRepository.save(variant); // 先儲存變更
+        ProductVariantJpaRepository.save(variant); // 先儲存變更
 
         // 若價格有變動，重新計算該商品的 BasePrice
         if (priceChanged) {
@@ -243,13 +243,13 @@ public class ProductService {
      * 修改：刪除後自動重新計算商品 BasePrice
      */
     @Transactional
-    @CacheEvict(value = {"product-summary", "product-pos"}, key = "#brandId")
+    @CacheEvict(value = {"ProductEntity-summary", "ProductEntity-pos"}, key = "#brandId")
     public void deleteProductVariant(Long brandId, Long variantId) {
-        ProductVariant variant = productVariantRepository.findByProduct_Brand_IdAndIdAndIsDeletedFalse(brandId, variantId)
+        ProductVariantEntity variant = ProductVariantJpaRepository.findByProduct_Brand_IdAndIdAndIsDeletedFalse(brandId, variantId)
                 .orElseThrow(() -> new ResourceNotFoundException("找不到規格或已刪除，ID：" + variantId));
 
         // 檢查是否為該商品的最後一個有效規格
-        long activeVariantsCount = productVariantRepository
+        long activeVariantsCount = ProductVariantJpaRepository
                 .findByProduct_Brand_IdAndProduct_IdAndIsDeletedFalse(brandId, variant.getProduct().getId())
                 .size();
 
@@ -259,7 +259,7 @@ public class ProductService {
 
         // 執行軟刪除
         variant.setDeleted(true);
-        productVariantRepository.save(variant); // 先儲存刪除狀態
+        ProductVariantJpaRepository.save(variant); // 先儲存刪除狀態
 
         // 重新計算該商品的 BasePrice (因為刪除的可能是最低價規格)
         recalculateProductBasePrice(variant.getProduct());
@@ -269,12 +269,12 @@ public class ProductService {
 
     /**
      * 重新計算並更新商品的 BasePrice
-     * 邏輯：找出所有「未刪除」的規格，取最低價更新回 Product
+     * 邏輯：找出所有「未刪除」的規格，取最低價更新回 ProductEntity
      */
-    private void recalculateProductBasePrice(Product product) {
+    private void recalculateProductBasePrice(ProductEntity ProductEntity) {
         // 1. 查詢該商品目前所有的有效規格
-        List<ProductVariant> activeVariants = productVariantRepository
-                .findByProduct_Brand_IdAndProduct_IdAndIsDeletedFalse(product.getBrand().getId(), product.getId());
+        List<ProductVariantEntity> activeVariants = ProductVariantJpaRepository
+                .findByProduct_Brand_IdAndProduct_IdAndIsDeletedFalse(ProductEntity.getBrand().getId(), ProductEntity.getId());
 
         if (activeVariants.isEmpty()) {
             return; // 理論上因刪除防護機制，不會走到這裡
@@ -282,14 +282,14 @@ public class ProductService {
 
         // 2. 找出最低價格
         BigDecimal minPrice = activeVariants.stream()
-                .map(ProductVariant::getPrice)
+                .map(ProductVariantEntity::getPrice)
                 .min(BigDecimal::compareTo)
-                .orElse(product.getBasePrice());
+                .orElse(ProductEntity.getBasePrice());
 
         // 3. 如果計算出的最低價與目前 BasePrice 不同，則更新並儲存
-        if (product.getBasePrice().compareTo(minPrice) != 0) {
-            product.setBasePrice(minPrice);
-            productRepository.save(product);
+        if (ProductEntity.getBasePrice().compareTo(minPrice) != 0) {
+            ProductEntity.setBasePrice(minPrice);
+            productRepository.save(ProductEntity);
         }
     }
 }

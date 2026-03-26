@@ -2,13 +2,13 @@ package tw.niels.beverage_api_project.modules.user.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
-import tw.niels.beverage_api_project.modules.user.entity.User;
-import tw.niels.beverage_api_project.modules.user.entity.profile.StaffProfile;
+import tw.niels.beverage_api_project.modules.user.entity.UserEntity;
+import tw.niels.beverage_api_project.modules.user.entity.profile.StaffProfileEntity;
 import tw.niels.beverage_api_project.modules.user.enums.StaffRole;
 
 /**
  * 用於回傳員工資訊的資料傳輸物件 (DTO)。
- * 這是根據最新的 User + StaffProfile 架構設計的。
+ * 這是根據最新的 UserEntity + StaffProfile 架構設計的。
  */
 @Data
 @Schema(description = "員工資訊回應")
@@ -39,34 +39,34 @@ public class StaffDto {
     private Long brandId;
 
     /**
-     * 靜態工廠方法，用於將 User 實體轉換為 StaffDto。
+     * 靜態工廠方法，用於將 UserEntity 實體轉換為 StaffDto。
      * 這種設計確保了 DTO 的建立邏輯被封裝起來。
      *
-     * @param user 包含員工資料的 User 實體
+     * @param UserEntity 包含員工資料的 UserEntity 實體
      * @return 轉換後的 StaffDto 物件
      */
-    public static StaffDto fromEntity(User user) {
-        // 基本的防呆處理，如果傳入的 user 是 null 或沒有 staffProfile，則不進行轉換
-        if (user == null || user.getStaffProfile() == null) {
+    public static StaffDto fromEntity(UserEntity UserEntity) {
+        // 基本的防呆處理，如果傳入的 UserEntity 是 null 或沒有 staffProfile，則不進行轉換
+        if (UserEntity == null || UserEntity.getStaffProfile() == null) {
             return null;
         }
 
         StaffDto dto = new StaffDto();
-        StaffProfile profile = user.getStaffProfile();
+        StaffProfileEntity profile = UserEntity.getStaffProfile();
 
-        // 從 User 實體中映射資料
-        dto.setUserId(user.getUserId());
-        dto.setPrimaryPhone(user.getPrimaryPhone());
-        dto.setActive(user.getIsActive());
-        if (user.getBrand() != null) {
-            dto.setBrandId(user.getBrand().getId());
+        // 從 UserEntity 實體中映射資料
+        dto.setUserId(UserEntity.getUserId());
+        dto.setPrimaryPhone(UserEntity.getPrimaryPhone());
+        dto.setActive(UserEntity.getIsActive());
+        if (UserEntity.getBrand() != null) {
+            dto.setBrandId(UserEntity.getBrand().getId());
         }
 
         // 從 StaffProfile 實體中映射資料
         dto.setFullName(profile.getFullName());
         dto.setRole(profile.getRole());
 
-        // 處理可能為 null 的 Store 關聯 (例如品牌管理員沒有 store)
+        // 處理可能為 null 的 StoreEntity 關聯 (例如品牌管理員沒有 StoreEntity)
         if (profile.getStore() != null) {
             dto.setStoreId(profile.getStore().getId());
             dto.setStoreName(profile.getStore().getName());

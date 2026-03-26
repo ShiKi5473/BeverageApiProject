@@ -7,8 +7,8 @@ import java.util.stream.Collectors;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import tw.niels.beverage_api_project.modules.product.entity.Product;
-import tw.niels.beverage_api_project.modules.product.entity.ProductVariant;
+import tw.niels.beverage_api_project.modules.product.entity.ProductEntity;
+import tw.niels.beverage_api_project.modules.product.entity.ProductVariantEntity;
 
 @Data
 @NoArgsConstructor
@@ -32,26 +32,26 @@ public class ProductPosDto {
     @Schema(description = "所屬分類")
     private Set<CategoryBasicDto> categories;
 
-    public static ProductPosDto fromEntity(Product product) {
-        if (product == null) return null;
+    public static ProductPosDto fromEntity(ProductEntity ProductEntity) {
+        if (ProductEntity == null) return null;
         ProductPosDto dto = new ProductPosDto();
-        dto.setId(product.getId());
-        dto.setName(product.getName());
-        dto.setBasePrice(product.getBasePrice());
+        dto.setId(ProductEntity.getId());
+        dto.setName(ProductEntity.getName());
+        dto.setBasePrice(ProductEntity.getBasePrice());
 
         // 轉換規格資料
-        if (product.getVariants() != null) {
-            dto.setVariants(product.getVariants().stream()
+        if (ProductEntity.getVariants() != null) {
+            dto.setVariants(ProductEntity.getVariants().stream()
                     .filter(v -> !v.isDeleted()) // 排除已刪除的規格
                     .map(ProductVariantDto::fromEntity)
                     .collect(Collectors.toSet()));
         }
 
-        if (product.getOptionGroups() != null) {
-            dto.setOptionGroups(product.getOptionGroups().stream().map(OptionGroupResponseDto::fromEntity).collect(Collectors.toSet()));
+        if (ProductEntity.getOptionGroups() != null) {
+            dto.setOptionGroups(ProductEntity.getOptionGroups().stream().map(OptionGroupResponseDto::fromEntity).collect(Collectors.toSet()));
         }
-        if (product.getCategories() != null) {
-            dto.setCategories(product.getCategories().stream().map(CategoryBasicDto::fromEntity).collect(Collectors.toSet()));
+        if (ProductEntity.getCategories() != null) {
+            dto.setCategories(ProductEntity.getCategories().stream().map(CategoryBasicDto::fromEntity).collect(Collectors.toSet()));
         }
         return dto;
     }
@@ -63,7 +63,7 @@ public class ProductPosDto {
         private String name;
         private BigDecimal price;
 
-        public static ProductVariantDto fromEntity(ProductVariant variant) {
+        public static ProductVariantDto fromEntity(ProductVariantEntity variant) {
             ProductVariantDto dto = new ProductVariantDto();
             dto.setId(variant.getId());
             dto.setName(variant.getName());

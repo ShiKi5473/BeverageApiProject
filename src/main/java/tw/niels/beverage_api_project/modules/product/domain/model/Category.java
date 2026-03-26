@@ -32,6 +32,11 @@ public class Category {
         return new Category(null, brandId, name, order, true);
     }
 
+    /**
+     * 由 Infrastructure Layer 在持久化後回填 ID。
+     */
+    void setId(Long id) { this.id = id; }
+
     // ─── Getters ───────────────────────────────────────────────────────────
 
     public Long getId() { return id; }

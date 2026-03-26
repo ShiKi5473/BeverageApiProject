@@ -12,42 +12,42 @@ import tw.niels.beverage_api_project.common.constants.AuthorityConstants;
 import tw.niels.beverage_api_project.common.exception.DomainException;
 import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
 import tw.niels.beverage_api_project.common.service.ControllerHelperService;
-import tw.niels.beverage_api_project.modules.brand.entity.Brand;
-import tw.niels.beverage_api_project.modules.brand.repository.BrandRepository;
+import tw.niels.beverage_api_project.modules.brand.entity.BrandEntity;
+import tw.niels.beverage_api_project.modules.brand.repository.BrandJpaRepository;
 import tw.niels.beverage_api_project.modules.order.dto.MemberDto;
-import tw.niels.beverage_api_project.modules.store.entity.Store;
-import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
+import tw.niels.beverage_api_project.modules.store.entity.StoreEntity;
+import tw.niels.beverage_api_project.modules.store.repository.StoreJpaRepository;
 import tw.niels.beverage_api_project.modules.user.dto.CreateUserRequestDto;
 import tw.niels.beverage_api_project.modules.user.dto.StaffDto;
 import tw.niels.beverage_api_project.modules.user.dto.UpdateStaffRequestDto;
-import tw.niels.beverage_api_project.modules.user.entity.User;
-import tw.niels.beverage_api_project.modules.user.entity.profile.MemberProfile;
-import tw.niels.beverage_api_project.modules.user.entity.profile.StaffProfile;
+import tw.niels.beverage_api_project.modules.user.entity.UserEntity;
+import tw.niels.beverage_api_project.modules.user.entity.profile.MemberProfileEntity;
+import tw.niels.beverage_api_project.modules.user.entity.profile.StaffProfileEntity;
 import tw.niels.beverage_api_project.modules.user.enums.StaffRole;
-import tw.niels.beverage_api_project.modules.user.repository.StaffProfileRepository;
-import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
+import tw.niels.beverage_api_project.modules.user.repository.StaffProfileJpaRepository;
+import tw.niels.beverage_api_project.modules.user.repository.UserJpaRepository;
 import tw.niels.beverage_api_project.security.AppUserDetails;
 
 @Service
 public class UserService {
 
-    private final UserRepository userRepository;
+    private final UserJpaRepository UserJpaRepository;
 
-    private final BrandRepository brandRepository;
+    private final BrandJpaRepository brandRepository;
 
-    private final StoreRepository storeRepository;
+    private final StoreJpaRepository storeRepository;
 
     private final PasswordEncoder passwordEncoder;
 
-    private final StaffProfileRepository staffProfileRepository;
+    private final StaffProfileJpaRepository staffProfileRepository;
 
     private final ControllerHelperService helperService;
 
-    public UserService(UserRepository userRepository, BrandRepository brandRepository, StoreRepository storeRepository,
+    public UserService(UserJpaRepository UserJpaRepository, BrandJpaRepository brandRepository, StoreJpaRepository storeRepository,
             PasswordEncoder passwordEncoder,
-                       StaffProfileRepository staffProfileRepository,
+                       StaffProfileJpaRepository staffProfileRepository,
                        ControllerHelperService helperService) {
-        this.userRepository = userRepository;
+        this.UserJpaRepository = UserJpaRepository;
         this.brandRepository = brandRepository;
         this.storeRepository = storeRepository;
         this.passwordEncoder = passwordEncoder;
@@ -56,29 +56,29 @@ public class UserService {
     }
 
     @Transactional
-    public User createUser(CreateUserRequestDto requestDto) {
+    public UserEntity createUser(CreateUserRequestDto requestDto) {
         // 1. 檢查品牌是否存在
-        Brand brand = brandRepository.findById(requestDto.getBrandId())
-                .orElseThrow(() -> new ResourceNotFoundException("Error: Brand not found with ID: " + requestDto.getBrandId()));
+        BrandEntity BrandEntity = brandRepository.findById(requestDto.getBrandId())
+                .orElseThrow(() -> new ResourceNotFoundException("Error: BrandEntity not found with ID: " + requestDto.getBrandId()));
 
         // 2. 檢查手機號碼是否已在該品牌下註冊
-        userRepository.findByPrimaryPhoneAndBrandId(requestDto.getPrimaryPhone(), requestDto.getBrandId())
+        UserJpaRepository.findByPrimaryPhoneAndBrandId(requestDto.getPrimaryPhone(), requestDto.getBrandId())
                 .ifPresent(existingUser -> {
-                    throw new DomainException("Error: Phone number '" + requestDto.getPrimaryPhone() + "' is already taken for this brand!");
+                    throw new DomainException("Error: Phone number '" + requestDto.getPrimaryPhone() + "' is already taken for this BrandEntity!");
                 });
 
-        // 3. 建立核心 User 物件
-        User user = new User();
-        user.setBrand(brand);
-        user.setPrimaryPhone(requestDto.getPrimaryPhone());
-        user.setPasswordHash(passwordEncoder.encode(requestDto.getPassword()));
-        user.setIsActive(true);
+        // 3. 建立核心 UserEntity 物件
+        UserEntity UserEntity = new UserEntity();
+        UserEntity.setBrand(BrandEntity);
+        UserEntity.setPrimaryPhone(requestDto.getPrimaryPhone());
+        UserEntity.setPasswordHash(passwordEncoder.encode(requestDto.getPassword()));
+        UserEntity.setIsActive(true);
 
         // 4. 根據請求，建立對應的 Profile
         // 建立員工 Profile
         if (requestDto.getStaffProfile() != null) {
             CreateUserRequestDto.StaffProfileDto staffDto = requestDto.getStaffProfile();
-            StaffProfile staffProfile = new StaffProfile();
+            StaffProfileEntity staffProfile = new StaffProfileEntity();
             staffProfile.setFullName(staffDto.getFullName());
             staffProfile.setEmployeeNumber(staffDto.getEmployeeNumber());
             staffProfile.setRole(staffDto.getRole());
@@ -86,48 +86,48 @@ public class UserService {
 
             if (staffDto.getStoreId() != null) {
                 // 修改：改拋出 ResourceNotFoundException
-                Store store = storeRepository.findByBrand_IdAndId(brand.getId(), staffDto.getStoreId())
-                        .orElseThrow(() -> new ResourceNotFoundException("Error: Store not found with ID: " + staffDto.getStoreId()));
-                staffProfile.setStore(store);
+                StoreEntity StoreEntity = storeRepository.findByBrand_IdAndId(BrandEntity.getId(), staffDto.getStoreId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Error: StoreEntity not found with ID: " + staffDto.getStoreId()));
+                staffProfile.setStore(StoreEntity);
             }
             // 建立雙向關聯
-            user.setStaffProfile(staffProfile);
+            UserEntity.setStaffProfile(staffProfile);
         }
 
         // 建立會員 Profile
         if (requestDto.getMemberProfile() != null) {
             CreateUserRequestDto.MemberProfileDto memberDto = requestDto.getMemberProfile();
-            MemberProfile memberProfile = new MemberProfile();
+            MemberProfileEntity memberProfile = new MemberProfileEntity();
             memberProfile.setFullName(memberDto.getFullName());
             memberProfile.setEmail(memberDto.getEmail());
             memberProfile.setBirthDate(memberDto.getBirthDate());
             memberProfile.setGender(memberDto.getGender());
             memberProfile.setNotes(memberDto.getNotes());
-            user.setMemberProfile(memberProfile);
+            UserEntity.setMemberProfile(memberProfile);
         }
 
-        // 5. 儲存 User (由於 CascadeType.ALL, Profile 會一併被儲存)
-        return userRepository.save(user);
+        // 5. 儲存 UserEntity (由於 CascadeType.ALL, Profile 會一併被儲存)
+        return UserJpaRepository.save(UserEntity);
     }
 
     /**
      * 依品牌 ID 與使用者 ID 查詢使用者（適用於員工查驗），找不到則拋出例外。
-     * 供跨模組的 Application Service 使用，避免直接依賴 UserRepository。
+     * 供跨模組的 Application Service 使用，避免直接依賴 UserJpaRepository。
      */
     @Transactional(readOnly = true)
-    public User getUser(Long brandId, Long userId) {
-        return userRepository.findByBrand_IdAndId(brandId, userId)
+    public UserEntity getUser(Long brandId, Long userId) {
+        return UserJpaRepository.findByBrand_IdAndId(brandId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("找不到使用者 (ID: " + userId + ")"));
     }
 
     /**
      * 依品牌 ID 與使用者 ID 查詢會員（須有 memberProfile），找不到或非會員則拋出例外。
      * 「是否為會員」的判斷封裝在此，外部不需自行 filter。
-     * 供跨模組的 Application Service 使用，避免直接依賴 UserRepository。
+     * 供跨模組的 Application Service 使用，避免直接依賴 UserJpaRepository。
      */
     @Transactional(readOnly = true)
-    public User getMember(Long brandId, Long memberId) {
-        return userRepository.findByBrand_IdAndId(brandId, memberId)
+    public UserEntity getMember(Long brandId, Long memberId) {
+        return UserJpaRepository.findByBrand_IdAndId(brandId, memberId)
                 .filter(u -> u.getMemberProfile() != null)
                 .orElseThrow(() -> new ResourceNotFoundException("找不到會員，ID：" + memberId));
     }
@@ -141,8 +141,8 @@ public class UserService {
      */
     @Transactional
     public Optional<MemberDto> findMemberByPhone(String phone, Long brandId) {
-        return userRepository.findByPrimaryPhoneAndBrandId(phone, brandId)
-                .filter(user -> user.getMemberProfile() != null)
+        return UserJpaRepository.findByPrimaryPhoneAndBrandId(phone, brandId)
+                .filter(UserEntity -> UserEntity.getMemberProfile() != null)
                 .map(MemberDto::fromEntity);
     }
 
@@ -153,7 +153,7 @@ public class UserService {
      */
     @Transactional(readOnly = true)
     public List<StaffDto> getStaffList(Long brandId, Long storeId) {
-        List<StaffProfile> profiles;
+        List<StaffProfileEntity> profiles;
         if (storeId != null) {
             profiles = staffProfileRepository.findByUser_Brand_IdAndStore_Id(brandId, storeId);
         } else {
@@ -172,10 +172,10 @@ public class UserService {
     @Transactional
     public StaffDto updateStaff(Long brandId, Long targetUserId, UpdateStaffRequestDto dto) {
         // 1. 查詢目標員工
-        StaffProfile targetProfile = staffProfileRepository.findByUser_Brand_IdAndUserId(brandId, targetUserId)
+        StaffProfileEntity targetProfile = staffProfileRepository.findByUser_Brand_IdAndUserId(brandId, targetUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("找不到員工 ID: " + targetUserId));
 
-        User targetUser = targetProfile.getUser();
+        UserEntity targetUser = targetProfile.getUser();
 
         // 權限檢查邏輯
         AppUserDetails currentUser = helperService.getCurrentUserDetails();
@@ -212,9 +212,9 @@ public class UserService {
 
         // 4. 更新所屬分店 (調店)
         if (dto.getStoreId() != null) {
-            Store store = storeRepository.findByBrand_IdAndId(brandId, dto.getStoreId())
+            StoreEntity StoreEntity = storeRepository.findByBrand_IdAndId(brandId, dto.getStoreId())
                     .orElseThrow(() -> new ResourceNotFoundException("找不到分店 ID: " + dto.getStoreId()));
-            targetProfile.setStore(store);
+            targetProfile.setStore(StoreEntity);
         } else if (dto.getRole() == StaffRole.BRAND_ADMIN) {
             // 只有品牌管理員允許沒有分店
             targetProfile.setStore(null);
@@ -226,7 +226,7 @@ public class UserService {
         }
 
         staffProfileRepository.save(targetProfile);
-        userRepository.save(targetUser);
+        UserJpaRepository.save(targetUser);
 
         return StaffDto.fromEntity(targetUser);
     }

@@ -3,16 +3,17 @@ package tw.niels.beverage_api_project.integration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+
 import tw.niels.beverage_api_project.AbstractIntegrationTest;
 import tw.niels.beverage_api_project.modules.brand.entity.Brand;
-import tw.niels.beverage_api_project.modules.brand.repository.BrandRepository;
+import tw.niels.beverage_api_project.modules.brand.repository.BrandJpaRepository;
 import tw.niels.beverage_api_project.modules.inventory.entity.InventoryBatch;
 import tw.niels.beverage_api_project.modules.inventory.entity.InventoryItem;
 import tw.niels.beverage_api_project.modules.inventory.repository.InventoryBatchRepository;
-import tw.niels.beverage_api_project.modules.inventory.repository.InventoryItemRepository;
+import tw.niels.beverage_api_project.modules.inventory.repository.InventoryItemJpaRepository;
 import tw.niels.beverage_api_project.modules.inventory.service.InventoryDeductionService;
-import tw.niels.beverage_api_project.modules.store.entity.Store;
-import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
+import tw.niels.beverage_api_project.modules.store.entity.StoreEntity;
+import tw.niels.beverage_api_project.modules.store.repository.StoreJpaRepository;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -30,13 +31,13 @@ public class InventoryConcurrencyIntegrationTest extends AbstractIntegrationTest
     @Autowired
     private InventoryDeductionService inventoryService;
     @Autowired
-    private InventoryItemRepository itemRepository;
+    private InventoryItemJpaRepository itemRepository;
     @Autowired
     private InventoryBatchRepository batchRepository;
     @Autowired
-    private StoreRepository storeRepository;
+    private StoreJpaRepository storeRepository;
     @Autowired
-    private BrandRepository brandRepository;
+    private BrandJpaRepository brandRepository;
 
     @Test
     @DisplayName("併發庫存扣減測試 - 10 個執行緒同時搶購 (FIFO 驗證)")
@@ -47,7 +48,7 @@ public class InventoryConcurrencyIntegrationTest extends AbstractIntegrationTest
         brand.setName("Test Brand");
         brand = brandRepository.save(brand);
 
-        Store store = new Store();
+        StoreEntity store = new StoreEntity();
         store.setName("Test Store");
         store.setBrand(brand);
         store = storeRepository.save(store);
@@ -116,7 +117,7 @@ public class InventoryConcurrencyIntegrationTest extends AbstractIntegrationTest
         assertThat(batches.get(1).getCurrentQuantity()).isEqualByComparingTo("50.00");
     }
 
-    private void createTestBatch(Store store, InventoryItem item, BigDecimal qty, LocalDate expiryDate) {
+    private void createTestBatch(StoreEntity store, InventoryItem item, BigDecimal qty, LocalDate expiryDate) {
         InventoryBatch batch = new InventoryBatch();
         batch.setStore(store);
         batch.setInventoryItem(item);

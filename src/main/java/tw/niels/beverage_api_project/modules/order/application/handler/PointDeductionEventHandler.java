@@ -7,7 +7,7 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 import tw.niels.beverage_api_project.modules.member.service.MemberPointService;
 import tw.niels.beverage_api_project.modules.order.domain.event.OrderPointsDeductedEvent;
-import tw.niels.beverage_api_project.modules.user.entity.User;
+import tw.niels.beverage_api_project.modules.user.entity.UserEntity;
 import tw.niels.beverage_api_project.modules.user.service.UserService;
 
 /**
@@ -32,8 +32,8 @@ public class PointDeductionEventHandler {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void handle(OrderPointsDeductedEvent event) {
         if (event.memberId() != null && event.pointsUsed() > 0) {
-            User memberUser = userService.getMember(event.brandId(), event.memberId());
-            // TODO: 因應舊有 MemberPointService 邏輯，目前 order 參數傳入 null，待 Phase 3 重構
+            UserEntity memberUser = userService.getMember(event.brandId(), event.memberId());
+            // TODO: 因應舊有 MemberPointService 邏輯，目前 OrderEntity 參數傳入 null，待 Phase 3 重構
             memberPointService.usePoints(memberUser, null, event.pointsUsed());
         }
     }

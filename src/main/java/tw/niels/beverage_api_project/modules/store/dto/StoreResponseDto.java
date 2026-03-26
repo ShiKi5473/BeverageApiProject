@@ -3,7 +3,7 @@ package tw.niels.beverage_api_project.modules.store.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import tw.niels.beverage_api_project.modules.store.entity.Store;
+import tw.niels.beverage_api_project.modules.store.entity.StoreEntity;
 
 @Data
 @NoArgsConstructor
@@ -23,7 +23,7 @@ public class StoreResponseDto {
     private String phoneNumber;
 
     // 靜態工廠方法：將 Entity 轉為 DTO
-    public static StoreResponseDto fromEntity(Store store) {
+    public static StoreResponseDto fromEntity(StoreEntity store) {
         if (store == null) return null;
 
         StoreResponseDto dto = new StoreResponseDto();

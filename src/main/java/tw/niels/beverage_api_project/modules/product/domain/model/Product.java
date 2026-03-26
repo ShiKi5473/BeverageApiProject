@@ -57,6 +57,11 @@ public class Product {
                 new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
     }
 
+    /**
+     * 由 Infrastructure Layer 在持久化後回填 ID。
+     */
+    void setId(Long id) { this.id = id; }
+
     // ─── Getters ───────────────────────────────────────────────────────────
 
     public Long getId() { return id; }

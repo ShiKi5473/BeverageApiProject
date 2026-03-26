@@ -5,8 +5,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import tw.niels.beverage_api_project.common.domain.vo.Money;
 import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
-import tw.niels.beverage_api_project.modules.brand.entity.BrandPointConfig;
-import tw.niels.beverage_api_project.modules.brand.repository.BrandPointConfigRepository;
+import tw.niels.beverage_api_project.modules.brand.entity.BrandPointConfigEntity;
+import tw.niels.beverage_api_project.modules.brand.repository.BrandPointConfigJpaRepository;
 import tw.niels.beverage_api_project.modules.order.application.command.ProcessPaymentCommand;
 import tw.niels.beverage_api_project.modules.order.domain.model.MemberSnapshot;
 import tw.niels.beverage_api_project.modules.order.domain.model.Order;
@@ -15,7 +15,7 @@ import tw.niels.beverage_api_project.modules.order.domain.service.OrderPricingDo
 import tw.niels.beverage_api_project.modules.order.entity.PaymentMethodEntity;
 import tw.niels.beverage_api_project.modules.order.service.PaymentMethodService;
 import tw.niels.beverage_api_project.modules.promotion.service.PromotionService;
-import tw.niels.beverage_api_project.modules.user.entity.User;
+import tw.niels.beverage_api_project.modules.user.entity.UserEntity;
 import tw.niels.beverage_api_project.modules.user.service.UserService;
 
 import java.math.BigDecimal;
@@ -45,7 +45,7 @@ public class ProcessPaymentHandler {
     private final UserService userService;
     private final PaymentMethodService paymentMethodService;
     private final PromotionService promotionService;
-    private final BrandPointConfigRepository brandPointConfigRepository;
+    private final BrandPointConfigJpaRepository BrandPointConfigJpaRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final OrderPricingDomainService orderPricingDomainService = new OrderPricingDomainService();
 
@@ -53,13 +53,13 @@ public class ProcessPaymentHandler {
                                 UserService userService,
                                 PaymentMethodService paymentMethodService,
                                 PromotionService promotionService,
-                                BrandPointConfigRepository brandPointConfigRepository,
+                                BrandPointConfigJpaRepository BrandPointConfigJpaRepository,
                                 ApplicationEventPublisher eventPublisher) {
         this.orderRepository = orderRepository;
         this.userService = userService;
         this.paymentMethodService = paymentMethodService;
         this.promotionService = promotionService;
-        this.brandPointConfigRepository = brandPointConfigRepository;
+        this.BrandPointConfigJpaRepository = BrandPointConfigJpaRepository;
         this.eventPublisher = eventPublisher;
     }
 
@@ -71,7 +71,7 @@ public class ProcessPaymentHandler {
         PaymentMethodEntity paymentMethod = paymentMethodService.getByCode(command.paymentMethod());
 
         // 處理會員快照
-        User memberUser = null;
+        UserEntity memberUser = null;
         MemberSnapshot memberSnapshot = null;
         if (command.memberId() != null) {
             memberUser = userService.getMember(command.brandId(), command.memberId());
@@ -107,8 +107,8 @@ public class ProcessPaymentHandler {
     }
 
     private BigDecimal getRedeemRate(Long brandId) {
-        return brandPointConfigRepository.findById(brandId)
-            .map(BrandPointConfig::getRedeemRate)
+        return BrandPointConfigJpaRepository.findById(brandId)
+            .map(BrandPointConfigEntity::getRedeemRate)
             .orElse(new BigDecimal("0.1"));
     }
 }

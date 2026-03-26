@@ -3,9 +3,11 @@ package tw.niels.beverage_api_project.modules.inventory.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
 import tw.niels.beverage_api_project.common.annotation.Audit;
 import tw.niels.beverage_api_project.common.constants.ApiPaths;
 import tw.niels.beverage_api_project.common.service.ControllerHelperService;
@@ -16,7 +18,7 @@ import tw.niels.beverage_api_project.modules.inventory.application.query.*;
 import tw.niels.beverage_api_project.modules.inventory.dto.AddShipmentRequestDto;
 import tw.niels.beverage_api_project.modules.inventory.dto.InventoryAuditItemResponseDto;
 import tw.niels.beverage_api_project.modules.inventory.dto.InventoryAuditRequestDto;
-import tw.niels.beverage_api_project.modules.store.entity.Store;
+import tw.niels.beverage_api_project.modules.store.entity.StoreEntity;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -44,7 +46,7 @@ public class InventoryController {
     @Operation(summary = "進貨 (Add Stock)")
     @Audit(action = "INVENTORY_ADD_SHIPMENT")
     public ResponseEntity<?> addShipment(@Valid @RequestBody AddShipmentRequestDto request) {
-        Store store = helperService.getSafeCurrentUserStore();
+        StoreEntity store = helperService.getSafeCurrentUserStore();
         Long brandId = helperService.getCurrentBrandId();
         Long userId = helperService.getCurrentUserId();
 
@@ -68,7 +70,7 @@ public class InventoryController {
     @Operation(summary = "提交盤點結果")
     @Audit(action = "INVENTORY_AUDIT")
     public ResponseEntity<?> performAudit(@Valid @RequestBody InventoryAuditRequestDto request) {
-        Store store = helperService.getSafeCurrentUserStore();
+        StoreEntity store = helperService.getSafeCurrentUserStore();
         Long brandId = helperService.getCurrentBrandId();
 
         commandHandler.handle(new PerformInventoryAuditCommand(brandId, store.getId(), request));
@@ -80,7 +82,7 @@ public class InventoryController {
     @Operation(summary = "手動扣減庫存 (測試 FIFO)")
     @Audit(action = "INVENTORY_MANUAL_DEDUCT")
     public ResponseEntity<?> manualDeduct(@PathVariable Long itemId, @RequestParam BigDecimal quantity) {
-        Store store = helperService.getSafeCurrentUserStore();
+        StoreEntity store = helperService.getSafeCurrentUserStore();
         Long brandId = helperService.getCurrentBrandId();
         helperService.validateStoreAccess(store.getId());
 
@@ -92,7 +94,7 @@ public class InventoryController {
     @PreAuthorize("hasAnyRole('MANAGER', 'STAFF')")
     @Operation(summary = "取得盤點清單")
     public ResponseEntity<List<InventoryAuditItemResponseDto>> getAuditList() {
-        Store store = helperService.getSafeCurrentUserStore();
+        StoreEntity store = helperService.getSafeCurrentUserStore();
         Long brandId = helperService.getCurrentBrandId();
 
         List<InventoryAuditItemResponseDto> list = queryHandler.handle(new GetInventoryAuditListQuery(brandId, store.getId()));

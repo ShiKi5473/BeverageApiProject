@@ -8,30 +8,30 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import tw.niels.beverage_api_project.modules.brand.entity.Brand;
-import tw.niels.beverage_api_project.modules.brand.repository.BrandRepository;
-import tw.niels.beverage_api_project.modules.inventory.entity.InventoryBatch;
-import tw.niels.beverage_api_project.modules.inventory.entity.InventoryItem;
-import tw.niels.beverage_api_project.modules.inventory.entity.PurchaseShipment;
-import tw.niels.beverage_api_project.modules.inventory.repository.InventoryBatchRepository;
-import tw.niels.beverage_api_project.modules.inventory.repository.InventoryItemRepository;
-import tw.niels.beverage_api_project.modules.inventory.repository.PurchaseShipmentRepository;
-import tw.niels.beverage_api_project.modules.product.entity.OptionGroup;
-import tw.niels.beverage_api_project.modules.product.entity.Product;
-import tw.niels.beverage_api_project.modules.product.entity.ProductOption;
-import tw.niels.beverage_api_project.modules.product.entity.ProductVariant;
+import tw.niels.beverage_api_project.modules.brand.entity.BrandEntity;
+import tw.niels.beverage_api_project.modules.brand.repository.BrandJpaRepository;
+import tw.niels.beverage_api_project.modules.inventory.entity.InventoryBatchEntity;
+import tw.niels.beverage_api_project.modules.inventory.entity.InventoryItemEntity;
+import tw.niels.beverage_api_project.modules.inventory.entity.PurchaseShipmentEntity;
+import tw.niels.beverage_api_project.modules.inventory.repository.InventoryBatchJpaRepository;
+import tw.niels.beverage_api_project.modules.inventory.repository.InventoryItemJpaRepository;
+import tw.niels.beverage_api_project.modules.inventory.repository.PurchaseShipmentJpaRepository;
+import tw.niels.beverage_api_project.modules.product.entity.OptionGroupEntity;
+import tw.niels.beverage_api_project.modules.product.entity.ProductEntity;
+import tw.niels.beverage_api_project.modules.product.entity.ProductOptionEntity;
+import tw.niels.beverage_api_project.modules.product.entity.ProductVariantEntity;
 import tw.niels.beverage_api_project.modules.product.enums.ProductStatus;
 import tw.niels.beverage_api_project.modules.product.enums.SelectionType;
-import tw.niels.beverage_api_project.modules.product.repository.OptionGroupRepository;
-import tw.niels.beverage_api_project.modules.product.repository.ProductOptionRepository;
-import tw.niels.beverage_api_project.modules.product.repository.ProductRepository;
-import tw.niels.beverage_api_project.modules.product.repository.ProductVariantRepository;
-import tw.niels.beverage_api_project.modules.store.entity.Store;
-import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
-import tw.niels.beverage_api_project.modules.user.entity.User;
-import tw.niels.beverage_api_project.modules.user.entity.profile.StaffProfile;
+import tw.niels.beverage_api_project.modules.product.repository.OptionGroupJpaRepository;
+import tw.niels.beverage_api_project.modules.product.repository.ProductOptionJpaRepository;
+import tw.niels.beverage_api_project.modules.product.repository.ProductJpaRepository;
+import tw.niels.beverage_api_project.modules.product.repository.ProductVariantJpaRepository;
+import tw.niels.beverage_api_project.modules.store.entity.StoreEntity;
+import tw.niels.beverage_api_project.modules.store.repository.StoreJpaRepository;
+import tw.niels.beverage_api_project.modules.user.entity.UserEntity;
+import tw.niels.beverage_api_project.modules.user.entity.profile.StaffProfileEntity;
 import tw.niels.beverage_api_project.modules.user.enums.StaffRole;
-import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
+import tw.niels.beverage_api_project.modules.user.repository.UserJpaRepository;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -45,29 +45,29 @@ public class DataSeeder implements CommandLineRunner {
 
     private static final Logger logger = LoggerFactory.getLogger(DataSeeder.class);
 
-    private final UserRepository userRepository;
-    private final BrandRepository brandRepository;
-    private final StoreRepository storeRepository;
-    private final ProductRepository productRepository;
-    private final OptionGroupRepository optionGroupRepository;
-    private final ProductOptionRepository productOptionRepository;
-    private final ProductVariantRepository productVariantRepository;
+    private final UserJpaRepository userRepository;
+    private final BrandJpaRepository brandRepository;
+    private final StoreJpaRepository storeRepository;
+    private final ProductJpaRepository productRepository;
+    private final OptionGroupJpaRepository optionGroupRepository;
+    private final ProductOptionJpaRepository productOptionRepository;
+    private final ProductVariantJpaRepository productVariantRepository;
     private final PasswordEncoder passwordEncoder;
-    private final InventoryItemRepository inventoryItemRepository;
-    private final InventoryBatchRepository inventoryBatchRepository;
-    private final PurchaseShipmentRepository purchaseShipmentRepository;
+    private final InventoryItemJpaRepository inventoryItemRepository;
+    private final InventoryBatchJpaRepository inventoryBatchRepository;
+    private final PurchaseShipmentJpaRepository purchaseShipmentRepository;
 
-    public DataSeeder(UserRepository userRepository,
-                      BrandRepository brandRepository,
-                      StoreRepository storeRepository,
-                      ProductRepository productRepository,
-                      OptionGroupRepository optionGroupRepository,
-                      ProductOptionRepository productOptionRepository,
-                      ProductVariantRepository productVariantRepository,
+    public DataSeeder(UserJpaRepository userRepository,
+                      BrandJpaRepository brandRepository,
+                      StoreJpaRepository storeRepository,
+                      ProductJpaRepository productRepository,
+                      OptionGroupJpaRepository optionGroupRepository,
+                      ProductOptionJpaRepository productOptionRepository,
+                      ProductVariantJpaRepository productVariantRepository,
                       PasswordEncoder passwordEncoder,
-                      InventoryItemRepository inventoryItemRepository,
-                      InventoryBatchRepository inventoryBatchRepository,
-                      PurchaseShipmentRepository purchaseShipmentRepository) {
+                      InventoryItemJpaRepository inventoryItemRepository,
+                      InventoryBatchJpaRepository inventoryBatchRepository,
+                      PurchaseShipmentJpaRepository purchaseShipmentRepository) {
         this.userRepository = userRepository;
         this.brandRepository = brandRepository;
         this.storeRepository = storeRepository;
@@ -91,7 +91,7 @@ public class DataSeeder implements CommandLineRunner {
         // ==========================================
         // 1. 建立品牌 (修正：優先檢查名稱，避免 Unique Constraint 衝突)
         // ==========================================
-        Brand brand = brandRepository.findByName("品茶軒").orElseGet(() -> {
+        BrandEntity brand = brandRepository.findByName("品茶軒").orElseGet(() -> {
             // 如果沒找到名字，再嘗試找 ID (防禦性檢查)
             return brandRepository.findById(1L).map(existing -> {
                 // ID 1 存在但名字不同 -> 改名為品茶軒 (確保測試環境一致)
@@ -99,7 +99,7 @@ public class DataSeeder implements CommandLineRunner {
                 return brandRepository.save(existing);
             }).orElseGet(() -> {
                 // 完全不存在 -> 建立新的
-                Brand b = new Brand();
+                BrandEntity b = new BrandEntity();
                 b.setId(1L); // 強制指定 ID 為 1
                 b.setName("品茶軒");
                 b.setContactPerson("測試員");
@@ -110,9 +110,9 @@ public class DataSeeder implements CommandLineRunner {
         // ==========================================
         // 2. 建立分店 (修正：增加防呆，避免重複建立)
         // ==========================================
-        Store store = storeRepository.findByBrand_IdAndId(brand.getId(), 1L).orElseGet(() -> {
+        StoreEntity store = storeRepository.findByBrand_IdAndId(brand.getId(), 1L).orElseGet(() -> {
             // 這裡也可以額外檢查是否已有同名分店，但通常分店ID綁定比較固定，暫時維持 ID 檢查
-            Store s = new Store();
+            StoreEntity s = new StoreEntity();
             s.setId(1L);
             s.setBrand(brand);
             s.setName("台北總店");
@@ -129,7 +129,7 @@ public class DataSeeder implements CommandLineRunner {
         createSeededUser(brand, store, "0900000001", "測試品牌管理員", StaffRole.BRAND_ADMIN, "ADMIN-001");
 
         // 3.2 MANAGER (店經理) - 保留原本號碼 0911111111 供相容性
-        User staffUser = createSeededUser(brand, store, "0911111111", "K6 測試員(店長)", StaffRole.MANAGER, "MANAGER-001");
+        UserEntity staffUser = createSeededUser(brand, store, "0911111111", "K6 測試員(店長)", StaffRole.MANAGER, "MANAGER-001");
 
         // 3.3 STAFF (一般店員)
         createSeededUser(brand, store, "0900000003", "測試店員", StaffRole.STAFF, "STAFF-001");
@@ -141,7 +141,7 @@ public class DataSeeder implements CommandLineRunner {
         // 4. 建立選項群組與選項
         // ==========================================
 // --- 4.1 甜度 (單選) ---
-        OptionGroup sugarGroup = createOptionGroup(brand, 10L, "甜度", SelectionType.SINGLE, 1);
+        OptionGroupEntity sugarGroup = createOptionGroup(brand, 10L, "甜度", SelectionType.SINGLE, 1);
 
         // 建立甜度選項
         createOption(sugarGroup, 11L, "全糖", BigDecimal.ZERO, false);
@@ -151,7 +151,7 @@ public class DataSeeder implements CommandLineRunner {
         createOption(sugarGroup, 15L, "無糖", BigDecimal.ZERO, false);
 
         // --- 4.2 冰塊 (單選) ---
-        OptionGroup iceGroup = createOptionGroup(brand, 20L, "冰塊", SelectionType.SINGLE, 2);
+        OptionGroupEntity iceGroup = createOptionGroup(brand, 20L, "冰塊", SelectionType.SINGLE, 2);
 
         // 建立冰塊選項
         createOption(iceGroup, 21L, "正常冰", BigDecimal.ZERO, false);
@@ -162,7 +162,7 @@ public class DataSeeder implements CommandLineRunner {
         createOption(iceGroup, 26L, "熱", BigDecimal.ZERO, false);
 
         // --- 4.3 加料 (多選) ---
-        OptionGroup toppingGroup = createOptionGroup(brand, 30L, "加料", SelectionType.MULTIPLE, 3);
+        OptionGroupEntity toppingGroup = createOptionGroup(brand, 30L, "加料", SelectionType.MULTIPLE, 3);
 
         // 建立加料選項
         createOption(toppingGroup, 31L, "珍珠", new BigDecimal("10.00"), false);
@@ -172,14 +172,14 @@ public class DataSeeder implements CommandLineRunner {
         // ==========================================
         // 5. 建立商品
         // ==========================================
-        Product product = productRepository.findByBrand_IdAndName(brand.getId(), "招牌紅茶")
+        ProductEntity product = productRepository.findByBrand_IdAndName(brand.getId(), "招牌紅茶")
                 .orElseGet(() -> productRepository.findByBrand_IdAndId(brand.getId(), 1L)
                         .map(existing -> {
                             existing.setName("招牌紅茶");
                             return productRepository.save(existing);
                         })
                         .orElseGet(() -> {
-                            Product p = new Product();
+                            ProductEntity p = new ProductEntity();
                             p.setId(1L);
                             p.setBrand(brand);
                             p.setName("招牌紅茶");
@@ -190,7 +190,7 @@ public class DataSeeder implements CommandLineRunner {
                         }));
 
         // 更新商品關聯的選項群組 (加入加料群組)
-        Set<OptionGroup> productOptionGroups = new HashSet<>();
+        Set<OptionGroupEntity> productOptionGroups = new HashSet<>();
         productOptionGroups.add(sugarGroup);
         productOptionGroups.add(iceGroup);
         productOptionGroups.add(toppingGroup);
@@ -198,13 +198,13 @@ public class DataSeeder implements CommandLineRunner {
         product.setOptionGroups(productOptionGroups);
         productRepository.save(product);
         // ==========================================
-        // 5.1 建立商品規格 (Product Variants)
+        // 5.1 建立商品規格 (ProductEntity Variants)
         // ==========================================
 
         // 建立 "中杯" (ID: 1)
         productVariantRepository.findByProduct_Brand_IdAndId(brand.getId(), 1L)
                 .orElseGet(() -> {
-                    ProductVariant v = new ProductVariant();
+                    ProductVariantEntity v = new ProductVariantEntity();
                     v.setId(1L); // 明確指定 ID 方便測試
                     v.setProduct(product);
                     v.setName("中杯");
@@ -217,7 +217,7 @@ public class DataSeeder implements CommandLineRunner {
         // 建立 "大杯" (ID: 2)
         productVariantRepository.findByProduct_Brand_IdAndId(brand.getId(), 2L)
                 .orElseGet(() -> {
-                    ProductVariant v = new ProductVariant();
+                    ProductVariantEntity v = new ProductVariantEntity();
                     v.setId(2L); // 明確指定 ID 方便測試
                     v.setProduct(product);
                     v.setName("大杯");
@@ -232,14 +232,14 @@ public class DataSeeder implements CommandLineRunner {
         // ==========================================
 
         // 6-1. 原物料
-        InventoryItem item = inventoryItemRepository.findByBrand_IdAndName(brand.getId(), "測試用茶葉")
+        InventoryItemEntity item = inventoryItemRepository.findByBrand_IdAndName(brand.getId(), "測試用茶葉")
                 .orElseGet(() -> inventoryItemRepository.findByBrand_IdAndId(brand.getId(), 1L)
                         .map(existing -> {
                             existing.setName("測試用茶葉");
                             return inventoryItemRepository.save(existing);
                         })
                         .orElseGet(() -> {
-                            InventoryItem i = new InventoryItem();
+                            InventoryItemEntity i = new InventoryItemEntity();
                             i.setId(1L);
                             i.setBrand(brand);
                             i.setName("測試用茶葉");
@@ -249,9 +249,9 @@ public class DataSeeder implements CommandLineRunner {
                         }));
 
         // 6-2. 進貨單 (Shipment 通常不檢查名稱，維持原樣)
-        PurchaseShipment shipment = purchaseShipmentRepository.findByStore_Brand_IdAndId(brand.getId(), 1L).orElseGet(() -> {
+        PurchaseShipmentEntity shipment = purchaseShipmentRepository.findByStore_Brand_IdAndId(brand.getId(), 1L).orElseGet(() -> {
             // ... 維持原樣 ...
-            PurchaseShipment s = new PurchaseShipment();
+            PurchaseShipmentEntity s = new PurchaseShipmentEntity();
             s.setId(1L);
             s.setStore(store);
             s.setStaff(staffUser);
@@ -263,7 +263,7 @@ public class DataSeeder implements CommandLineRunner {
         // 6-3. 庫存批次 (Batch 維持原樣，但需注意 V9 新增了 store_id)
         // 如果您的 Batch Entity 已經更新了 V9 的 store 欄位，這裡需要補上 s.setStore(store);
         inventoryBatchRepository.findByStore_Brand_IdAndId(brand.getId(), 1L).orElseGet(() -> {
-            InventoryBatch b = new InventoryBatch();
+            InventoryBatchEntity b = new InventoryBatchEntity();
             b.setId(1L);
             b.setShipment(shipment);
             b.setInventoryItem(item);
@@ -278,9 +278,9 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     /**
-     * 建立或取得 OptionGroup
+     * 建立或取得 OptionGroupEntity
      */
-    private OptionGroup createOptionGroup(Brand brand, Long id, String name, SelectionType type, int sortOrder) {
+    private OptionGroupEntity createOptionGroup(BrandEntity brand, Long id, String name, SelectionType type, int sortOrder) {
         return optionGroupRepository.findByBrand_IdAndName(brand.getId(), name)
                 .orElseGet(() -> optionGroupRepository.findByBrand_IdAndId(brand.getId(), id)
                         .map(existing -> {
@@ -288,7 +288,7 @@ public class DataSeeder implements CommandLineRunner {
                             return optionGroupRepository.save(existing);
                         })
                         .orElseGet(() -> {
-                            OptionGroup g = new OptionGroup();
+                            OptionGroupEntity g = new OptionGroupEntity();
                             g.setId(id);
                             g.setBrand(brand);
                             g.setName(name);
@@ -299,9 +299,9 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     /**
-     * 建立或取得 ProductOption (不檢查名稱是否重複，若 ID 不存在則建立)
+     * 建立或取得 ProductOptionEntity (不檢查名稱是否重複，若 ID 不存在則建立)
      */
-    private void createOption(OptionGroup group, Long id, String name, BigDecimal price, boolean isDefault) {
+    private void createOption(OptionGroupEntity group, Long id, String name, BigDecimal price, boolean isDefault) {
         // 為了避免重複建立同名選項，這裡簡單檢查一下：
         // 如果該 ID 已存在，我們暫不更新內容 (避免覆蓋使用者修改)，若不存在則新增。
         // 若希望強制更新名稱，可在此處修改邏輯。
@@ -309,7 +309,7 @@ public class DataSeeder implements CommandLineRunner {
             return;
         }
 
-        ProductOption opt = new ProductOption();
+        ProductOptionEntity opt = new ProductOptionEntity();
         opt.setId(id);
         opt.setOptionGroup(group);
         opt.setOptionName(name);
@@ -321,16 +321,16 @@ public class DataSeeder implements CommandLineRunner {
     /**
      * 建立或更新指定角色的測試帳號
      */
-    private User createSeededUser(Brand brand, Store store, String phone, String name, StaffRole role, String empNo) {
-        User user = userRepository.findByPrimaryPhoneAndBrandId(phone, brand.getId())
+    private UserEntity createSeededUser(BrandEntity brand, StoreEntity store, String phone, String name, StaffRole role, String empNo) {
+        UserEntity user = userRepository.findByPrimaryPhoneAndBrandId(phone, brand.getId())
                 .orElseGet(() -> {
-                    User u = new User();
+                    UserEntity u = new UserEntity();
                     u.setBrand(brand);
                     u.setPrimaryPhone(phone);
                     u.setPasswordHash(passwordEncoder.encode("password123"));
                     u.setIsActive(true);
 
-                    StaffProfile profile = new StaffProfile();
+                    StaffProfileEntity profile = new StaffProfileEntity();
                     profile.setFullName(name);
                     profile.setEmployeeNumber(empNo);
                     profile.setRole(role);

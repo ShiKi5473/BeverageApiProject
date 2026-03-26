@@ -2,7 +2,7 @@ package tw.niels.beverage_api_project.modules.brand.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
-import tw.niels.beverage_api_project.modules.brand.entity.Brand;
+import tw.niels.beverage_api_project.modules.brand.entity.BrandEntity;
 
 import java.util.Date;
 
@@ -28,15 +28,15 @@ public class BrandResponseDto {
     @Schema(description = "更新時間")
     private Date updatedAt;
 
-    public static BrandResponseDto fromEntity(Brand brand) {
-        if (brand == null) return null;
+    public static BrandResponseDto fromEntity(BrandEntity BrandEntity) {
+        if (BrandEntity == null) return null;
         BrandResponseDto dto = new BrandResponseDto();
-        dto.setBrandId(brand.getId());
-        dto.setName(brand.getName());
-        dto.setContactPerson(brand.getContactPerson());
-        dto.setIsActive(brand.getIsActive());
-        dto.setCreatedAt(brand.getCreatedAt());
-        dto.setUpdatedAt(brand.getUpdatedAt());
+        dto.setBrandId(BrandEntity.getId());
+        dto.setName(BrandEntity.getName());
+        dto.setContactPerson(BrandEntity.getContactPerson());
+        dto.setIsActive(BrandEntity.getIsActive());
+        dto.setCreatedAt(BrandEntity.getCreatedAt());
+        dto.setUpdatedAt(BrandEntity.getUpdatedAt());
         return dto;
     }
 }

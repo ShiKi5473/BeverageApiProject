@@ -15,7 +15,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import tw.niels.beverage_api_project.config.RabbitConfig;
 import tw.niels.beverage_api_project.modules.kds.dto.KdsOrderDto;
 import tw.niels.beverage_api_project.modules.kds.strategy.KdsEventStrategy;
-import tw.niels.beverage_api_project.modules.order.entity.Order;
+import tw.niels.beverage_api_project.modules.order.entity.OrderEntity;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
 import tw.niels.beverage_api_project.modules.order.event.OrderStateChangedEvent;
 
@@ -66,13 +66,13 @@ public class KdsService {
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleOrderStateChange(OrderStateChangedEvent event) {
-        Order order = event.order();
-        if (order.getStore() == null) return;
+        OrderEntity OrderEntity = event.OrderEntity();
+        if (OrderEntity.getStore() == null) return;
 
-        Long storeId = order.getStore().getId();
+        Long storeId = OrderEntity.getStore().getId();
 
         // 1. 轉換 DTO
-        KdsOrderDto orderDto = KdsOrderDto.fromEntity(order);
+        KdsOrderDto orderDto = KdsOrderDto.fromEntity(OrderEntity);
 
         // 2. 決定前端動作 (Action)
         // 優先使用我們自定義的邏輯，涵蓋 NEW_ORDER
@@ -89,7 +89,7 @@ public class KdsService {
         try {
             // 4. 發布到 RabbitMQ Fanout Exchange -> 所有 Server 實例都會收到
             rabbitTemplate.convertAndSend(RabbitConfig.KDS_EXCHANGE, "", broadcastMsg);
-            logger.debug("已廣播 RabbitMQ 訊息: {} (Store: {})", action, storeId);
+            logger.debug("已廣播 RabbitMQ 訊息: {} (StoreEntity: {})", action, storeId);
         // 修正：捕捉特定的 AmqpException，KDS 廣播失敗不影響訂單狀態變更（訂單已提交成功）
         } catch (AmqpException e) {
             logger.error("RabbitMQ 發送失敗", e);

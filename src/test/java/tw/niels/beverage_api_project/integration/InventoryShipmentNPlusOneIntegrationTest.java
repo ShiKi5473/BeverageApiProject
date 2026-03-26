@@ -1,6 +1,7 @@
 package tw.niels.beverage_api_project.integration;
 
 import io.hypersistence.utils.jdbc.validator.SQLStatementCountValidator;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -8,20 +9,21 @@ import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+
 import tw.niels.beverage_api_project.AbstractIntegrationTest;
 import tw.niels.beverage_api_project.common.service.ControllerHelperService;
 import tw.niels.beverage_api_project.config.DataSeeder;
 import tw.niels.beverage_api_project.config.TestDataSourceConfig;
 import tw.niels.beverage_api_project.modules.brand.entity.Brand;
-import tw.niels.beverage_api_project.modules.brand.repository.BrandRepository;
+import tw.niels.beverage_api_project.modules.brand.repository.BrandJpaRepository;
 import tw.niels.beverage_api_project.modules.inventory.dto.AddShipmentRequestDto;
 import tw.niels.beverage_api_project.modules.inventory.entity.InventoryItem;
-import tw.niels.beverage_api_project.modules.inventory.repository.InventoryItemRepository;
+import tw.niels.beverage_api_project.modules.inventory.repository.InventoryItemJpaRepository;
 import tw.niels.beverage_api_project.modules.inventory.service.InventoryService;
 import tw.niels.beverage_api_project.modules.report.schedule.ReportRecoveryRunner;
 import tw.niels.beverage_api_project.modules.report.schedule.ReportScheduler;
-import tw.niels.beverage_api_project.modules.store.entity.Store;
-import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
+import tw.niels.beverage_api_project.modules.store.entity.StoreEntity;
+import tw.niels.beverage_api_project.modules.store.repository.StoreJpaRepository;
 import tw.niels.beverage_api_project.modules.user.entity.User;
 import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
 
@@ -40,9 +42,9 @@ public class InventoryShipmentNPlusOneIntegrationTest extends AbstractIntegratio
     @MockitoBean private ControllerHelperService helperService;
 
     @Autowired private InventoryService inventoryService;
-    @Autowired private InventoryItemRepository itemRepository;
-    @Autowired private BrandRepository brandRepository;
-    @Autowired private StoreRepository storeRepository;
+    @Autowired private InventoryItemJpaRepository itemRepository;
+    @Autowired private BrandJpaRepository brandRepository;
+    @Autowired private StoreJpaRepository storeRepository;
     @Autowired private UserRepository userRepository;
 
     private Long brandId;
@@ -59,7 +61,7 @@ public class InventoryShipmentNPlusOneIntegrationTest extends AbstractIntegratio
         brand = brandRepository.save(brand);
         this.brandId = brand.getId();
 
-        Store store = new Store();
+        StoreEntity store = new StoreEntity();
         store.setBrand(brand);
         store.setName("Inv Store");
         store = storeRepository.save(store);

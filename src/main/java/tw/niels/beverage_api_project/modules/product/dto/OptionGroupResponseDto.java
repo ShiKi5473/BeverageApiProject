@@ -2,7 +2,7 @@ package tw.niels.beverage_api_project.modules.product.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
-import tw.niels.beverage_api_project.modules.product.entity.OptionGroup;
+import tw.niels.beverage_api_project.modules.product.entity.OptionGroupEntity;
 import tw.niels.beverage_api_project.modules.product.enums.SelectionType;
 
 import java.util.Set;
@@ -27,7 +27,7 @@ public class OptionGroupResponseDto {
     @Schema(description = "包含的選項列表")
     private Set<ProductOptionResponseDto> options;
 
-    public static OptionGroupResponseDto fromEntity(OptionGroup entity) {
+    public static OptionGroupResponseDto fromEntity(OptionGroupEntity entity) {
         if (entity == null) return null;
 
         OptionGroupResponseDto dto = new OptionGroupResponseDto();

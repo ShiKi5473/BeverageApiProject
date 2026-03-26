@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
-import tw.niels.beverage_api_project.modules.order.entity.Order;
+import tw.niels.beverage_api_project.modules.order.entity.OrderEntity;
 import tw.niels.beverage_api_project.modules.order.entity.PaymentMethodEntity;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
 
@@ -149,7 +149,7 @@ public class OrderResponseDto {
         dto.setFinalAmount(order.getFinalAmount() != null ? order.getFinalAmount().amount() : null);
         dto.setPointsUsed(order.getPointsUsed());
         dto.setPointsEarned(order.getPointsEarned());
-        
+
         // 付款方式目前只存 ID，暫不展開詳細資訊或後續補齊
         if (order.getPaymentMethodId() != null) {
             PaymentMethodDto pmDto = new PaymentMethodDto();

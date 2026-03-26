@@ -1,35 +1,37 @@
 package tw.niels.beverage_api_project.integration;
 
 import io.hypersistence.utils.jdbc.validator.SQLStatementCountValidator;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+
 import tw.niels.beverage_api_project.AbstractIntegrationTest;
 import tw.niels.beverage_api_project.common.service.ControllerHelperService;
 import tw.niels.beverage_api_project.config.DataSeeder;
 import tw.niels.beverage_api_project.config.TestDataSourceConfig;
-import tw.niels.beverage_api_project.modules.brand.entity.Brand;
-import tw.niels.beverage_api_project.modules.brand.repository.BrandRepository;
-import tw.niels.beverage_api_project.modules.order.entity.Order;
-import tw.niels.beverage_api_project.modules.order.entity.OrderItem;
+import tw.niels.beverage_api_project.modules.brand.entity.BrandEntity;
+import tw.niels.beverage_api_project.modules.brand.repository.BrandJpaRepository;
+import tw.niels.beverage_api_project.modules.order.entity.OrderEntity;
+import tw.niels.beverage_api_project.modules.order.entity.OrderItemEntity;
 import tw.niels.beverage_api_project.modules.order.entity.PaymentMethodEntity;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
-import tw.niels.beverage_api_project.modules.order.repository.OrderRepository;
-import tw.niels.beverage_api_project.modules.order.repository.PaymentMethodRepository;
-import tw.niels.beverage_api_project.modules.product.entity.Category;
-import tw.niels.beverage_api_project.modules.product.entity.Product;
+import tw.niels.beverage_api_project.modules.order.repository.OrderJpaRepository;
+import tw.niels.beverage_api_project.modules.order.repository.PaymentMethodJpaRepository;
+import tw.niels.beverage_api_project.modules.product.entity.CategoryEntity;
+import tw.niels.beverage_api_project.modules.product.entity.ProductEntity;
 import tw.niels.beverage_api_project.modules.product.enums.ProductStatus;
-import tw.niels.beverage_api_project.modules.product.repository.CategoryRepository;
-import tw.niels.beverage_api_project.modules.product.repository.ProductRepository;
+import tw.niels.beverage_api_project.modules.product.repository.CategoryJpaRepository;
+import tw.niels.beverage_api_project.modules.product.repository.ProductJpaRepository;
 import tw.niels.beverage_api_project.modules.report.schedule.ReportRecoveryRunner;
 import tw.niels.beverage_api_project.modules.report.schedule.ReportScheduler;
 import tw.niels.beverage_api_project.modules.report.service.ReportAggregationService;
 import tw.niels.beverage_api_project.modules.report.service.StoreSettlementService;
-import tw.niels.beverage_api_project.modules.store.entity.Store;
-import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
+import tw.niels.beverage_api_project.modules.store.entity.StoreEntity;
+import tw.niels.beverage_api_project.modules.store.repository.StoreJpaRepository;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -49,12 +51,12 @@ public class ReportAggregationNPlusOneIntegrationTest extends AbstractIntegratio
 
     @Autowired private ReportAggregationService reportAggregationService;
     @Autowired private StoreSettlementService storeSettlementService;
-    @Autowired private BrandRepository brandRepository;
-    @Autowired private StoreRepository storeRepository;
-    @Autowired private ProductRepository productRepository;
-    @Autowired private CategoryRepository categoryRepository;
-    @Autowired private OrderRepository orderRepository;
-    @Autowired private PaymentMethodRepository paymentMethodRepository;
+    @Autowired private BrandJpaRepository brandRepository;
+    @Autowired private StoreJpaRepository storeRepository;
+    @Autowired private ProductJpaRepository productRepository;
+    @Autowired private CategoryJpaRepository categoryRepository;
+    @Autowired private OrderJpaRepository orderRepository;
+    @Autowired private PaymentMethodJpaRepository paymentMethodRepository;
 
     private Long brandId;
     private Long storeId;
@@ -66,18 +68,18 @@ public class ReportAggregationNPlusOneIntegrationTest extends AbstractIntegratio
         SQLStatementCountValidator.reset();
 
         // 1. 基礎資料
-        Brand brand = new Brand();
+        BrandEntity brand = new BrandEntity();
         brand.setName("Report Test Brand");
         brand = brandRepository.save(brand);
         this.brandId = brand.getId();
 
-        Store store = new Store();
+        StoreEntity store = new StoreEntity();
         store.setBrand(brand);
         store.setName("Report Store");
         store = storeRepository.save(store);
         this.storeId = store.getId();
 
-        Category category = new Category();
+        CategoryEntity category = new CategoryEntity();
         category.setBrand(brand);
         category.setName("Tea");
         categoryRepository.save(category);
@@ -97,7 +99,7 @@ public class ReportAggregationNPlusOneIntegrationTest extends AbstractIntegratio
         // 2. 建立 5 種不同商品，並產生 5 筆訂單 (每筆買一種)
         // 這會導致 processStoreStats 中的迴圈跑 5 次
         for (int i = 1; i <= 5; i++) {
-            Product product = new Product();
+            ProductEntity product = new ProductEntity();
             product.setBrand(brand);
             product.setName("Drink " + i);
             product.setBasePrice(new BigDecimal("50"));
@@ -126,7 +128,7 @@ public class ReportAggregationNPlusOneIntegrationTest extends AbstractIntegratio
 
         // 斷言分析：
         // 目前程式碼 (ReportAggregationService.java:202) 在迴圈內呼叫 findByBrand_IdAndId
-        // 5 種商品 = 5 次 Select (Product) + 5 次 Select (Category, 因為 lazy loading)
+        // 5 種商品 = 5 次 Select (ProductEntity) + 5 次 Select (CategoryEntity, 因為 lazy loading)
         // 加上前面的統計查詢 3 次 (Status, Payment, ProductStats) + Insert 報表
         // 總 Select 預計會超過 10 次。
 
@@ -135,8 +137,8 @@ public class ReportAggregationNPlusOneIntegrationTest extends AbstractIntegratio
         SQLStatementCountValidator.assertSelectCount(4);
     }
 
-    private void createClosedOrder(Brand brand, Store store, Product product, String orderNo) {
-        Order order = new Order();
+    private void createClosedOrder(BrandEntity brand, StoreEntity store, ProductEntity product, String orderNo) {
+        OrderEntity order = new OrderEntity();
         order.setBrand(brand);
         order.setStore(store);
         order.setOrderNumber(orderNo);
@@ -146,13 +148,19 @@ public class ReportAggregationNPlusOneIntegrationTest extends AbstractIntegratio
         order.setFinalAmount(new BigDecimal("50"));
         order.setPaymentMethod(this.cashPaymentMethod);
 
-        OrderItem item = new OrderItem();
+        OrderItemEntity item = new OrderItemEntity();
         item.setOrder(order);
         item.setProduct(product);
         item.setQuantity(1);
         item.setUnitPrice(new BigDecimal("50"));
         item.setSubtotal(new BigDecimal("50"));
-        // 這裡設定 ProductSnapshot 是為了模擬真實情況，但報表統計是關聯 Product ID
+        // 這裡設定 ProductSnapshot 是為了解決 N+1
+
+        order.getItems().add(item);
+        orderRepository.save(order);
+    }
+}
+        // 這裡設定 ProductEntitySnapshot 是為了模擬真實情況，但報表統計是關聯 ProductEntity ID
 
         order.getItems().add(item);
         orderRepository.save(order);

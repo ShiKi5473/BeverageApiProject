@@ -12,37 +12,37 @@ import tw.niels.beverage_api_project.common.exception.DomainException;
 import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
 import tw.niels.beverage_api_project.modules.brand.dto.CreateBrandRequestDto;
 import tw.niels.beverage_api_project.modules.brand.dto.UpdatePointConfigDto;
-import tw.niels.beverage_api_project.modules.brand.entity.Brand;
-import tw.niels.beverage_api_project.modules.brand.entity.BrandPointConfig;
-import tw.niels.beverage_api_project.modules.brand.repository.BrandPointConfigRepository;
-import tw.niels.beverage_api_project.modules.brand.repository.BrandRepository;
+import tw.niels.beverage_api_project.modules.brand.entity.BrandEntity;
+import tw.niels.beverage_api_project.modules.brand.entity.BrandPointConfigEntity;
+import tw.niels.beverage_api_project.modules.brand.repository.BrandPointConfigJpaRepository;
+import tw.niels.beverage_api_project.modules.brand.repository.BrandJpaRepository;
 import tw.niels.beverage_api_project.security.BrandContextHolder;
 
 @Service
 public class BrandService {
 
-    private final BrandRepository brandRepository;
-    private final BrandPointConfigRepository brandPointConfigRepository;
+    private final BrandJpaRepository brandRepository;
+    private final BrandPointConfigJpaRepository BrandPointConfigJpaRepository;
 
-    public BrandService(BrandRepository brandRepository,
-                        BrandPointConfigRepository brandPointConfigRepository) {
+    public BrandService(BrandJpaRepository brandRepository,
+                        BrandPointConfigJpaRepository BrandPointConfigJpaRepository) {
         this.brandRepository = brandRepository;
-        this.brandPointConfigRepository = brandPointConfigRepository;
+        this.BrandPointConfigJpaRepository = BrandPointConfigJpaRepository;
     }
 
     @Transactional // 建議加上交易註解
-    public Brand createBrand(CreateBrandRequestDto requestDto) {
+    public BrandEntity createBrand(CreateBrandRequestDto requestDto) {
         // 檢查品牌名稱是否已存在
         brandRepository.findByName(requestDto.getName()).ifPresent(b -> {
             throw new DomainException("品牌名稱 '" + requestDto.getName() + "' 已經存在。");
         });
 
-        Brand brand = new Brand();
-        brand.setName(requestDto.getName());
-        brand.setContactPerson(requestDto.getContactPerson());
-        brand.setIsActive(true); // 預設為啟用
+        BrandEntity BrandEntity = new BrandEntity();
+        BrandEntity.setName(requestDto.getName());
+        BrandEntity.setContactPerson(requestDto.getContactPerson());
+        BrandEntity.setIsActive(true); // 預設為啟用
 
-        return brandRepository.save(brand);
+        return brandRepository.save(BrandEntity);
     }
 
     /**
@@ -50,7 +50,7 @@ public class BrandService {
      * 取得當前登入用戶所屬的品牌資訊
      * 安全性由 ContextHolder 保證
      */
-    public Brand getCurrentBrandProfile() {
+    public BrandEntity getCurrentBrandProfile() {
         Long currentBrandId = BrandContextHolder.getBrandId();
 
         if (currentBrandId == null) {
@@ -62,18 +62,18 @@ public class BrandService {
     }
 
     @Transactional
-    public BrandPointConfig updatePointConfig(Long brandId, UpdatePointConfigDto dto) {
+    public BrandPointConfigEntity updatePointConfig(Long brandId, UpdatePointConfigDto dto) {
         // 1. 確保品牌存在
-        Brand brand = brandRepository.findById(brandId)
+        BrandEntity BrandEntity = brandRepository.findById(brandId)
                 .orElseThrow(() -> new ResourceNotFoundException("找不到品牌，ID：" + brandId));
 
         // 2. 直接從 config repository 查找 (因為 ID 是共享的，所以直接用 brandId)
-        BrandPointConfig config = brandPointConfigRepository.findById(brandId)
+        BrandPointConfigEntity config = BrandPointConfigJpaRepository.findById(brandId)
                 .orElse(null);
 
         // 3. 如果不存在則建立
         if (config == null) {
-            config = new BrandPointConfig(brand);
+            config = new BrandPointConfigEntity(BrandEntity);
         }
 
         // 4. 更新數值
@@ -82,7 +82,7 @@ public class BrandService {
         config.setExpiryDays(dto.getExpiryDays());
 
         // 5. 直接儲存 config
-        return brandPointConfigRepository.save(config);
+        return BrandPointConfigJpaRepository.save(config);
     }
 
     /**
@@ -90,7 +90,7 @@ public class BrandService {
      * 建議重新命名以明確意圖，例如 getAllBrandsForAdmin
      */
     // 權限驗證由 Controller 層的 @PreAuthorize 負責（符合 Phase 0 架構決策）
-    public List<Brand> getAllBrandsForAdmin() {
+    public List<BrandEntity> getAllBrandsForAdmin() {
         return brandRepository.findAll();
     }
 
@@ -99,12 +99,12 @@ public class BrandService {
      * 允許查詢系統中的任何品牌
      * 建議加上 @PreAuthorize("hasRole('PLATFORM_ADMIN')")
      */
-    public Optional<Brand> getBrandById(Long id) {
+    public Optional<BrandEntity> getBrandById(Long id) {
         return brandRepository.findById(id); // 這裡必須能呼叫 findById
     }
 
 
-    public List<Brand> getActiveBrands() {
+    public List<BrandEntity> getActiveBrands() {
         return brandRepository.findByIsActiveTrue();
     }
 }

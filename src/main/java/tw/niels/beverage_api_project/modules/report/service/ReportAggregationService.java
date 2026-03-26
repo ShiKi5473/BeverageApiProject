@@ -7,7 +7,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import tw.niels.beverage_api_project.modules.store.repository.StoreIdentity;
-import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
+import tw.niels.beverage_api_project.modules.store.repository.StoreJpaRepository;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -25,11 +25,11 @@ public class ReportAggregationService {
 
     private static final Logger logger = LoggerFactory.getLogger(ReportAggregationService.class);
 
-    private final StoreRepository storeRepository;
+    private final StoreJpaRepository storeRepository;
     private final StoreSettlementService storeSettlementService;
 
 
-    public ReportAggregationService(StoreRepository storeRepository,
+    public ReportAggregationService(StoreJpaRepository storeRepository,
                                     StoreSettlementService storeSettlementService) {
         this.storeRepository = storeRepository;
         this.storeSettlementService = storeSettlementService;

@@ -1,8 +1,8 @@
 package tw.niels.beverage_api_project.modules.promotion.strategy;
 
 import org.springframework.stereotype.Component;
-import tw.niels.beverage_api_project.modules.order.entity.Order;
-import tw.niels.beverage_api_project.modules.promotion.entity.Promotion;
+import tw.niels.beverage_api_project.modules.order.entity.OrderEntity;
+import tw.niels.beverage_api_project.modules.promotion.entity.PromotionEntity;
 import tw.niels.beverage_api_project.modules.promotion.enums.PromotionType;
 
 import java.math.BigDecimal;
@@ -16,8 +16,8 @@ public class FixedAmountCalculator implements PromotionCalculator {
     }
 
     @Override
-    public BigDecimal calculateDiscount(Order order, Promotion promotion) {
-        BigDecimal orderTotal = order.getTotalAmount();
+    public BigDecimal calculateDiscount(OrderEntity OrderEntity, PromotionEntity promotion) {
+        BigDecimal orderTotal = OrderEntity.getTotalAmount();
         BigDecimal minSpend = promotion.getMinSpend();
 
         // 檢查門檻

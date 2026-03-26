@@ -9,7 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import tw.niels.beverage_api_project.common.annotation.Audit;
 import tw.niels.beverage_api_project.common.service.ControllerHelperService;
-import tw.niels.beverage_api_project.modules.audit.entity.AuditLog;
+import tw.niels.beverage_api_project.modules.audit.entity.AuditLogEntity;
 import tw.niels.beverage_api_project.modules.audit.service.AuditLogService;
 import tw.niels.beverage_api_project.security.AppUserDetails;
 
@@ -59,7 +59,7 @@ public class AuditAspect {
     }
 
     private void recordLog(ProceedingJoinPoint joinPoint, Audit audit, boolean success, String errorMsg) {
-        AuditLog log = new AuditLog();
+        AuditLogEntity log = new AuditLogEntity();
         log.setTimestamp(Instant.now());
         log.setAction(audit.action());
         log.setSuccess(success);

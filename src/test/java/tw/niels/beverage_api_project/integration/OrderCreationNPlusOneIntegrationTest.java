@@ -1,4 +1,4 @@
-package tw.niels.beverage_api_project.integration;
+﻿package tw.niels.beverage_api_project.integration;
 
 import io.hypersistence.utils.jdbc.validator.SQLStatementCountValidator;
 import org.junit.jupiter.api.BeforeEach;
@@ -7,30 +7,31 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+
 import tw.niels.beverage_api_project.AbstractIntegrationTest;
 import tw.niels.beverage_api_project.common.service.ControllerHelperService;
 import tw.niels.beverage_api_project.config.DataSeeder;
 import tw.niels.beverage_api_project.config.TestDataSourceConfig;
-import tw.niels.beverage_api_project.modules.brand.entity.Brand;
-import tw.niels.beverage_api_project.modules.brand.repository.BrandRepository;
+import tw.niels.beverage_api_project.modules.brand.entity.BrandEntity;
+import tw.niels.beverage_api_project.modules.brand.repository.BrandJpaRepository;
 import tw.niels.beverage_api_project.modules.order.dto.CreateOrderRequestDto;
 import tw.niels.beverage_api_project.modules.order.dto.OrderItemDto;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
 import tw.niels.beverage_api_project.modules.order.facade.OrderProcessFacade;
 import tw.niels.beverage_api_project.modules.order.service.OrderService;
-import tw.niels.beverage_api_project.modules.product.entity.Category;
-import tw.niels.beverage_api_project.modules.product.entity.Product;
-import tw.niels.beverage_api_project.modules.product.entity.ProductVariant;
+import tw.niels.beverage_api_project.modules.product.entity.CategoryEntity;
+import tw.niels.beverage_api_project.modules.product.entity.ProductEntity;
+import tw.niels.beverage_api_project.modules.product.entity.ProductVariantEntity;
 import tw.niels.beverage_api_project.modules.product.enums.ProductStatus;
-import tw.niels.beverage_api_project.modules.product.repository.CategoryRepository;
-import tw.niels.beverage_api_project.modules.product.repository.ProductRepository;
-import tw.niels.beverage_api_project.modules.product.repository.ProductVariantRepository; // 新增注入
+import tw.niels.beverage_api_project.modules.product.repository.CategoryJpaRepository;
+import tw.niels.beverage_api_project.modules.product.repository.ProductJpaRepository;
+import tw.niels.beverage_api_project.modules.product.repository.ProductVariantJpaRepository;
 import tw.niels.beverage_api_project.modules.report.schedule.ReportRecoveryRunner;
 import tw.niels.beverage_api_project.modules.report.schedule.ReportScheduler;
-import tw.niels.beverage_api_project.modules.store.entity.Store;
-import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
-import tw.niels.beverage_api_project.modules.user.entity.User;
-import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
+import tw.niels.beverage_api_project.modules.store.entity.StoreEntity;
+import tw.niels.beverage_api_project.modules.store.repository.StoreJpaRepository;
+import tw.niels.beverage_api_project.modules.user.entity.UserEntity;
+import tw.niels.beverage_api_project.modules.user.repository.UserJpaRepository;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -48,17 +49,16 @@ public class OrderCreationNPlusOneIntegrationTest extends AbstractIntegrationTes
 
     @Autowired private OrderService orderService;
     @Autowired private OrderProcessFacade orderProcessFacade;
-    @Autowired private BrandRepository brandRepository;
-    @Autowired private StoreRepository storeRepository;
-    @Autowired private ProductRepository productRepository;
-    @Autowired private ProductVariantRepository productVariantRepository; // 新增
-    @Autowired private CategoryRepository categoryRepository;
-    @Autowired private UserRepository userRepository;
+    @Autowired private BrandJpaRepository brandJpaRepository;
+    @Autowired private StoreJpaRepository storeJpaRepository;
+    @Autowired private ProductJpaRepository productJpaRepository;
+    @Autowired private ProductVariantJpaRepository productVariantJpaRepository;
+    @Autowired private CategoryJpaRepository categoryJpaRepository;
+    @Autowired private UserJpaRepository userJpaRepository;
 
     private Long brandId;
     private Long storeId;
     private Long staffUserId;
-    // 儲存商品 ID 與對應的 規格 ID
     private record ProductInfo(Long productId, Long variantId) {}
     private List<ProductInfo> productInfos = new ArrayList<>();
 
@@ -66,53 +66,49 @@ public class OrderCreationNPlusOneIntegrationTest extends AbstractIntegrationTes
     void setup() {
         SQLStatementCountValidator.reset();
 
-        Brand brand = new Brand();
+        BrandEntity brand = new BrandEntity();
         brand.setName("Order Test Brand");
-        brand = brandRepository.save(brand);
+        brand = brandJpaRepository.save(brand);
         this.brandId = brand.getId();
 
-        Store store = new Store();
+        StoreEntity store = new StoreEntity();
         store.setBrand(brand);
         store.setName("Order Store");
-        store = storeRepository.save(store);
+        store = storeJpaRepository.save(store);
         this.storeId = store.getId();
 
-        User staff = new User();
+        UserEntity staff = new UserEntity();
         staff.setBrand(brand);
         staff.setPrimaryPhone("0912345678");
         staff.setPasswordHash("hash123");
-        staff = userRepository.save(staff);
+        staff = userJpaRepository.save(staff);
         this.staffUserId = staff.getId();
 
-        Category category = new Category();
+        CategoryEntity category = new CategoryEntity();
         category.setBrand(brand);
         category.setName("Coffee");
-        categoryRepository.save(category);
+        categoryJpaRepository.save(category);
 
-        // 建立 5 種商品，並且每種商品建立 1 個規格
         for (int i = 1; i <= 5; i++) {
-            // 1. 建立商品
-            Product p = new Product();
+            ProductEntity p = new ProductEntity();
             p.setBrand(brand);
             p.setName("Latte " + i);
             p.setBasePrice(BigDecimal.valueOf(60));
             p.setStatus(ProductStatus.ACTIVE);
-            p.setCategories(Set.of(category));
-            p = productRepository.save(p);
+            p = productJpaRepository.save(p);
 
-            // 2. 建立規格 (Variant) - 重要修改
-            ProductVariant v = new ProductVariant();
+            ProductVariantEntity v = new ProductVariantEntity();
             v.setProduct(p);
             v.setName("Medium");
             v.setPrice(BigDecimal.valueOf(60));
             v.setSkuCode("LATTE-" + i + "-M");
-            v.setDeleted(false);
-            v = productVariantRepository.save(v);
+            v.setIsDeleted(false);
+            v = productVariantJpaRepository.save(v);
 
             productInfos.add(new ProductInfo(p.getId(), v.getId()));
         }
 
-        storeRepository.flush();
+        storeJpaRepository.flush();
         SQLStatementCountValidator.reset();
     }
 
@@ -123,11 +119,10 @@ public class OrderCreationNPlusOneIntegrationTest extends AbstractIntegrationTes
         request.setStatus(OrderStatus.PREPARING);
 
         List<OrderItemDto> items = new ArrayList<>();
-        // 使用 Record 建構子來建立 DTO，並填入 variantId
         for (ProductInfo info : productInfos) {
             OrderItemDto item = new OrderItemDto(
                     info.productId(),
-                    info.variantId(), // 必填：規格 ID
+                    info.variantId(),
                     1,
                     null,
                     Collections.emptyList()
@@ -136,22 +131,11 @@ public class OrderCreationNPlusOneIntegrationTest extends AbstractIntegrationTes
         }
         request.setItems(items);
 
-        // 重置計數器
         SQLStatementCountValidator.reset();
 
-        // 執行建立訂單
         orderProcessFacade.createOrder(brandId, storeId, staffUserId, request);
 
-        // 斷言分析：
-        // 1. SELECT Store
-        // 2. SELECT Staff
-        // 3. SELECT Batch Products (IN clause)
-        // 4. SELECT Batch Variants (IN clause) -> 新增的查詢
-        // 5. SELECT User/Staff Profiles (視 JPA fetch 設定，通常會有關聯查詢)
-        // OrderItemProcessorService 現在會執行：productRepository.findByBrand_IdAndIdIn AND productVariantRepository.findBy...
-
-        // 預期查詢數增加 1 (因為多了一次對 product_variants 的批次查詢)
-        // 原本預期 5，現在改為 6。重點是查詢次數固定，不會隨 items 數量 (5) 而變成 5+N
+        // 預期查詢數
         SQLStatementCountValidator.assertSelectCount(6);
     }
 }

@@ -4,10 +4,10 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import tw.niels.beverage_api_project.modules.order.entity.Order;
-import tw.niels.beverage_api_project.modules.order.entity.OrderItem;
+import tw.niels.beverage_api_project.modules.order.entity.OrderEntity;
+import tw.niels.beverage_api_project.modules.order.entity.OrderItemEntity;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
-import tw.niels.beverage_api_project.modules.product.entity.ProductOption;
+import tw.niels.beverage_api_project.modules.product.entity.ProductOptionEntity;
 
 import java.util.Date;
 import java.util.List;
@@ -31,13 +31,13 @@ public class KdsOrderDto {
     private List<KdsOrderItemDto> items;
 
     // 保留自定義建構子 (供 Service 層轉換實體使用)
-    public KdsOrderDto(Order order) {
-        this.orderId = order.getId();
-        this.orderNumber = order.getOrderNumber();
-        this.status = order.getStatus();
-        this.orderTime = order.getOrderTime();
-        this.customerNote = order.getCustomerNote();
-        this.items = order.getItems().stream()
+    public KdsOrderDto(OrderEntity OrderEntity) {
+        this.orderId = OrderEntity.getId();
+        this.orderNumber = OrderEntity.getOrderNumber();
+        this.status = OrderEntity.getStatus();
+        this.orderTime = OrderEntity.getOrderTime();
+        this.customerNote = OrderEntity.getCustomerNote();
+        this.items = OrderEntity.getItems().stream()
                 .map(KdsOrderItemDto::fromEntity)
                 .collect(Collectors.toList());
     }
@@ -45,8 +45,8 @@ public class KdsOrderDto {
     /**
      * 靜態工廠方法 (Static Factory Method)
      */
-    public static KdsOrderDto fromEntity(Order order) {
-        return new KdsOrderDto(order);
+    public static KdsOrderDto fromEntity(OrderEntity OrderEntity) {
+        return new KdsOrderDto(OrderEntity);
     }
 
     // 內部靜態類別 (Inner Static Class) - KdsOrderItemDto
@@ -60,7 +60,7 @@ public class KdsOrderDto {
         private String notes; // 品項層級的備註 (例如：少冰)
         private List<KdsOrderOptionDto> options;
 
-        public KdsOrderItemDto(OrderItem item) {
+        public KdsOrderItemDto(OrderItemEntity item) {
             this.orderItemId = item.getId();
             this.productName = item.getProduct().getName();
             this.quantity = item.getQuantity();
@@ -70,7 +70,7 @@ public class KdsOrderDto {
                     .collect(Collectors.toList());
         }
 
-        public static KdsOrderItemDto fromEntity(OrderItem item) {
+        public static KdsOrderItemDto fromEntity(OrderItemEntity item) {
             return new KdsOrderItemDto(item);
         }
     }
@@ -82,11 +82,11 @@ public class KdsOrderDto {
         private String optionName;
         // 注意：廚房不需要知道價格調整 (priceAdjustment)
 
-        public KdsOrderOptionDto(ProductOption option) {
+        public KdsOrderOptionDto(ProductOptionEntity option) {
             this.optionName = option.getOptionName();
         }
 
-        public static KdsOrderOptionDto fromEntity(ProductOption option) {
+        public static KdsOrderOptionDto fromEntity(ProductOptionEntity option) {
             return new KdsOrderOptionDto(option);
         }
     }

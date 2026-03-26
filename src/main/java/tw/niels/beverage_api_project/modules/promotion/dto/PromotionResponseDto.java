@@ -3,7 +3,7 @@ package tw.niels.beverage_api_project.modules.promotion.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import tw.niels.beverage_api_project.modules.product.dto.ProductSummaryDto;
-import tw.niels.beverage_api_project.modules.promotion.entity.Promotion;
+import tw.niels.beverage_api_project.modules.promotion.entity.PromotionEntity;
 import tw.niels.beverage_api_project.modules.promotion.enums.PromotionType;
 
 import java.math.BigDecimal;
@@ -28,7 +28,7 @@ public class PromotionResponseDto {
     // 使用 Set 確保不重複 (對應 Entity 的 ManyToMany Set)
     private Set<ProductSummaryDto> applicableProducts;
 
-    public static PromotionResponseDto fromEntity(Promotion entity) {
+    public static PromotionResponseDto fromEntity(PromotionEntity entity) {
         if (entity == null) return null; // 防呆
 
         PromotionResponseDto dto = new PromotionResponseDto();

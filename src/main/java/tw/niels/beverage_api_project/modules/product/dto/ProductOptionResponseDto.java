@@ -2,7 +2,7 @@ package tw.niels.beverage_api_project.modules.product.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
-import tw.niels.beverage_api_project.modules.product.entity.ProductOption;
+import tw.niels.beverage_api_project.modules.product.entity.ProductOptionEntity;
 
 import java.math.BigDecimal;
 
@@ -22,7 +22,7 @@ public class ProductOptionResponseDto {
     @Schema(description = "是否為預設值", example = "false")
     private boolean isDefault;
 
-    public static ProductOptionResponseDto fromEntity(ProductOption entity) {
+    public static ProductOptionResponseDto fromEntity(ProductOptionEntity entity) {
         if (entity == null) return null;
 
         ProductOptionResponseDto dto = new ProductOptionResponseDto();

@@ -4,7 +4,7 @@ import org.springframework.stereotype.Service;
 
 import tw.niels.beverage_api_project.common.exception.BadRequestException;
 import tw.niels.beverage_api_project.modules.order.entity.PaymentMethodEntity;
-import tw.niels.beverage_api_project.modules.order.repository.PaymentMethodRepository;
+import tw.niels.beverage_api_project.modules.order.repository.PaymentMethodJpaRepository;
 
 /**
  * 支付方式服務。
@@ -13,10 +13,10 @@ import tw.niels.beverage_api_project.modules.order.repository.PaymentMethodRepos
 @Service
 public class PaymentMethodService {
 
-    private final PaymentMethodRepository paymentMethodRepository;
+    private final PaymentMethodJpaRepository PaymentMethodJpaRepository;
 
-    public PaymentMethodService(PaymentMethodRepository paymentMethodRepository) {
-        this.paymentMethodRepository = paymentMethodRepository;
+    public PaymentMethodService(PaymentMethodJpaRepository PaymentMethodJpaRepository) {
+        this.PaymentMethodJpaRepository = PaymentMethodJpaRepository;
     }
 
     /**
@@ -27,7 +27,7 @@ public class PaymentMethodService {
      * @throws BadRequestException 若代碼無對應的支付方式
      */
     public PaymentMethodEntity getByCode(String code) {
-        return paymentMethodRepository.findByCode(code)
+        return PaymentMethodJpaRepository.findByCode(code)
                 .orElseThrow(() -> new BadRequestException("無效的支付方式代碼：" + code));
     }
 }

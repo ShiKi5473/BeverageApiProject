@@ -7,8 +7,8 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
 import jakarta.transaction.Transactional;
-import tw.niels.beverage_api_project.modules.user.entity.User;
-import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
+import tw.niels.beverage_api_project.modules.user.entity.UserEntity;
+import tw.niels.beverage_api_project.modules.user.repository.UserJpaRepository;
 
 /**
  * 實現 UserDetailsService 介面，用於 Spring Security 載入使用者資訊。
@@ -19,7 +19,7 @@ import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
 @RequiredArgsConstructor
 public class CustomUserDetailsService implements UserDetailsService {
 
-    private final UserRepository userRepository;
+    private final UserJpaRepository userRepository;
 
     @Override
     @Transactional // 加上交易註解以確保能懶加載 (Lazy Loading) 關聯的 Profile
@@ -36,7 +36,7 @@ public class CustomUserDetailsService implements UserDetailsService {
 
         // 在我們的設計中，username 即為 primaryPhone
         // 使用包含 brandId 的查詢方法，確保租戶隔離
-        User user = userRepository.findByPrimaryPhoneAndBrandId(username, brandId)
+        UserEntity user = userRepository.findByPrimaryPhoneAndBrandId(username, brandId)
                 .orElseThrow(() -> new UsernameNotFoundException(
                         "User not found with phone: " + username + " for brand: " + brandId));
 

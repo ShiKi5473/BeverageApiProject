@@ -4,7 +4,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import tw.niels.beverage_api_project.modules.member.application.command.*;
 import tw.niels.beverage_api_project.modules.member.service.MemberPointService;
-import tw.niels.beverage_api_project.modules.user.entity.User;
+import tw.niels.beverage_api_project.modules.user.entity.UserEntity;
 import tw.niels.beverage_api_project.modules.user.service.UserService;
 
 /**
@@ -34,7 +34,7 @@ public class MembershipCommandHandler {
 
     @Transactional
     public Long handle(RegisterMemberCommand command) {
-        User newUser = userService.createUser(command.requestDto());
+        UserEntity newUser = userService.createUser(command.requestDto());
         return newUser.getId();
     }
 

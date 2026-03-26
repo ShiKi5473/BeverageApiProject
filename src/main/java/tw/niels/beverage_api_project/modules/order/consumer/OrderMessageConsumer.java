@@ -1,4 +1,4 @@
-// 路徑：src/main/java/tw/niels/beverage_api_project/modules/order/consumer/OrderMessageConsumer.java
+// 路徑：src/main/java/tw/niels/beverage_api_project/modules/OrderEntity/consumer/OrderMessageConsumer.java
 package tw.niels.beverage_api_project.modules.order.consumer;
 
 import com.rabbitmq.client.Channel;
@@ -11,7 +11,7 @@ import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 import tw.niels.beverage_api_project.config.RabbitConfig;
 import tw.niels.beverage_api_project.modules.order.dto.AsyncOrderTaskDto;
-import tw.niels.beverage_api_project.modules.order.entity.Order;
+import tw.niels.beverage_api_project.modules.order.entity.OrderEntity;
 import tw.niels.beverage_api_project.modules.order.event.OrderStateChangedEvent;
 import tw.niels.beverage_api_project.modules.order.facade.OrderProcessFacade;
 
@@ -38,7 +38,7 @@ public class OrderMessageConsumer {
 
         try {
             // 1. 執行核心業務：寫入訂單
-            Order createdOrder = orderProcessFacade.createOrder(
+            OrderEntity createdOrder = orderProcessFacade.createOrder(
                     task.getBrandId(),
                     task.getStoreId(),
                     task.getUserId(),

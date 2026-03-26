@@ -1,13 +1,14 @@
 package tw.niels.beverage_api_project.modules.promotion.service;
 
+import java.time.LocalDateTime;
+import java.util.List;
+
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import tw.niels.beverage_api_project.modules.promotion.entity.Promotion;
-import tw.niels.beverage_api_project.modules.promotion.repository.PromotionRepository;
 
-import java.time.LocalDateTime;
-import java.util.List;
+import tw.niels.beverage_api_project.modules.promotion.entity.PromotionEntity;
+import tw.niels.beverage_api_project.modules.promotion.repository.PromotionJpaRepository;
 
 /**
  * 促銷活動快取服務
@@ -16,10 +17,10 @@ import java.util.List;
 @Service
 public class PromotionCacheService {
 
-    private final PromotionRepository promotionRepository;
+    private final PromotionJpaRepository PromotionJpaRepository;
 
-    public PromotionCacheService(PromotionRepository promotionRepository) {
-        this.promotionRepository = promotionRepository;
+    public PromotionCacheService(PromotionJpaRepository PromotionJpaRepository) {
+        this.PromotionJpaRepository = PromotionJpaRepository;
     }
 
     /**
@@ -27,7 +28,7 @@ public class PromotionCacheService {
      */
     @Cacheable(value = "promotions", key = "#brandId")
     @Transactional(readOnly = true)
-    public List<Promotion> getActivePromotions(Long brandId) {
-        return promotionRepository.findActivePromotionsByBrand(brandId, LocalDateTime.now());
+    public List<PromotionEntity> getActivePromotions(Long brandId) {
+        return PromotionJpaRepository.findActivePromotionEntitysByBrand(brandId, LocalDateTime.now());
     }
 }

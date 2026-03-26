@@ -3,7 +3,7 @@ package tw.niels.beverage_api_project.modules.order.state;
 import tw.niels.beverage_api_project.common.exception.BadRequestException;
 import tw.niels.beverage_api_project.modules.order.dto.CreateOrderRequestDto;
 import tw.niels.beverage_api_project.modules.order.dto.ProcessPaymentRequestDto;
-import tw.niels.beverage_api_project.modules.order.entity.Order;
+import tw.niels.beverage_api_project.modules.order.entity.OrderEntity;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
 
 /**
@@ -17,27 +17,27 @@ public abstract class AbstractOrderState implements OrderState {
     protected abstract OrderStatus getStatus();
 
     @Override
-    public void update(Order order, CreateOrderRequestDto dto) {
+    public void update(OrderEntity OrderEntity, CreateOrderRequestDto dto) {
         throw new BadRequestException("訂單狀態為 " + getStatus() + "，無法被修改內容。");
     }
 
     @Override
-    public void processPayment(Order order, ProcessPaymentRequestDto requestDto) {
+    public void processPayment(OrderEntity OrderEntity, ProcessPaymentRequestDto requestDto) {
         throw new BadRequestException("訂單狀態為 " + getStatus() + "，無法進行結帳。");
     }
 
     @Override
-    public void complete(Order order) {
+    public void complete(OrderEntity OrderEntity) {
         throw new BadRequestException("訂單狀態為 " + getStatus() + "，無法標記為完成。");
     }
 
     @Override
-    public void cancel(Order order) {
+    public void cancel(OrderEntity OrderEntity) {
         throw new BadRequestException("訂單狀態為 " + getStatus() + "，無法取消。");
     }
 
     @Override
-    public void accept(Order order) {
+    public void accept(OrderEntity OrderEntity) {
         throw new BadRequestException("訂單狀態為 " + getStatus() + "，無法執行接單動作。");
     }
 }

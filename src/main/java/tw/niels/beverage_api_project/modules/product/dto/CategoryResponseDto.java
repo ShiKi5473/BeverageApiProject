@@ -2,7 +2,7 @@ package tw.niels.beverage_api_project.modules.product.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
-import tw.niels.beverage_api_project.modules.product.entity.Category;
+import tw.niels.beverage_api_project.modules.product.entity.CategoryEntity;
 
 @Data
 @Schema(description = "商品分類詳細資訊")
@@ -20,16 +20,16 @@ public class CategoryResponseDto {
     @Schema(description = "所屬品牌 ID", example = "1")
     private Long brandId;
 
-    public static CategoryResponseDto fromEntity(Category category) {
-        if (category == null) return null;
+    public static CategoryResponseDto fromEntity(CategoryEntity CategoryEntity) {
+        if (CategoryEntity == null) return null;
 
         CategoryResponseDto dto = new CategoryResponseDto();
-        dto.setCategoryId(category.getId());
-        dto.setName(category.getName());
-        dto.setSortOrder(category.getSortOrder());
+        dto.setCategoryId(CategoryEntity.getId());
+        dto.setName(CategoryEntity.getName());
+        dto.setSortOrder(CategoryEntity.getSortOrder());
 
-        if (category.getBrand() != null) {
-            dto.setBrandId(category.getBrand().getId());
+        if (CategoryEntity.getBrand() != null) {
+            dto.setBrandId(CategoryEntity.getBrand().getId());
         }
         return dto;
     }

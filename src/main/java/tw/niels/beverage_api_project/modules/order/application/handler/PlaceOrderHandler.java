@@ -124,7 +124,7 @@ public class PlaceOrderHandler {
                 dto.quantity(),
                 variant.getPrice(), // 暫不計入選項
                 dto.notes(),
-                dto.optionIds() != null ? dto.optionIds() : new ArrayList<>(),
+                dto.optionIds() != null ? dto.optionIds() : List.<Long>of(),
                 new ProductSnapshot(product.getId(), "Snapshot Name", variant.getPrice(), "Snapshot Category", "Snapshot Variant") // 暫無 Snapshot 取值邏輯，傳入假資料
             );
             items.add(item);

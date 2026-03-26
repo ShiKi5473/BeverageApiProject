@@ -1,10 +1,10 @@
 package tw.niels.beverage_api_project.modules.promotion.strategy;
 
 import org.springframework.stereotype.Component;
-import tw.niels.beverage_api_project.modules.order.entity.Order;
-import tw.niels.beverage_api_project.modules.order.entity.OrderItem;
-import tw.niels.beverage_api_project.modules.product.entity.Product;
-import tw.niels.beverage_api_project.modules.promotion.entity.Promotion;
+import tw.niels.beverage_api_project.modules.order.entity.OrderEntity;
+import tw.niels.beverage_api_project.modules.order.entity.OrderItemEntity;
+import tw.niels.beverage_api_project.modules.product.entity.ProductEntity;
+import tw.niels.beverage_api_project.modules.promotion.entity.PromotionEntity;
 import tw.niels.beverage_api_project.modules.promotion.enums.PromotionType;
 
 import java.math.BigDecimal;
@@ -23,7 +23,7 @@ public class BuyXGetYCalculator implements PromotionCalculator {
     }
 
     @Override
-    public BigDecimal calculateDiscount(Order order, Promotion promotion) {
+    public BigDecimal calculateDiscount(OrderEntity OrderEntity, PromotionEntity promotion) {
         // 1. 解析 X (需購買數) 和 Y (贈送數)
         int buyCount = promotion.getMinSpend() != null ? promotion.getMinSpend().intValue() : 1;
         int freeCount = promotion.getValue() != null ? promotion.getValue().intValue() : 1;
@@ -32,7 +32,7 @@ public class BuyXGetYCalculator implements PromotionCalculator {
         if (groupSize <= 0) return BigDecimal.ZERO;
 
         // 2. 取得符合資格的商品單價列表 (已抽離方法)
-        List<BigDecimal> eligibleItemPrices = collectEligibleItemPrices(order, promotion);
+        List<BigDecimal> eligibleItemPrices = collectEligibleItemPrices(OrderEntity, promotion);
 
         // 3. 計算折扣
         return calculateGroupDiscount(eligibleItemPrices, groupSize, freeCount);
@@ -40,21 +40,21 @@ public class BuyXGetYCalculator implements PromotionCalculator {
 
     /**
      * 從訂單中篩選出適用於此活動的商品，並將每個數量展開為獨立的單價
-     * @param order     訂單
+     * @param OrderEntity     訂單
      * @param promotion 促銷活動設定
      * @return 符合資格的單價列表 (未排序)
      */
-    private List<BigDecimal> collectEligibleItemPrices(Order order, Promotion promotion) {
-        // 找出適用此活動的 Product IDs
+    private List<BigDecimal> collectEligibleItemPrices(OrderEntity OrderEntity, PromotionEntity promotion) {
+        // 找出適用此活動的 ProductEntity IDs
         Set<Long> applicableProductIds = promotion.getApplicableProducts().stream()
-                .map(Product::getId)
+                .map(ProductEntity::getId)
                 .collect(Collectors.toSet());
 
         List<BigDecimal> prices = new ArrayList<>();
 
-        for (OrderItem item : order.getItems()) {
+        for (OrderItemEntity item : OrderEntity.getItems()) {
             // 如果活動沒指定商品 (全館適用) 或者 商品在適用列表中
-            // 注意：這裡假設活動是綁定 Product 層級，若是綁定 Variant 層級需修改此處邏輯
+            // 注意：這裡假設活動是綁定 ProductEntity 層級，若是綁定 Variant 層級需修改此處邏輯
             boolean isApplicable = applicableProductIds.isEmpty() ||
                     applicableProductIds.contains(item.getProduct().getId());
 

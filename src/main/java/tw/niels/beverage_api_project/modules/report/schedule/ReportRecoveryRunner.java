@@ -8,8 +8,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
-import tw.niels.beverage_api_project.modules.report.entity.DailyStoreStats;
-import tw.niels.beverage_api_project.modules.report.repository.DailyStoreStatsRepository;
+import tw.niels.beverage_api_project.modules.report.entity.DailyStoreStatsEntity;
+import tw.niels.beverage_api_project.modules.report.repository.DailyStoreStatsJpaRepository;
 import tw.niels.beverage_api_project.modules.report.service.ReportAggregationService;
 
 import java.time.Duration;
@@ -24,14 +24,14 @@ public class ReportRecoveryRunner implements ApplicationRunner {
     private static final Logger logger = LoggerFactory.getLogger(ReportRecoveryRunner.class);
 
     private final ReportAggregationService reportAggregationService;
-    private final DailyStoreStatsRepository dailyStoreStatsRepository;
+    private final DailyStoreStatsJpaRepository DailyStoreStatsJpaRepository;
     private final LockProvider lockProvider; // 注入 LockProvider
 
     public ReportRecoveryRunner(ReportAggregationService reportAggregationService,
-                                DailyStoreStatsRepository dailyStoreStatsRepository,
+                                DailyStoreStatsJpaRepository DailyStoreStatsJpaRepository,
                                 LockProvider lockProvider) {
         this.reportAggregationService = reportAggregationService;
-        this.dailyStoreStatsRepository = dailyStoreStatsRepository;
+        this.DailyStoreStatsJpaRepository = DailyStoreStatsJpaRepository;
         this.lockProvider = lockProvider;
     }
 
@@ -70,7 +70,7 @@ public class ReportRecoveryRunner implements ApplicationRunner {
         LocalDate yesterday = LocalDate.now().minusDays(1);
 
         // 2. 查詢資料庫
-        Optional<DailyStoreStats> lastStatOpt = dailyStoreStatsRepository.findTopByOrderByDateDesc();
+        Optional<DailyStoreStatsEntity> lastStatOpt = DailyStoreStatsJpaRepository.findTopByOrderByDateDesc();
         LocalDate startDate;
 
         if (lastStatOpt.isPresent()) {

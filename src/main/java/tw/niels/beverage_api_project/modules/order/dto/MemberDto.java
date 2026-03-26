@@ -2,8 +2,8 @@ package tw.niels.beverage_api_project.modules.order.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
-import tw.niels.beverage_api_project.modules.user.entity.User;
-import tw.niels.beverage_api_project.modules.user.entity.profile.MemberProfile;
+import tw.niels.beverage_api_project.modules.user.entity.UserEntity;
+import tw.niels.beverage_api_project.modules.user.entity.profile.MemberProfileEntity;
 
 @Data
 @Schema(description = "會員基本資訊 (用於 POS 查詢)")
@@ -21,9 +21,9 @@ public class MemberDto {
     @Schema(description = "備註")
     private String notes;
 
-    public static MemberDto fromEntity(User user) {
-        if (user == null || user.getMemberProfile() == null) return null;
-        MemberProfile profile = user.getMemberProfile();
+    public static MemberDto fromEntity(UserEntity UserEntity) {
+        if (UserEntity == null || UserEntity.getMemberProfile() == null) return null;
+        MemberProfileEntity profile = UserEntity.getMemberProfile();
         MemberDto dto = new MemberDto();
         dto.setUserId(profile.getUserId());
         dto.setPrimaryPhone(profile.getUser().getPrimaryPhone());

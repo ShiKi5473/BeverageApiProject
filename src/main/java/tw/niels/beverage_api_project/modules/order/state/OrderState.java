@@ -2,7 +2,7 @@ package tw.niels.beverage_api_project.modules.order.state;
 
 import tw.niels.beverage_api_project.modules.order.dto.CreateOrderRequestDto;
 import tw.niels.beverage_api_project.modules.order.dto.ProcessPaymentRequestDto;
-import tw.niels.beverage_api_project.modules.order.entity.Order;
+import tw.niels.beverage_api_project.modules.order.entity.OrderEntity;
 
 /**
  * 狀態模式介面
@@ -14,30 +14,30 @@ public interface OrderState {
      * 動作：更新訂單內容
      * (僅 HELD 狀態可執行)
      */
-    void update(Order order, CreateOrderRequestDto dto);
+    void update(OrderEntity OrderEntity, CreateOrderRequestDto dto);
 
     /**
      * 動作：處理付款
      * (僅 PENDING 和 HELD 狀態可執行)
      */
-    void processPayment(Order order, ProcessPaymentRequestDto requestDto);
+    void processPayment(OrderEntity OrderEntity, ProcessPaymentRequestDto requestDto);
 
     /**
      * 動作：完成訂單
      * (僅 PREPARING 狀態可執行)
      */
-    void complete(Order order);
+    void complete(OrderEntity OrderEntity);
 
     /**
      * 動作：取消訂單
      * (PENDING, HELD, PREPARING 狀態可執行)
      */
-    void cancel(Order order);
+    void cancel(OrderEntity OrderEntity);
 
     /**
      * 動作：店家確認接單
      * (僅 AWAITING_ACCEPTANCE 狀態可執行)
      */
-    void accept(Order order);
+    void accept(OrderEntity OrderEntity);
 
 }
