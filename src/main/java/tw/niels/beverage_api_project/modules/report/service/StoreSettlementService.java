@@ -6,9 +6,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
-import tw.niels.beverage_api_project.modules.order.repository.OrderJpaRepository;
-import tw.niels.beverage_api_project.modules.product.entity.ProductEntity;
-import tw.niels.beverage_api_project.modules.product.repository.ProductJpaRepository;
 import tw.niels.beverage_api_project.modules.report.dto.OrderStatusStatsDto;
 import tw.niels.beverage_api_project.modules.report.dto.PaymentStatsDto;
 import tw.niels.beverage_api_project.modules.report.dto.ProductSalesStatsDto;
@@ -16,15 +13,20 @@ import tw.niels.beverage_api_project.modules.report.entity.DailyProductStatsEnti
 import tw.niels.beverage_api_project.modules.report.entity.DailyStoreStatsEntity;
 import tw.niels.beverage_api_project.modules.report.repository.DailyProductStatsJpaRepository;
 import tw.niels.beverage_api_project.modules.report.repository.DailyStoreStatsJpaRepository;
+import tw.niels.beverage_api_project.modules.report.repository.OrderReportQueryRepository;
+import tw.niels.beverage_api_project.modules.report.repository.ProductCategoryReportQueryRepository;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 分店日結結算服務。
@@ -37,19 +39,27 @@ public class StoreSettlementService {
 
     private static final Logger logger = LoggerFactory.getLogger(StoreSettlementService.class);
 
-    private final OrderJpaRepository orderRepository;
-    private final ProductJpaRepository productRepository;
+    /** 商品沒有任何分類時的預設分類名稱 */
+    private static final String UNCATEGORIZED = "未分類";
+
+    // [B-6] 報表專用的訂單查詢（綁定 java.util.Date），取代 OrderJpaRepository 內綁 LocalDateTime 的舊查詢
+    private final OrderReportQueryRepository orderReportQueryRepository;
+    private final ProductCategoryReportQueryRepository productCategoryReportQueryRepository;
     private final DailyStoreStatsJpaRepository DailyStoreStatsJpaRepository;
     private final DailyProductStatsJpaRepository DailyProductStatsJpaRepository;
+    // [B-7] 營業時區：日結區間 (LocalDateTime) 要用它轉成 Date，而不是 JVM 預設時區
+    private final ZoneId businessZoneId;
 
-    public StoreSettlementService(OrderJpaRepository orderRepository,
-                                  ProductJpaRepository productRepository,
+    public StoreSettlementService(OrderReportQueryRepository orderReportQueryRepository,
+                                  ProductCategoryReportQueryRepository productCategoryReportQueryRepository,
                                   DailyStoreStatsJpaRepository DailyStoreStatsJpaRepository,
-                                  DailyProductStatsJpaRepository DailyProductStatsJpaRepository) {
-        this.orderRepository = orderRepository;
-        this.productRepository = productRepository;
+                                  DailyProductStatsJpaRepository DailyProductStatsJpaRepository,
+                                  ZoneId businessZoneId) {
+        this.orderReportQueryRepository = orderReportQueryRepository;
+        this.productCategoryReportQueryRepository = productCategoryReportQueryRepository;
         this.DailyStoreStatsJpaRepository = DailyStoreStatsJpaRepository;
         this.DailyProductStatsJpaRepository = DailyProductStatsJpaRepository;
+        this.businessZoneId = businessZoneId;
     }
 
     /**
@@ -69,45 +79,87 @@ public class StoreSettlementService {
             DailyStoreStatsJpaRepository.flush();
         }
 
+        // [B-7] 以營業時區把日結區間轉成 java.util.Date（OrderEntity 的時間欄位型別）
+        Date startDate = Date.from(start.atZone(businessZoneId).toInstant());
+        Date endDate = Date.from(end.atZone(businessZoneId).toInstant());
+
         // --- 步驟 1: 準備分店統計物件 ---
         DailyStoreStatsEntity storeStats = new DailyStoreStatsEntity();
         storeStats.setStoreId(storeId);
         storeStats.setBrandId(brandId);
         storeStats.setDate(date);
 
-        // --- 步驟 2: 查詢並統計訂單狀態 ---
-        List<OrderStatusStatsDto> statusStats = orderRepository.findOrderStatusStatsByStoreAndDateRange(storeId, start, end);
+        // --- 步驟 2: 查詢並統計訂單狀態（一次查詢涵蓋 CLOSED / CANCELLED / 未結案） ---
+        // [B-6 修正] CLOSED 依 completedTime；CANCELLED 依 orderTime（取消單不會寫 completedTime，
+        // 舊版用 completedTime 篩選導致取消數永遠是 0）
+        List<OrderStatusStatsDto> statusStats = orderReportQueryRepository.findDailyStatusStats(storeId, startDate, endDate);
+
+        // [效能] 未結案數整店只需要算一次（舊版在每個商品的迴圈內各查一次）
+        long unclosedCount = 0;
 
         for (OrderStatusStatsDto dto : statusStats) {
             if (dto.getStatus() == OrderStatus.CLOSED) {
                 storeStats.setTotalOrders(dto.getCount().intValue());
-                storeStats.setTotalRevenue(dto.getTotalAmount());
-                storeStats.setTotalDiscount(dto.getDiscountAmount());
-                storeStats.setFinalRevenue(dto.getFinalAmount());
+                // SUM 欄位可能為 null（例如折扣欄位未填），DB 欄位是 NOT NULL，所以統一轉成 0
+                storeStats.setTotalRevenue(nz(dto.getTotalAmount()));
+                storeStats.setTotalDiscount(nz(dto.getDiscountAmount()));
+                storeStats.setFinalRevenue(nz(dto.getFinalAmount()));
             } else if (dto.getStatus() == OrderStatus.CANCELLED) {
                 storeStats.setCancelledOrders(dto.getCount().intValue());
+            } else if (OrderReportQueryRepository.UNCLOSED_STATUSES.contains(dto.getStatus())) {
+                unclosedCount += dto.getCount();
             }
         }
 
+        if (unclosedCount > 0) {
+            logger.warn("【日結警告】分店 ID: {} 在日期 {} 尚有 {} 筆訂單未結案 (非 CLOSED/CANCELLED)。",
+                    storeId, date, unclosedCount);
+        }
+
         // --- 步驟 3: 查詢並統計付款方式 ---
-        List<PaymentStatsDto> paymentStats = orderRepository.findPaymentStatsByStoreAndDateRange(storeId, start, end);
+        // [B-6 修正] 真實的付款代碼是 CASH / CREDIT_CARD / THIRD_PARTY（舊版只認 CASH 與不存在的 LINE_PAY）。
+        // 沒有付款方式的訂單不會出現在查詢結果中（INNER JOIN），即「忽略」；line_pay_total 欄位保留，維持 0。
+        List<PaymentStatsDto> paymentStats = orderReportQueryRepository.findClosedPaymentStats(storeId, startDate, endDate);
 
         for (PaymentStatsDto dto : paymentStats) {
             String code = dto.getPaymentCode();
             BigDecimal amount = dto.getTotalAmount();
+            if (code == null || amount == null) {
+                continue;
+            }
 
             if ("CASH".equalsIgnoreCase(code)) {
                 storeStats.setCashTotal(amount);
-            } else if ("LINE_PAY".equalsIgnoreCase(code)) {
-                storeStats.setLinePayTotal(amount);
+            } else if ("CREDIT_CARD".equalsIgnoreCase(code)) {
+                storeStats.setCreditCardTotal(amount);
+            } else if ("THIRD_PARTY".equalsIgnoreCase(code)) {
+                storeStats.setThirdPartyTotal(amount);
+            } else {
+                logger.debug("分店 {} 在 {} 出現未列入細分的付款方式代碼: {}", storeId, date, code);
             }
         }
 
         DailyStoreStatsJpaRepository.save(storeStats);
 
         // --- 步驟 4: 計算並儲存商品銷售統計 ---
-        List<ProductSalesStatsDto> productStats = orderRepository.findProductStatsByStoreAndDateRange(storeId, start, end);
+        List<ProductSalesStatsDto> productStats = orderReportQueryRepository.findClosedProductStats(storeId, startDate, endDate);
 
+        if (productStats.isEmpty()) {
+            return;
+        }
+
+        // [效能] 分類名稱一次批次查詢（舊版在迴圈內對每個商品各查一次商品並展開 categories）
+        Set<Long> productIds = productStats.stream()
+                .map(ProductSalesStatsDto::getProductId)
+                .collect(Collectors.toSet());
+        Map<Long, String> categoryNameByProduct = new HashMap<>();
+        for (ProductCategoryReportQueryRepository.ProductCategoryRow row :
+                productCategoryReportQueryRepository.findCategoryRows(brandId, productIds)) {
+            // 查詢已依 (商品 ID, 分類名稱) 排序，同一商品只取第一個分類，結果穩定
+            categoryNameByProduct.putIfAbsent(row.getProductId(), row.getCategoryName());
+        }
+
+        List<DailyProductStatsEntity> productStatsToSave = new ArrayList<>();
         for (ProductSalesStatsDto dto : productStats) {
             DailyProductStatsEntity prodStat = new DailyProductStatsEntity();
             prodStat.setStoreId(storeId);
@@ -117,32 +169,14 @@ public class StoreSettlementService {
             prodStat.setDate(date);
             prodStat.setQuantitySold(dto.getTotalQuantity().intValue());
             prodStat.setTotalSalesAmount(dto.getTotalSalesAmount());
-
-            Optional<ProductEntity> productOpt = productRepository.findByBrand_IdAndId(brandId, dto.getProductId());
-
-            if (productOpt.isPresent() && !productOpt.get().getCategories().isEmpty()) {
-                String categoryName = productOpt.get().getCategories().iterator().next().getName();
-                prodStat.setCategoryName(categoryName);
-            } else {
-                prodStat.setCategoryName("未分類");
-            }
-
-            Date startDate = Date.from(start.atZone(ZoneId.systemDefault()).toInstant());
-            Date endDate = Date.from(end.atZone(ZoneId.systemDefault()).toInstant());
-
-            long unclosedCount = orderRepository.countOrdersByStoreIdAndOrderTimeBetweenAndStatusIn(
-                    storeId,
-                    startDate,
-                    endDate,
-                    Arrays.asList(OrderStatus.PREPARING, OrderStatus.READY_FOR_PICKUP, OrderStatus.PENDING, OrderStatus.HELD, OrderStatus.AWAITING_ACCEPTANCE)
-            );
-
-            if (unclosedCount > 0) {
-                logger.warn("【日結警告】分店 ID: {} 在日期 {} 尚有 {} 筆訂單未結案 (非 CLOSED/CANCELLED)。",
-                        storeId, date, unclosedCount);
-            }
-
-            DailyProductStatsJpaRepository.save(prodStat);
+            prodStat.setCategoryName(categoryNameByProduct.getOrDefault(dto.getProductId(), UNCATEGORIZED));
+            productStatsToSave.add(prodStat);
         }
+        DailyProductStatsJpaRepository.saveAll(productStatsToSave);
+    }
+
+    /** null 安全：金額為 null 時視為 0 */
+    private static BigDecimal nz(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
     }
 }

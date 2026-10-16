@@ -13,10 +13,13 @@ package tw.niels.beverage_api_project.modules.order.domain.exception;
  * - 業務不變量（Invariant）被破壞
  *
  * 此例外不依賴任何框架，由 Application Layer 捕捉後轉換為
- * 對應的 HTTP 回應（如 400 Bad Request）。
+ * 對應的 HTTP 回應。
+ *
+ * 修正：改為繼承 common 的 DomainException（原本直接繼承 RuntimeException），
+ * 讓 GlobalExceptionHandler 將非法狀態轉換等業務錯誤回應為 HTTP 422，而不是 500。
  * ============================================================
  */
-public class OrderDomainException extends RuntimeException {
+public class OrderDomainException extends tw.niels.beverage_api_project.common.exception.DomainException {
 
     /**
      * 建立一個訂單領域例外。

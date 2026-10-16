@@ -22,9 +22,12 @@ import tw.niels.beverage_api_project.modules.brand.application.handler.BrandComm
 import tw.niels.beverage_api_project.modules.brand.application.handler.BrandQueryHandler;
 import tw.niels.beverage_api_project.modules.brand.application.query.GetAllBrandsQuery;
 import tw.niels.beverage_api_project.modules.brand.application.query.GetBrandByIdQuery;
+import tw.niels.beverage_api_project.modules.brand.dto.BrandResponseDto;
 import tw.niels.beverage_api_project.modules.brand.dto.UpdatePointConfigDto;
-import tw.niels.beverage_api_project.modules.brand.entity.BrandEntity;
-import tw.niels.beverage_api_project.modules.brand.entity.BrandPointConfigEntity;
+import tw.niels.beverage_api_project.common.constants.AuthorityConstants;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 @RestController
 @RequestMapping(ApiPaths.API_V1 + ApiPaths.BRANDS)
@@ -46,13 +49,22 @@ public class BrandController {
     @GetMapping
     @Operation(summary = "取得所有品牌列表 (僅限平台管理員)")
     @PreAuthorize("hasRole('PLATFORM_ADMIN')")
-    public ResponseEntity<List<BrandEntity>> getAllBrands() {
+    public ResponseEntity<List<BrandResponseDto>> getAllBrands() {
         return ResponseEntity.ok(queryHandler.handle(new GetAllBrandsQuery()));
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "查詢單一品牌")
-    public ResponseEntity<BrandEntity> getBrandById(@PathVariable Long id) {
+    @Operation(summary = "查詢單一品牌", description = "平台管理員可查任一品牌；租戶使用者僅能查自己的品牌")
+    public ResponseEntity<BrandResponseDto> getBrandById(@PathVariable Long id) {
+        // 修正 IDOR(S-1)：原本任何已登入者都能讀取任一品牌。
+        // 平台管理員放行；其餘使用者（員工／會員）只能讀取自己所屬的品牌。
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        boolean isPlatformAdmin = authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(a -> AuthorityConstants.ROLE_PLATFORM_ADMIN.equals(a.getAuthority()));
+        if (!isPlatformAdmin && !id.equals(helperService.getCurrentBrandId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+
         return queryHandler.handle(new GetBrandByIdQuery(id))
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
@@ -66,10 +78,10 @@ public class BrandController {
     @PreAuthorize("hasRole('BRAND_ADMIN')")
     @Operation(summary = "更新會員點數規則")
     @Audit(action = "UPDATE_POINT_CONFIG")
-    public ResponseEntity<BrandPointConfigEntity> updatePointConfig(
+    public ResponseEntity<Void> updatePointConfig(
             @Valid @RequestBody UpdatePointConfigDto requestDto) {
         Long currentBrandId = helperService.getCurrentBrandId();
-        BrandPointConfigEntity updatedConfig = commandHandler.handle(new UpdatePointConfigCommand(currentBrandId, requestDto));
-        return ResponseEntity.ok(updatedConfig);
+        commandHandler.handle(new UpdatePointConfigCommand(currentBrandId, requestDto));
+        return ResponseEntity.noContent().build();
     }
 }

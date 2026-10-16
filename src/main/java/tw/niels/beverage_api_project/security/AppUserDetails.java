@@ -22,7 +22,15 @@ public record AppUserDetails(
         String password,
         boolean isActive,
         Collection<? extends GrantedAuthority> authorities
-) implements UserDetails {
+) implements UserDetails, TenantPrincipal {
+
+    /**
+     * 推播用唯一識別（"U:" + userId），取代手機號碼，避免跨品牌同號誤收通知。
+     */
+    @Override
+    public String principalKey() {
+        return "U:" + userId;
+    }
 
     // --- 靜態建構方法 (Factory Method) ---
     public static AppUserDetails build(UserEntity user) {
@@ -51,6 +59,37 @@ public record AppUserDetails(
                 user.getIsActive(),
                 Collections.unmodifiableSet(authorities)
         );
+    }
+
+    /**
+     * 【新增】由 JWT claims（或 SSE ticket 內容）直接建立身分，不查資料庫。
+     * <p>
+     * JwtAuthenticationFilter 每個請求都會呼叫，因此不能有 DB 存取；
+     * password 為 null（已通過 token 驗證，不再需要密碼），isActive 固定為 true
+     * （停權時由 TokenRevocationService 撤銷 token，而非靠每次查 DB 的 isActive）。
+     * </p>
+     *
+     * @param userId   使用者 ID
+     * @param brandId  品牌 ID
+     * @param storeId  分店 ID（品牌管理員、會員為 null）
+     * @param username 帳號（手機號碼，即 JWT subject）
+     * @param role     角色（如 ROLE_STAFF），可為 null
+     */
+    public static AppUserDetails fromClaims(Long userId, Long brandId, Long storeId, String username, String role) {
+        Collection<? extends GrantedAuthority> authorities = (role == null || role.isBlank())
+                ? Collections.emptySet()
+                : Collections.singleton(new SimpleGrantedAuthority(role));
+        return new AppUserDetails(userId, brandId, storeId, username, null, true, authorities);
+    }
+
+    /**
+     * 【新增】取得第一個角色字串（員工／會員只有一個角色），供 SSE ticket 等需要序列化身分的情境使用。
+     */
+    public String primaryRole() {
+        if (authorities == null || authorities.isEmpty()) {
+            return null;
+        }
+        return authorities.iterator().next().getAuthority();
     }
 
     // --- UserDetails 介面實作 ---

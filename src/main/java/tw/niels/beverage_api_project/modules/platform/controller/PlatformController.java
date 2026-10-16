@@ -64,7 +64,8 @@ public class PlatformController {
     /**
      * 為指定品牌建立第一位「品牌管理員 (BRAND_ADMIN)」
      */
-    @PostMapping("/brands/{brandId}/admin-UserEntity")
+    // 【修正】批次改名殘留：路徑 /admin-UserEntity 還原為 /admin-user
+    @PostMapping("/brands/{brandId}/admin-user")
     @PreAuthorize("hasRole('PLATFORM_ADMIN')")
     @Operation(summary = "建立品牌初始管理員", description = "為新品牌建立第一個 BRAND_ADMIN 帳號 (僅平台管理員)")
     public ResponseEntity<CreateUserResponseDto> createBrandAdmin(
@@ -80,7 +81,8 @@ public class PlatformController {
         }
 
         UserEntity newUser = userService.createUser(createUserRequestDto);
-        String msg = "BrandEntity Admin created successfully for BrandEntity " + brandId + " with UserEntity ID: " + newUser.getUserId();
+        // 【修正】批次改名殘留：訊息中的 "BrandEntity" / "UserEntity" 還原為一般用語
+        String msg = "Brand Admin created successfully for Brand " + brandId + " with User ID: " + newUser.getUserId();
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new CreateUserResponseDto(msg, newUser.getUserId()));

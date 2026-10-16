@@ -3,8 +3,9 @@ package tw.niels.beverage_api_project.modules.order.domain;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+// 修正 Money import：Money VO 已移至 common 模組
+import tw.niels.beverage_api_project.common.domain.vo.Money;
 import tw.niels.beverage_api_project.modules.order.domain.exception.OrderDomainException;
-import tw.niels.beverage_api_project.modules.order.domain.model.Money;
 
 import java.math.BigDecimal;
 

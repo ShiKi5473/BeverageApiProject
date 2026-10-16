@@ -44,12 +44,13 @@ public class StoreController {
     @PostMapping
     @PreAuthorize("hasRole('BRAND_ADMIN')")
     @Operation(summary = "建立新分店", description = "為品牌新增一家分店 (僅品牌管理員)")
-    public ResponseEntity<StoreEntity> createStore(@Valid @RequestBody CreateStoreRequestDto createStoreRequestDto) {
+    public ResponseEntity<StoreResponseDto> createStore(@Valid @RequestBody CreateStoreRequestDto createStoreRequestDto) {
         Long currentBrandId = helperService.getCurrentBrandId();
         createStoreRequestDto.setBrandId(currentBrandId);
 
         StoreEntity newStore = storeService.createStore(createStoreRequestDto);
-        return new ResponseEntity<>(newStore, HttpStatus.CREATED);
+        // Controller 不再直接回傳 JPA Entity，改回傳 DTO（ID 以字串輸出）
+        return new ResponseEntity<>(StoreResponseDto.fromEntity(newStore), HttpStatus.CREATED);
     }
 
     /**
@@ -57,7 +58,9 @@ public class StoreController {
      * 用途：報表頁面的分店篩選器
      */
     @GetMapping
-    @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
+    // 開放 MEMBER、GUEST：線上點餐頁需讓會員／訪客選擇分店；
+    // 仍僅回傳「自己所屬品牌」的分店（getCurrentBrandId 對訪客同樣適用）
+    @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF', 'MEMBER', 'GUEST')")
     @Operation(summary = "查詢分店列表", description = "取得當前品牌下的所有分店")
     public ResponseEntity<List<StoreResponseDto>> getStoresByBrand() {
         Long brandId = helperService.getCurrentBrandId();

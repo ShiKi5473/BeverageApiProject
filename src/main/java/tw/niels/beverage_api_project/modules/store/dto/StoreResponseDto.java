@@ -1,5 +1,7 @@
 package tw.niels.beverage_api_project.modules.store.dto;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -11,6 +13,8 @@ import tw.niels.beverage_api_project.modules.store.entity.StoreEntity;
 public class StoreResponseDto {
 
     @Schema(description = "分店 ID", example = "1")
+    // ID 以字串輸出，避免 TSID 超過 JS 安全整數範圍而失真(P0-10)
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long storeId;
 
     @Schema(description = "分店名稱", example = "台北信義店")

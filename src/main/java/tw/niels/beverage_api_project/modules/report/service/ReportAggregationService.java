@@ -6,6 +6,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import tw.niels.beverage_api_project.modules.store.entity.StoreEntity;
 import tw.niels.beverage_api_project.modules.store.repository.StoreIdentity;
 import tw.niels.beverage_api_project.modules.store.repository.StoreJpaRepository;
 
@@ -85,5 +86,36 @@ public class ReportAggregationService {
         } while (storePage.hasNext());
 
         logger.info("日結報表計算完成。成功: {}, 失敗: {}, 總分店數: {}", successCount, failCount, storePage.getTotalElements());
+    }
+
+    /**
+     * [S-1 新增] 只結算「指定品牌」旗下分店的日結報表。
+     * <p>
+     * 手動觸發端點讓 BRAND_ADMIN 使用時，只能重算自己品牌的分店，
+     * 不可像 {@link #generateDailyStats(LocalDate)} 那樣重算全平台所有品牌。
+     * 同樣不開啟外層交易，每間分店由 StoreSettlementService 以獨立交易處理。
+     * </p>
+     */
+    public void generateDailyStatsForBrand(Long brandId, LocalDate date) {
+        logger.info("開始執行品牌日結報表計算，品牌 ID: {}，目標日期: {}", brandId, date);
+
+        LocalDateTime startOfDay = date.atStartOfDay();
+        LocalDateTime endOfDay = date.atTime(LocalTime.MAX);
+
+        int successCount = 0;
+        int failCount = 0;
+
+        // 單一品牌的分店數量有限，一次載入即可（只取 id，不展開關聯）
+        for (StoreEntity store : storeRepository.findByBrand_Id(brandId)) {
+            try {
+                storeSettlementService.processStoreStats(store.getId(), brandId, date, startOfDay, endOfDay);
+                successCount++;
+            } catch (Exception e) {
+                logger.error("品牌 {} 的分店 ID: {} 日結失敗", brandId, store.getId(), e);
+                failCount++;
+            }
+        }
+
+        logger.info("品牌 {} 日結報表計算完成。成功: {}, 失敗: {}", brandId, successCount, failCount);
     }
 }

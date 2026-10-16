@@ -32,6 +32,9 @@ public record OrderCancelledEvent(
         /** 被取消的訂單 ID（TSID） */
         Long orderId,
 
+        /** 訂單所屬品牌 ID（供 Member Application 進行多租戶隔離查詢） */
+        Long brandId,
+
         /**
          * 取消前的訂單狀態（即「從哪個狀態被取消」）
          * 供下游系統判斷是否需要退款或其他補償動作
@@ -57,13 +60,14 @@ public record OrderCancelledEvent(
      * 靜態工廠方法，自動填入事件發生時間。
      *
      * @param orderId             訂單 ID
+     * @param brandId             品牌 ID
      * @param cancelledFromStatus 取消前的狀態
      * @param pointsUsed          已使用積點（需退還）
      * @param memberId            會員 ID（可為 null）
      * @return 新的 OrderCancelledEvent
      */
-    public static OrderCancelledEvent of(Long orderId, OrderStatus cancelledFromStatus,
+    public static OrderCancelledEvent of(Long orderId, Long brandId, OrderStatus cancelledFromStatus,
                                          Long pointsUsed, Long memberId) {
-        return new OrderCancelledEvent(orderId, cancelledFromStatus, pointsUsed, memberId, Instant.now());
+        return new OrderCancelledEvent(orderId, brandId, cancelledFromStatus, pointsUsed, memberId, Instant.now());
     }
 }

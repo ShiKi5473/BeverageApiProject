@@ -13,6 +13,7 @@ import tw.niels.beverage_api_project.modules.user.entity.UserEntity;
 import tw.niels.beverage_api_project.modules.user.repository.UserJpaRepository;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Function;
@@ -28,7 +29,7 @@ public class InventoryService {
 
     private static final String REASON_TYPE_RESTOCK = "RESTOCK";
     private static final String SHIPMENT_NOTE_PREFIX = "進貨單號: ";
-    private static final String MSG_STORE_NOT_FOUND = "StoreEntity not found";
+    private static final String MSG_STORE_NOT_FOUND = "找不到分店";
 
     private final InventoryItemJpaRepository itemRepository;
     private final InventoryBatchJpaRepository batchRepository;
@@ -37,6 +38,8 @@ public class InventoryService {
     private final UserJpaRepository UserJpaRepository;
     private final InventorySnapshotJpaRepository snapshotRepository;
     private final InventoryTransactionJpaRepository transactionRepository;
+    // [B-7] 使用營業時區的 Clock (TimeConfig)，不再依賴 JVM 預設時區
+    private final Clock clock;
 
     public InventoryService(InventoryItemJpaRepository itemRepository,
                             InventoryBatchJpaRepository batchRepository,
@@ -44,7 +47,9 @@ public class InventoryService {
                             StoreJpaRepository storeRepository,
                             UserJpaRepository UserJpaRepository,
                             InventorySnapshotJpaRepository snapshotRepository,
-                            InventoryTransactionJpaRepository transactionRepository) {
+                            InventoryTransactionJpaRepository transactionRepository,
+                            Clock clock) {
+        this.clock = clock;
         this.itemRepository = itemRepository;
         this.batchRepository = batchRepository;
         this.shipmentRepository = shipmentRepository;
@@ -63,13 +68,13 @@ public class InventoryService {
                 .orElseThrow(() -> new ResourceNotFoundException(MSG_STORE_NOT_FOUND));
 
         UserEntity staff = UserJpaRepository.findByBrand_IdAndId(brandId, userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Staff not found: " + userId));
+                .orElseThrow(() -> new ResourceNotFoundException("找不到員工，ID：" + userId));
 
         // 1. 建立進貨單主檔
         PurchaseShipmentEntity shipment = new PurchaseShipmentEntity();
         shipment.setStore(StoreEntity);
         shipment.setStaff(staff);
-        shipment.setShipmentDate(LocalDateTime.now());
+        shipment.setShipmentDate(LocalDateTime.now(clock));
         shipment.setSupplier(request.getSupplier());
         shipment.setInvoiceNo(request.getInvoiceNo());
         shipment.setNotes(request.getNotes());
@@ -102,6 +107,8 @@ public class InventoryService {
         // 準備批次儲存的 List
         List<InventoryBatchEntity> batchesToSave = new ArrayList<>();
         List<InventoryTransactionEntity> transactionsToSave = new ArrayList<>();
+        // [B-5 新增] 依品項彙總本次進貨量 (同一品項可能在請求中出現多次)，用 TreeMap 讓更新順序固定以降低死鎖機率
+        Map<Long, BigDecimal> receivedByItem = new TreeMap<>();
 
         // 5. 記憶體內處理邏輯
         for (AddShipmentRequestDto.BatchItemDto itemDto : request.getItems()) {
@@ -116,6 +123,9 @@ public class InventoryService {
             batch.setCurrentQuantity(itemDto.getQuantity());
             batch.setExpiryDate(itemDto.getExpiryDate());
             batchesToSave.add(batch);
+
+            // [B-5 新增] 累計此品項的進貨量，迴圈結束後一次累加到品牌層級 totalQuantity
+            receivedByItem.merge(item.getId(), itemDto.getQuantity(), BigDecimal::add);
 
             // 更新或建立 Snapshot (從 Map 取得，如果沒有則建立新的並放入 Map)
             InventorySnapshotEntity snapshot = snapshotMap.computeIfAbsent(item.getId(), k -> {
@@ -148,17 +158,24 @@ public class InventoryService {
         snapshotRepository.saveAll(snapshotMap.values()); // 寫入所有更新後的 Snapshot
         transactionRepository.saveAll(transactionsToSave);
 
+        // 7. [B-5 修正] 進貨同步增加品牌層級 InventoryItem.totalQuantity
+        // 原本只有盤盈會加 totalQuantity、進貨不加，導致三套庫存數字逐漸分歧。
+        // 使用原子的 UPDATE ... SET total = total + :amount，不必先鎖定品項即可安全累加。
+        receivedByItem.forEach(itemRepository::increaseTotalQuantity);
+
         return shipment;
     }
 
     /**
      * 查詢即時庫存
-     * 優先從 Snapshot 讀取，若無則回傳 0
+     * [B-5 修正] 以本店批次總和為準 (與扣減 / 盤點使用同一來源)；
+     * 沒有批次時才退回讀取 Snapshot，兩者皆無則回傳 0
      */
     @Transactional(readOnly = true)
     public BigDecimal getCurrentStock(Long storeId, Long itemId) {
-        return snapshotRepository.findByStore_IdAndInventoryItem_Id(storeId, itemId)
-                .map(InventorySnapshotEntity::getQuantity)
-                .orElse(BigDecimal.ZERO);
+        return batchRepository.sumQuantityByStoreAndItem(storeId, itemId)
+                .orElseGet(() -> snapshotRepository.findByStore_IdAndInventoryItem_Id(storeId, itemId)
+                        .map(InventorySnapshotEntity::getQuantity)
+                        .orElse(BigDecimal.ZERO));
     }
 }

@@ -112,6 +112,14 @@ public class OrderEntity extends BaseTsidEntity {
     @Column(name = "member_snapshot")
     private MemberSnapshot memberSnapshot;
 
+    // 新增（V18）：線上訪客識別（"GUEST:uuid"），供訂單通知推播給訪客使用
+    @Column(name = "guest_ref", length = 64)
+    private String guestRef;
+
+    // 新增（V18）：線上下單請求 ID（ticketId），以部分唯一索引保護，讓 MQ 消費者冪等
+    @Column(name = "request_id", length = 32)
+    private String requestId;
+
     public OrderEntity() {
     }
 

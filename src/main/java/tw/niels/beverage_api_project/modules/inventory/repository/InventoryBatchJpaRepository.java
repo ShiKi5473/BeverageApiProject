@@ -41,6 +41,46 @@ public interface InventoryBatchJpaRepository extends JpaRepository<InventoryBatc
     @Query("SELECT b FROM InventoryBatchEntity b WHERE b.store.id = :storeId AND b.inventoryItem.id IN :itemIds AND b.currentQuantity > 0 ORDER BY b.expiryDate ASC")
     List<InventoryBatchEntity> findAvailableBatchesForItems(@Param("storeId") Long storeId, @Param("itemIds") Set<Long> itemIds);
 
+    /**
+     * [B-5 修正] 批次查詢多個品項的可用批次，並加上悲觀寫鎖 (PESSIMISTIC_WRITE)。
+     * 原本 processBatchDeductions 使用的 findAvailableBatchesForItems 沒有鎖定批次，
+     * 與單品項版本 (findAvailableBatchesForUpdate) 行為不一致；
+     * 排序加上 b.id 作為次要條件，確保加鎖順序固定、結果可預期。
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT b FROM InventoryBatchEntity b " +
+            "WHERE b.store.id = :storeId AND b.inventoryItem.id IN :itemIds AND b.currentQuantity > 0 " +
+            "ORDER BY b.expiryDate ASC, b.id ASC")
+    List<InventoryBatchEntity> findAvailableBatchesForItemsForUpdate(@Param("storeId") Long storeId,
+                                                                     @Param("itemIds") Set<Long> itemIds);
+
+    /**
+     * [B-5 新增] 分組查詢：某店「多個品項」各自的批次庫存總和 (盤點時的系統數量來源)。
+     * 沒有任何批次的品項不會出現在結果中，呼叫端以 0 處理。
+     */
+    @Query("SELECT b.inventoryItem.id AS itemId, SUM(b.currentQuantity) AS quantity " +
+            "FROM InventoryBatchEntity b " +
+            "WHERE b.store.id = :storeId AND b.inventoryItem.id IN :itemIds " +
+            "GROUP BY b.inventoryItem.id")
+    List<ItemQuantitySum> sumQuantityByStoreAndItems(@Param("storeId") Long storeId,
+                                                     @Param("itemIds") Set<Long> itemIds);
+
+    /**
+     * [B-5 新增] 分組查詢：某店「所有品項」的批次庫存總和 (盤點清單顯示用)。
+     */
+    @Query("SELECT b.inventoryItem.id AS itemId, SUM(b.currentQuantity) AS quantity " +
+            "FROM InventoryBatchEntity b " +
+            "WHERE b.store.id = :storeId " +
+            "GROUP BY b.inventoryItem.id")
+    List<ItemQuantitySum> sumQuantityByStore(@Param("storeId") Long storeId);
+
+    /** 分組加總結果的投影介面 (itemId -> 批次總量) */
+    interface ItemQuantitySum {
+        Long getItemId();
+
+        BigDecimal getQuantity();
+    }
+
 
     /**
      * 查詢某店某商品的總庫存量

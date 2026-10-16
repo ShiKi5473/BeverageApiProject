@@ -5,14 +5,12 @@ import tw.niels.beverage_api_project.common.domain.vo.Money;
 import tw.niels.beverage_api_project.modules.order.domain.event.OrderCancelledEvent;
 import tw.niels.beverage_api_project.modules.order.domain.event.OrderClosedEvent;
 import tw.niels.beverage_api_project.modules.order.domain.event.OrderPlacedEvent;
-import tw.niels.beverage_api_project.modules.order.domain.event.OrderPointsDeductedEvent;
 import tw.niels.beverage_api_project.modules.order.domain.event.OrderStatusChangedEvent;
 import tw.niels.beverage_api_project.modules.order.domain.exception.OrderDomainException;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Date;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -31,21 +29,25 @@ import java.util.Set;
  * 業務規則：
  * - 訂單只能從允許的狀態執行對應操作（見各方法的前置條件說明）
  * - 最終態（CLOSED / CANCELLED）的訂單不允許任何操作
- * - 積點使用後若訂單取消，需透過 OrderCancelledEvent 通知退還
+ * - 積點於結帳交易內同步扣減（由 Application Layer 呼叫 Member.consumePoints），
+ *   若訂單取消，透過 OrderCancelledEvent 通知 Member 退還
  * - 訂單完成時（CLOSED）的積點累積，透過 OrderClosedEvent 通知
  *
  * 不變量（Invariants）：
+ * - id 於建立時即已指派（不再等待持久化後回填），所有領域事件都帶有非 null 的 orderId
  * - finalAmount ≥ 0（最低為 0 元，不得為負）
  * - totalAmount = sum(items.subtotal)
  * - finalAmount = totalAmount - discountAmount（最低歸零）
  * - 一旦進入 CLOSED 或 CANCELLED，狀態不再改變
  *
  * 發布事件：
- * - OrderPlacedEvent：訂單建立時
+ * - OrderPlacedEvent：訂單建立時（現場 place() 與線上 placeOnline()）
  * - OrderStatusChangedEvent：狀態轉換（除 CLOSED 和 CANCELLED 外）
  * - OrderClosedEvent：訂單完成取餐時
  * - OrderCancelledEvent：訂單取消時
- * - OrderPointsDeductedEvent：付款時若有使用積點（供 PointDeductionEventHandler 於 AFTER_COMMIT 執行扣減，解決 C3 技術債）
+ *
+ * 修改說明：移除 OrderPointsDeductedEvent（原本 AFTER_COMMIT 才扣點，點數不足時折扣已生效）。
+ * 現在由結帳 Handler 在同一交易內同步扣點，不足時整筆回滾。
  *
  * 與其他 Context 的互動：
  * - 發布 OrderClosedEvent → Inventory, Member, Report Application 訂閱
@@ -72,8 +74,12 @@ public class Order {
 
     // ─── 識別欄位 ─────────────────────────────────────────────────────────
 
-    /** 訂單 ID（TSID），由 Infrastructure Layer 在持久化後設定 */
-    private Long id;
+    /**
+     * 訂單 ID（TSID）。
+     * 修改：改為建立時由 Application Layer 透過 OrderRepository.nextId() 預先指派，
+     * 不再於持久化後以反射回填，確保 OrderPlacedEvent 等事件的 orderId 不為 null。
+     */
+    private final Long id;
 
     /** 訂單所屬品牌 ID */
     private final Long brandId;
@@ -92,9 +98,21 @@ public class Order {
      */
     private Long memberId;
 
+    /**
+     * 線上訪客識別（"GUEST:uuid"），用於推播通知給未登入會員的訪客。
+     * 新增欄位：線上訪客點餐時設定，其餘訂單為 null。
+     */
+    private final String guestRef;
+
+    /**
+     * 線上訂單的請求識別（即 ticketId）。
+     * 新增欄位：資料庫以唯一索引保護，讓 RabbitMQ 消費者重送時不會重複建立訂單（冪等）。
+     */
+    private final String requestId;
+
     // ─── 訂單資訊欄位 ──────────────────────────────────────────────────────
 
-    /** 訂單號碼（人類可讀，如 A001、B023） */
+    /** 訂單號碼（格式 {storeId}-{yyyyMMdd}-{seq:04d}，品牌內唯一） */
     private final OrderNumber orderNumber;
 
     /** 訂單當前狀態 */
@@ -142,6 +160,13 @@ public class Order {
     private MemberSnapshot memberSnapshot;
 
     /**
+     * 是否為尚未持久化的新聚合。
+     * 新增：因為 id 改為預先指派，Repository 無法再用「id 是否為 null」判斷新增或更新，
+     * 改以此旗標判斷（place / placeOnline 為 true，reconstitute 為 false）。
+     */
+    private boolean newAggregate;
+
+    /**
      * 領域事件收集器（Domain Event Collector）
      *
      * 業務方法執行時將事件加入此清單，
@@ -153,14 +178,19 @@ public class Order {
     // ─── 建構子（私有，強制使用靜態工廠方法）────────────────────────────────
 
     /**
-     * 私有建構子：僅供靜態工廠方法或 Infrastructure Mapper 使用。
+     * 私有建構子：僅供靜態工廠方法 place() / placeOnline() 使用。
      */
-    private Order(Long brandId, Long storeId, Long staffId,
+    private Order(Long id, Long brandId, Long storeId, Long staffId, Long memberId,
+                  String guestRef, String requestId,
                   OrderNumber orderNumber, List<OrderItem> items,
-                  Money totalAmount, String customerNote) {
+                  Money totalAmount, String customerNote, OrderStatus initialStatus) {
+        this.id = id;
         this.brandId = brandId;
         this.storeId = storeId;
         this.staffId = staffId;
+        this.memberId = memberId;
+        this.guestRef = guestRef;
+        this.requestId = requestId;
         this.orderNumber = orderNumber;
         this.items = new ArrayList<>(items);
         this.totalAmount = totalAmount;
@@ -170,8 +200,9 @@ public class Order {
         this.pointsEarned = 0L;
         this.customerNote = customerNote;
         this.orderTime = Instant.now();
-        // 初始狀態由工廠方法決定，預設為 PENDING
-        this.status = OrderStatus.PENDING;
+        // 初始狀態由工廠方法決定（現場為 PENDING，線上為 AWAITING_ACCEPTANCE）
+        this.status = initialStatus;
+        this.newAggregate = true;
     }
 
     /**
@@ -180,6 +211,7 @@ public class Order {
      * 命名用 {@code reconstitute} 強調「重建」語意，而非「建立新訂單」。
      */
     private Order(Long id, Long brandId, Long storeId, Long staffId, Long memberId,
+                  String guestRef, String requestId,
                   OrderNumber orderNumber, OrderStatus status,
                   Money totalAmount, Money discountAmount, Money finalAmount,
                   Long pointsUsed, Long pointsEarned, Long paymentMethodId,
@@ -190,6 +222,8 @@ public class Order {
         this.storeId = storeId;
         this.staffId = staffId;
         this.memberId = memberId;
+        this.guestRef = guestRef;
+        this.requestId = requestId;
         this.orderNumber = orderNumber;
         this.status = status;
         this.totalAmount = totalAmount;
@@ -203,6 +237,8 @@ public class Order {
         this.completedTime = completedTime;
         this.items = new ArrayList<>(items);
         this.memberSnapshot = memberSnapshot;
+        // 從資料庫重建的聚合一律視為「已存在」
+        this.newAggregate = false;
     }
 
     // ─── 靜態工廠方法 ──────────────────────────────────────────────────────
@@ -213,6 +249,10 @@ public class Order {
      * 後置狀態（Post-state）：PENDING
      * 發布事件：OrderPlacedEvent
      *
+     * 修改：新增 id 參數（由 OrderRepository.nextId() 預先產生），
+     * 讓 OrderPlacedEvent 與後續所有事件都帶有正確的 orderId。
+     *
+     * @param id           預先指派的訂單 ID（不得為 null）
      * @param brandId      品牌 ID
      * @param storeId      店家 ID
      * @param staffId      服務員工 ID
@@ -220,24 +260,18 @@ public class Order {
      * @param items        訂單品項清單（至少一項）
      * @param customerNote 顧客備註（可為 null）
      * @return 狀態為 PENDING 的新訂單
-     * @throws OrderDomainException 若 items 為空
+     * @throws OrderDomainException 若 id 為 null 或 items 為空
      */
-    public static Order place(Long brandId, Long storeId, Long staffId,
+    public static Order place(Long id, Long brandId, Long storeId, Long staffId,
                               OrderNumber orderNumber, List<OrderItem> items,
                               String customerNote) {
-        // 驗證品項不得為空
-        if (items == null || items.isEmpty()) {
-            throw new OrderDomainException("訂單必須包含至少一個品項");
-        }
+        validateNewOrder(id, items);
+        Money totalAmount = sumSubtotals(items);
 
-        // 計算總金額
-        Money totalAmount = items.stream()
-                .map(OrderItem::getSubtotal)
-                .reduce(Money.ZERO, Money::add);
+        Order order = new Order(id, brandId, storeId, staffId, null, null, null,
+                orderNumber, items, totalAmount, customerNote, OrderStatus.PENDING);
 
-        Order order = new Order(brandId, storeId, staffId, orderNumber, items, totalAmount, customerNote);
-
-        // 發布「訂單已建立」事件
+        // 發布「訂單已建立」事件（此時 id 已存在，事件的 orderId 不為 null）
         order.domainEvents.add(
                 OrderPlacedEvent.of(order.id, brandId, storeId, orderNumber.value())
         );
@@ -246,7 +280,48 @@ public class Order {
     }
 
     /**
-     * 供 Infrastructure Mapper 從資料庫重建 Domain Model。
+     * 建立一張線上訂單（線上點餐流程，會員或訪客下單）。
+     *
+     * 新增方法：原本線上訂單由前端決定初始狀態（可直接送 CLOSED/PREPARING 跳過接單），
+     * 現在固定為 AWAITING_ACCEPTANCE，需由店家呼叫 accept() 接單後才進入製作。
+     *
+     * 後置狀態（Post-state）：AWAITING_ACCEPTANCE
+     * 發布事件：OrderPlacedEvent（KDS 依此顯示「待接單」）
+     *
+     * @param id             預先指派的訂單 ID（不得為 null）
+     * @param brandId        品牌 ID
+     * @param storeId        店家 ID
+     * @param memberId       會員 ID（會員下單時設定，訪客為 null）
+     * @param memberSnapshot 會員快照（memberId 不為 null 時建議提供）
+     * @param guestRef       訪客識別（"GUEST:uuid"，會員或員工下單時為 null）
+     * @param requestId      線上下單請求 ID（ticketId，用於冪等）
+     * @param orderNumber    訂單號碼
+     * @param items          訂單品項（至少一項）
+     * @param customerNote   顧客備註（可為 null）
+     * @return 狀態為 AWAITING_ACCEPTANCE 的新訂單
+     */
+    public static Order placeOnline(Long id, Long brandId, Long storeId,
+                                    Long memberId, MemberSnapshot memberSnapshot,
+                                    String guestRef, String requestId,
+                                    OrderNumber orderNumber, List<OrderItem> items,
+                                    String customerNote) {
+        validateNewOrder(id, items);
+        Money totalAmount = sumSubtotals(items);
+
+        Order order = new Order(id, brandId, storeId, null, memberId, guestRef, requestId,
+                orderNumber, items, totalAmount, customerNote, OrderStatus.AWAITING_ACCEPTANCE);
+        order.memberSnapshot = memberSnapshot;
+
+        // 發布「訂單已建立」事件；KDS 監聽者會依載入後的狀態（AWAITING_ACCEPTANCE）推播 PENDING_ACCEPTANCE
+        order.domainEvents.add(
+                OrderPlacedEvent.of(order.id, brandId, storeId, orderNumber.value())
+        );
+
+        return order;
+    }
+
+    /**
+     * 供 Infrastructure Mapper 從資料庫重建 Domain Model（相容舊呼叫，不含線上訂單欄位）。
      * 不發布任何事件，不執行業務驗證。
      */
     public static Order reconstitute(Long id, Long brandId, Long storeId, Long staffId, Long memberId,
@@ -255,9 +330,28 @@ public class Order {
                                      Long pointsUsed, Long pointsEarned, Long paymentMethodId,
                                      String customerNote, Instant orderTime, Instant completedTime,
                                      List<OrderItem> items, MemberSnapshot memberSnapshot) {
-        return new Order(id, brandId, storeId, staffId, memberId, orderNumber, status,
-                totalAmount, discountAmount, finalAmount, pointsUsed, pointsEarned,
-                paymentMethodId, customerNote, orderTime, completedTime, items, memberSnapshot);
+        return reconstitute(id, brandId, storeId, staffId, memberId, null, null,
+                orderNumber, status, totalAmount, discountAmount, finalAmount,
+                pointsUsed, pointsEarned, paymentMethodId, customerNote, orderTime, completedTime,
+                items, memberSnapshot);
+    }
+
+    /**
+     * 供 Infrastructure Mapper 從資料庫重建 Domain Model（完整版本，含 guestRef / requestId）。
+     * 新增多載：線上訂單需要保留訪客識別與請求 ID。
+     * 不發布任何事件，不執行業務驗證。
+     */
+    public static Order reconstitute(Long id, Long brandId, Long storeId, Long staffId, Long memberId,
+                                     String guestRef, String requestId,
+                                     OrderNumber orderNumber, OrderStatus status,
+                                     Money totalAmount, Money discountAmount, Money finalAmount,
+                                     Long pointsUsed, Long pointsEarned, Long paymentMethodId,
+                                     String customerNote, Instant orderTime, Instant completedTime,
+                                     List<OrderItem> items, MemberSnapshot memberSnapshot) {
+        return new Order(id, brandId, storeId, staffId, memberId, guestRef, requestId,
+                orderNumber, status, totalAmount, discountAmount, finalAmount,
+                pointsUsed, pointsEarned, paymentMethodId, customerNote, orderTime, completedTime,
+                items != null ? items : List.of(), memberSnapshot);
     }
 
     // ─── 業務方法（狀態轉換）─────────────────────────────────────────────
@@ -311,10 +405,10 @@ public class Order {
      * 進行結帳付款（POS 現場結帳流程）。
      *
      * Application Layer 負責在呼叫此方法前：
-     * 1. 計算積點折抵金額（pointsDiscount）
+     * 1. 計算積點折抵金額（pointsDiscount，上限為訂單金額）
      * 2. 計算促銷折扣金額（promoDiscount）
      * 3. 合計總折扣（totalDiscount = pointsDiscount + promoDiscount）
-     * 4. 從系統扣減積點（呼叫 MemberPointService）
+     * 4. 於同一交易內呼叫 Member.consumePoints() 同步扣點（不足時整筆回滾）
      * 5. 建立 MemberSnapshot
      *
      * 前置條件（Pre-condition）：訂單狀態必須為 PENDING 或 HELD
@@ -353,11 +447,8 @@ public class Order {
         // 狀態轉換：→ PREPARING
         this.status = OrderStatus.PREPARING;
         domainEvents.add(OrderStatusChangedEvent.of(this.id, oldStatus, this.status));
-        
-        // 若有使用積點，發布積點扣減事件（供 PointDeductionEventHandler 於 AFTER_COMMIT 時執行扣減）
-        if (this.pointsUsed > 0) {
-            domainEvents.add(OrderPointsDeductedEvent.of(this.id, this.brandId, this.memberId, this.pointsUsed, this.orderNumber.value()));
-        }
+
+        // 修改：移除 OrderPointsDeductedEvent，積點改由結帳 Handler 在交易內同步扣減
     }
 
     /**
@@ -414,7 +505,7 @@ public class Order {
 
         // 發布「訂單完成」事件，攜帶財務資訊供下游系統使用
         domainEvents.add(
-                OrderClosedEvent.of(this.id, this.finalAmount, this.pointsEarned, this.memberId)
+                OrderClosedEvent.of(this.id, this.brandId, this.storeId, this.finalAmount, this.pointsEarned, this.memberId)
         );
     }
 
@@ -442,7 +533,7 @@ public class Order {
 
         // 發布「訂單取消」事件，攜帶積點資訊供 Member Application 退還
         domainEvents.add(
-                OrderCancelledEvent.of(this.id, cancelledFromStatus, this.pointsUsed, this.memberId)
+                OrderCancelledEvent.of(this.id, this.brandId, cancelledFromStatus, this.pointsUsed, this.memberId)
         );
     }
 
@@ -465,7 +556,42 @@ public class Order {
         return events;
     }
 
+    // ─── 持久化狀態（供 Infrastructure 使用）────────────────────────────────
+
+    /**
+     * 是否為尚未持久化的新聚合（由 place / placeOnline 建立）。
+     * 新增：Repository 依此決定要 persist 新實體，或更新同交易中受管的既有實體。
+     */
+    public boolean isNew() { return newAggregate; }
+
+    /**
+     * 標記為已持久化（僅供 Infrastructure Repository 在 persist 後呼叫）。
+     * 新增：避免同一個聚合在同交易內第二次 save 時又被當成新訂單 persist。
+     */
+    public void markPersisted() { this.newAggregate = false; }
+
     // ─── 私有輔助方法 ──────────────────────────────────────────────────────
+
+    /**
+     * 驗證建立新訂單的共同前置條件。
+     * 新增：抽出 place / placeOnline 共用的檢查（id 必須預先指派、品項不得為空）。
+     */
+    private static void validateNewOrder(Long id, List<OrderItem> items) {
+        if (id == null) {
+            throw new OrderDomainException("訂單 ID 必須在建立時指派（請使用 OrderRepository.nextId()）");
+        }
+        // 驗證品項不得為空
+        if (items == null || items.isEmpty()) {
+            throw new OrderDomainException("訂單必須包含至少一個品項");
+        }
+    }
+
+    /** 計算品項小計總和 */
+    private static Money sumSubtotals(List<OrderItem> items) {
+        return items.stream()
+                .map(OrderItem::getSubtotal)
+                .reduce(Money.ZERO, Money::add);
+    }
 
     /**
      * 驗證當前狀態是否符合操作的前置條件。
@@ -483,17 +609,17 @@ public class Order {
     }
 
     // ─── Getters（無 public setters，保護 Aggregate 完整性）──────────────────
+    // 修改：移除 public setId()，id 改為建立時指派且不可變（原本由 Repository 以反射回填）
 
     /** 訂單 ID（TSID） */
     public Long getId() { return id; }
-
-    /** 由 Infrastructure Mapper 在儲存後回填 ID */
-    public void setId(Long id) { this.id = id; }
 
     public Long getBrandId() { return brandId; }
     public Long getStoreId() { return storeId; }
     public Long getStaffId() { return staffId; }
     public Long getMemberId() { return memberId; }
+    public String getGuestRef() { return guestRef; }
+    public String getRequestId() { return requestId; }
     public OrderNumber getOrderNumber() { return orderNumber; }
     public OrderStatus getStatus() { return status; }
     public Money getTotalAmount() { return totalAmount; }

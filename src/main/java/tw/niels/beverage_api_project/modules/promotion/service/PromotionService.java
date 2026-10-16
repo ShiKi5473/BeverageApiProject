@@ -2,6 +2,7 @@ package tw.niels.beverage_api_project.modules.promotion.service;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -62,6 +63,9 @@ public class PromotionService {
 
     /**
      * 計算訂單的最佳促銷折扣
+     *
+     * 個別促銷計算失敗時不中斷整體流程，但會收集所有失敗紀錄，
+     * 最後以單一日誌輸出彙總（修復 M8：避免每筆失敗都輸出日誌）
      */
     public BigDecimal calculateBestDiscount(OrderEntity OrderEntity) {
         if (OrderEntity.getBrand() == null) return BigDecimal.ZERO;
@@ -73,6 +77,9 @@ public class PromotionService {
 
         BigDecimal maxDiscount = BigDecimal.ZERO;
 
+        // 收集計算失敗的活動（M8 修復：累積後統一輸出，避免每筆失敗都呼叫 logger）
+        List<String> failedPromotions = new ArrayList<>();
+
         for (PromotionEntity promotion : activePromotions) {
             try {
                 PromotionCalculator calculator = strategyFactory.getCalculator(promotion.getType());
@@ -82,10 +89,16 @@ public class PromotionService {
                     maxDiscount = discount;
                 }
             } catch (Exception e) {
-                // 個別促銷計算失敗不應中斷整體折扣計算，記錄警告後跳過該活動
-                logger.warn("促銷活動 '{}' (ID: {}) 折扣計算失敗，已跳過: {}",
-                        promotion.getName(), promotion.getId(), e.getMessage());
+                // 個別促銷計算失敗不應中斷整體折扣計算，收集後統一彙報
+                failedPromotions.add(String.format("'%s'(ID:%d):%s",
+                        promotion.getName(), promotion.getId(), e.getMessage()));
             }
+        }
+
+        // 統一輸出失敗彙總（而非每次失敗各自輸出一行）
+        if (!failedPromotions.isEmpty()) {
+            logger.warn("品牌 ID={} 共 {} 個促銷活動折扣計算失敗，已跳過：{}",
+                    brandId, failedPromotions.size(), String.join("; ", failedPromotions));
         }
 
         return maxDiscount;
@@ -116,13 +129,22 @@ public class PromotionService {
         promotion.setIsActive(true);
 
         if (request.getApplicableProductIds() != null && !request.getApplicableProductIds().isEmpty()) {
-            Set<ProductEntity> products = new HashSet<>();
-            for (Long pid : request.getApplicableProductIds()) {
-                ProductEntity p = productRepository.findByBrand_IdAndId(brandId, pid)
-                        .orElseThrow(() -> new BadRequestException("商品 ID " + pid + " 無效或不屬於此品牌"));
-                products.add(p);
+            // 修復 M2：以批次查詢取代迴圈內的 N+1 個別查詢
+            List<ProductEntity> foundProducts = productRepository.findByBrand_IdAndIdIn(
+                    brandId, request.getApplicableProductIds());
+
+            // 驗證所有指定商品 ID 都存在且屬於此品牌
+            if (foundProducts.size() != request.getApplicableProductIds().size()) {
+                Set<Long> foundIds = foundProducts.stream()
+                        .map(ProductEntity::getId)
+                        .collect(java.util.stream.Collectors.toSet());
+                List<Long> invalidIds = request.getApplicableProductIds().stream()
+                        .filter(pid -> !foundIds.contains(pid))
+                        .toList();
+                throw new BadRequestException("以下商品 ID 無效或不屬於此品牌：" + invalidIds);
             }
-            promotion.setApplicableProducts(products);
+
+            promotion.setApplicableProducts(new HashSet<>(foundProducts));
         }
 
         return PromotionJpaRepository.save(promotion);

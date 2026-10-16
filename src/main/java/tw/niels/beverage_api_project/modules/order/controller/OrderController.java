@@ -140,7 +140,7 @@ public class OrderController {
     @Operation(summary = "更新暫存訂單")
     public ResponseEntity<OrderResponseDto> updateHeldOrder(
             @PathVariable Long orderId,
-            @Valid @RequestBody CreateOrderRequestDto request) {
+            @Valid @RequestBody UpdateOrderRequestDto request) {
         Long brandId = helperService.getCurrentBrandId();
         updateHeldOrderHandler.handle(new UpdateHeldOrderCommand(brandId, orderId, request.getStatus(), request.getItems()));
         Order order = orderQueryHandler.handle(new GetOrderQuery(brandId, orderId));

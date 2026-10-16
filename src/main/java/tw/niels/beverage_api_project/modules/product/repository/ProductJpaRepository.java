@@ -33,5 +33,24 @@ public interface ProductJpaRepository extends JpaRepository<ProductEntity, Long>
 
     List<ProductEntity> findByBrand_IdAndIdIn(Long brandId, Collection<Long> ids);
 
+    /**
+     * 透過規格 ID 反查所屬商品（含完整 FETCH JOIN 以避免 N+1）。
+     * 用於 UpdateProductVariantCommand 與 DeleteProductVariantCommand
+     * （這兩個命令只攜帶 variantId，需反查商品）。
+     */
+    @Query("""
+        SELECT DISTINCT p FROM ProductEntity p
+        LEFT JOIN FETCH p.variants
+        LEFT JOIN FETCH p.categories
+        LEFT JOIN FETCH p.optionGroups og
+        LEFT JOIN FETCH og.options
+        WHERE p.brand.id = :brandId
+          AND EXISTS (
+            SELECT v FROM ProductVariantEntity v
+            WHERE v.product = p AND v.id = :variantId AND v.isDeleted = false
+          )
+    """)
+    Optional<ProductEntity> findByBrand_IdAndVariantId(Long brandId, Long variantId);
+
     // 保留所有原有方法
 }

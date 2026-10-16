@@ -27,6 +27,7 @@ import tw.niels.beverage_api_project.modules.user.enums.StaffRole;
 import tw.niels.beverage_api_project.modules.user.repository.StaffProfileJpaRepository;
 import tw.niels.beverage_api_project.modules.user.repository.UserJpaRepository;
 import tw.niels.beverage_api_project.security.AppUserDetails;
+import tw.niels.beverage_api_project.security.TokenRevocationService;
 
 @Service
 public class UserService {
@@ -43,10 +44,15 @@ public class UserService {
 
     private final ControllerHelperService helperService;
 
+    // 員工角色／分店／啟用狀態變更時，用來撤銷舊 token
+    private final TokenRevocationService tokenRevocationService;
+
     public UserService(UserJpaRepository UserJpaRepository, BrandJpaRepository brandRepository, StoreJpaRepository storeRepository,
             PasswordEncoder passwordEncoder,
                        StaffProfileJpaRepository staffProfileRepository,
-                       ControllerHelperService helperService) {
+                       ControllerHelperService helperService,
+                       TokenRevocationService tokenRevocationService) {
+        this.tokenRevocationService = tokenRevocationService;
         this.UserJpaRepository = UserJpaRepository;
         this.brandRepository = brandRepository;
         this.storeRepository = storeRepository;
@@ -59,12 +65,12 @@ public class UserService {
     public UserEntity createUser(CreateUserRequestDto requestDto) {
         // 1. 檢查品牌是否存在
         BrandEntity BrandEntity = brandRepository.findById(requestDto.getBrandId())
-                .orElseThrow(() -> new ResourceNotFoundException("Error: BrandEntity not found with ID: " + requestDto.getBrandId()));
+                .orElseThrow(() -> new ResourceNotFoundException("找不到品牌，ID：" + requestDto.getBrandId()));
 
         // 2. 檢查手機號碼是否已在該品牌下註冊
         UserJpaRepository.findByPrimaryPhoneAndBrandId(requestDto.getPrimaryPhone(), requestDto.getBrandId())
                 .ifPresent(existingUser -> {
-                    throw new DomainException("Error: Phone number '" + requestDto.getPrimaryPhone() + "' is already taken for this BrandEntity!");
+                    throw new DomainException("手機號碼已被使用：" + requestDto.getPrimaryPhone());
                 });
 
         // 3. 建立核心 UserEntity 物件
@@ -87,7 +93,7 @@ public class UserService {
             if (staffDto.getStoreId() != null) {
                 // 修改：改拋出 ResourceNotFoundException
                 StoreEntity StoreEntity = storeRepository.findByBrand_IdAndId(BrandEntity.getId(), staffDto.getStoreId())
-                        .orElseThrow(() -> new ResourceNotFoundException("Error: StoreEntity not found with ID: " + staffDto.getStoreId()));
+                        .orElseThrow(() -> new ResourceNotFoundException("找不到分店，ID：" + staffDto.getStoreId()));
                 staffProfile.setStore(StoreEntity);
             }
             // 建立雙向關聯
@@ -200,6 +206,11 @@ public class UserService {
             }
         }
 
+        // 記錄變更前的角色、分店、啟用狀態，用於判斷是否需要撤銷舊 token（S-3：JWT 不再每次查 DB）
+        StaffRole oldRole = targetProfile.getRole();
+        Long oldStoreId = targetProfile.getStore() != null ? targetProfile.getStore().getId() : null;
+        boolean oldActive = Boolean.TRUE.equals(targetUser.getIsActive());
+
         // 2. 更新基本資料
         if (dto.getFullName() != null) {
             targetProfile.setFullName(dto.getFullName());
@@ -227,6 +238,18 @@ public class UserService {
 
         staffProfileRepository.save(targetProfile);
         UserJpaRepository.save(targetUser);
+
+        // 角色、分店或啟用狀態有變動時，撤銷該員工既有的 JWT：
+        // 因 token 內已含 role/storeId，且 Filter 不再查 DB，必須靠撤銷機制讓舊權限立即失效，
+        // 員工需重新登入取得新的 token。
+        Long newStoreId = targetProfile.getStore() != null ? targetProfile.getStore().getId() : null;
+        boolean newActive = Boolean.TRUE.equals(targetUser.getIsActive());
+        boolean roleChanged = oldRole != targetProfile.getRole();
+        boolean storeChanged = !java.util.Objects.equals(oldStoreId, newStoreId);
+        boolean activeChanged = oldActive != newActive;
+        if (roleChanged || storeChanged || activeChanged) {
+            tokenRevocationService.revokeUser(targetUserId);
+        }
 
         return StaffDto.fromEntity(targetUser);
     }

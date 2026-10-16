@@ -1,32 +1,34 @@
 package tw.niels.beverage_api_project.modules.platform.service;
 
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import tw.niels.beverage_api_project.config.SecurityConfig;
 import tw.niels.beverage_api_project.modules.auth.dto.JwtAuthResponseDto;
 import tw.niels.beverage_api_project.modules.platform.dto.PlatformLoginRequestDto;
 import tw.niels.beverage_api_project.security.jwt.JwtTokenProvider;
 
 @Service
-@RequiredArgsConstructor
 public class PlatformAuthService {
 
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider tokenProvider;
 
-    //【注意】
-    // 我們不需要直接注入 PlatformAdminDetailsService，
-    // AuthenticationManager 會自動根據 Token 類型 (UsernamePasswordAuthenticationToken)
-    // 去尋找合適的 UserDetailsService。
-    // 為了讓平台登入使用 PlatformAdminDetailsService，
-    // 我們需要修改 SecurityConfig，讓 AuthenticationManager 知道有兩個 UserDetailsService。
+    /**
+     * 【修改】明確注入「平台管理員專用」的 AuthenticationManager（只含 PlatformAdminDetailsService 的 Provider）。
+     * 原本共用同一個 ProviderManager（租戶 + 平台），平台登入與租戶登入互相「退回」對方的 Provider；
+     * 現在兩條登入路徑完全分離：平台登入只認 platform_admins，租戶登入只認品牌使用者。
+     */
+    public PlatformAuthService(@Qualifier(SecurityConfig.PLATFORM_AUTH_MANAGER) AuthenticationManager authenticationManager,
+                               JwtTokenProvider tokenProvider) {
+        this.authenticationManager = authenticationManager;
+        this.tokenProvider = tokenProvider;
+    }
 
     public JwtAuthResponseDto login(PlatformLoginRequestDto loginRequestDto) {
-        // 這裡的認證會由 AuthenticationManager 處理，
-        // 它會去呼叫 PlatformAdminDetailsService
+        // 認證失敗拋出 AuthenticationException，由 GlobalExceptionHandler 轉為 401 ErrorResponse
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         loginRequestDto.getUsername(),
@@ -34,8 +36,12 @@ public class PlatformAuthService {
                 )
         );
 
-        SecurityContextHolder.getContext().setAuthentication(authentication);
+        // 【修改】登入 API 為無狀態，不再寫入 SecurityContextHolder
         String token = tokenProvider.generateToken(authentication);
-        return new JwtAuthResponseDto(token);
+        JwtAuthResponseDto responseDto = new JwtAuthResponseDto(token);
+        if (!authentication.getAuthorities().isEmpty()) {
+            responseDto.setRole(authentication.getAuthorities().iterator().next().getAuthority());
+        }
+        return responseDto;
     }
 }

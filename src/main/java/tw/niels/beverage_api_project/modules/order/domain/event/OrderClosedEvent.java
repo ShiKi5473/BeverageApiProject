@@ -31,6 +31,12 @@ public record OrderClosedEvent(
         /** 完成的訂單 ID（TSID） */
         Long orderId,
 
+        /** 訂單所屬品牌 ID（供下游系統進行多租戶隔離查詢） */
+        Long brandId,
+
+        /** 訂單所屬店家 ID（供 Inventory、Report 等使用） */
+        Long storeId,
+
         /** 訂單的最終實付金額（已扣除折扣與點數折抵） */
         Money finalAmount,
 
@@ -50,12 +56,15 @@ public record OrderClosedEvent(
      * 靜態工廠方法，自動填入事件發生時間。
      *
      * @param orderId      訂單 ID
+     * @param brandId      品牌 ID
+     * @param storeId      店家 ID
      * @param finalAmount  最終實付金額
      * @param pointsEarned 累積積點數
      * @param memberId     會員 ID（可為 null）
      * @return 新的 OrderClosedEvent
      */
-    public static OrderClosedEvent of(Long orderId, Money finalAmount, Long pointsEarned, Long memberId) {
-        return new OrderClosedEvent(orderId, finalAmount, pointsEarned, memberId, Instant.now());
+    public static OrderClosedEvent of(Long orderId, Long brandId, Long storeId,
+                                       Money finalAmount, Long pointsEarned, Long memberId) {
+        return new OrderClosedEvent(orderId, brandId, storeId, finalAmount, pointsEarned, memberId, Instant.now());
     }
 }

@@ -1,5 +1,6 @@
 package tw.niels.beverage_api_project.modules.product.repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -17,6 +18,12 @@ public interface OptionGroupJpaRepository extends JpaRepository<OptionGroupEntit
 
     // 根據品牌 ID 與名稱查詢 (用於 DataSeeder 防呆)
     Optional<OptionGroupEntity> findByBrand_IdAndName(Long brandId, String name);
+
+    /**
+     * 新增：依品牌批次查詢多個選項群組（品牌隔離的 findAllById 替代方案）。
+     * 用於商品連結選項群組時一次驗證並取得所有群組，避免逐筆查詢。
+     */
+    List<OptionGroupEntity> findByBrand_IdAndIdIn(Long brandId, Collection<Long> groupIds);
 
     /**
      * 禁用預設的 findById，強迫使用 findByBrand_BrandIdAndGroupId()。

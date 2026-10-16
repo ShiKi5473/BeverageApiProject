@@ -1,6 +1,7 @@
 package tw.niels.beverage_api_project.modules.report.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -8,6 +9,7 @@ import tw.niels.beverage_api_project.modules.report.dto.BrandSalesSummaryDto;
 import tw.niels.beverage_api_project.modules.report.dto.StoreRankingDto;
 import tw.niels.beverage_api_project.modules.report.entity.DailyStoreStatsEntity;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -47,10 +49,60 @@ public interface DailyStoreStatsJpaRepository extends JpaRepository<DailyStoreSt
                                                  @Param("endDate") LocalDate endDate);
 
     /**
+     * 查詢指定分店的指定日期統計（供即時累計更新使用）
+     */
+    Optional<DailyStoreStatsEntity> findByStoreIdAndDate(Long storeId, LocalDate date);
+
+    /**
      * 系統用：取得資料庫中「日期最新」的一筆紀錄
      * 用途：判斷最後一次成功結算是哪一天
      */
     Optional<DailyStoreStatsEntity> findTopByOrderByDateDesc();
+
+    /**
+     * [B-6 新增] 系統用：取得「早於指定日期」的最新一筆紀錄。
+     * 用途：補漏檢查 (ReportRecoveryRunner) 要找的是「最後一次完整日結的日期」。
+     * 即時統計 Handler 會寫入「今天」的資料列，若直接用全域最新日期，永遠會得到今天而誤判為「已是最新」。
+     */
+    Optional<DailyStoreStatsEntity> findTopByDateLessThanOrderByDateDesc(LocalDate date);
+
+    /**
+     * [B-6 新增] 即時統計原子累加 (UPSERT)。
+     * <p>
+     * 原本 OrderClosedReportHandler 是「讀取 → 在記憶體加總 → 存回」(read-modify-write)，
+     * 兩筆訂單同時完成時會互相覆蓋而少算。這裡改成單一 SQL：
+     * 不存在就新增一筆 (訂單數 1)，已存在就由資料庫在持有列鎖的情況下原子累加，
+     * 衝突目標為唯一鍵 uk_daily_store_stats_store_date (store_id, date)。
+     * </p>
+     * 欄位名稱以 Flyway 為準：主鍵欄位 V4 已改名為 daily_store_stats_id，id 由應用程式以 TSID 提供。
+     */
+    @Modifying
+    @Query(value = "INSERT INTO daily_store_stats (" +
+            "daily_store_stats_id, store_id, brand_id, date, " +
+            "total_orders, total_revenue, total_discount, final_revenue, cancelled_orders, " +
+            "cash_total, line_pay_total, credit_card_total, third_party_total, created_at) " +
+            "VALUES (:id, :storeId, :brandId, :statDate, " +
+            "1, :totalRevenue, :totalDiscount, :finalRevenue, 0, " +
+            ":cashTotal, 0, :creditCardTotal, :thirdPartyTotal, CURRENT_TIMESTAMP) " +
+            "ON CONFLICT (store_id, date) DO UPDATE SET " +
+            "total_orders = daily_store_stats.total_orders + 1, " +
+            "total_revenue = daily_store_stats.total_revenue + EXCLUDED.total_revenue, " +
+            "total_discount = daily_store_stats.total_discount + EXCLUDED.total_discount, " +
+            "final_revenue = daily_store_stats.final_revenue + EXCLUDED.final_revenue, " +
+            "cash_total = COALESCE(daily_store_stats.cash_total, 0) + EXCLUDED.cash_total, " +
+            "credit_card_total = daily_store_stats.credit_card_total + EXCLUDED.credit_card_total, " +
+            "third_party_total = daily_store_stats.third_party_total + EXCLUDED.third_party_total",
+            nativeQuery = true)
+    void upsertRealtimeStats(@Param("id") Long id,
+                             @Param("storeId") Long storeId,
+                             @Param("brandId") Long brandId,
+                             @Param("statDate") LocalDate statDate,
+                             @Param("totalRevenue") BigDecimal totalRevenue,
+                             @Param("totalDiscount") BigDecimal totalDiscount,
+                             @Param("finalRevenue") BigDecimal finalRevenue,
+                             @Param("cashTotal") BigDecimal cashTotal,
+                             @Param("creditCardTotal") BigDecimal creditCardTotal,
+                             @Param("thirdPartyTotal") BigDecimal thirdPartyTotal);
 
     /**
      * 系統用：檢查是否已存在該日報表 (避免重複執行)

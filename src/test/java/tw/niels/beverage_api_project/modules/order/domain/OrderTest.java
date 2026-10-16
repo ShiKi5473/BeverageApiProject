@@ -10,7 +10,8 @@ import tw.niels.beverage_api_project.modules.order.domain.event.OrderPlacedEvent
 import tw.niels.beverage_api_project.modules.order.domain.event.OrderStatusChangedEvent;
 import tw.niels.beverage_api_project.modules.order.domain.exception.OrderDomainException;
 import tw.niels.beverage_api_project.modules.order.domain.model.MemberSnapshot;
-import tw.niels.beverage_api_project.modules.order.domain.model.Money;
+// 修正 Money import：Money VO 已移至 common 模組
+import tw.niels.beverage_api_project.common.domain.vo.Money;
 import tw.niels.beverage_api_project.modules.order.domain.model.Order;
 import tw.niels.beverage_api_project.modules.order.domain.model.OrderItem;
 import tw.niels.beverage_api_project.modules.order.domain.model.OrderNumber;

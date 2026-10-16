@@ -8,11 +8,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import tw.niels.beverage_api_project.common.exception.BadRequestException;
 import tw.niels.beverage_api_project.modules.inventory.dao.InventoryBatchDAO;
-import tw.niels.beverage_api_project.modules.inventory.entity.InventoryBatch;
-import tw.niels.beverage_api_project.modules.inventory.entity.InventoryItem;
-import tw.niels.beverage_api_project.modules.inventory.repository.InventoryBatchRepository;
-import tw.niels.beverage_api_project.modules.inventory.repository.InventoryItemRepository;
-import tw.niels.beverage_api_project.modules.store.repository.StoreRepository;
+// 修���：Entity 類別必��加上 Entity 後綴，Repository 必須加上 Jpa 前綴
+import tw.niels.beverage_api_project.modules.inventory.entity.InventoryBatchEntity;
+import tw.niels.beverage_api_project.modules.inventory.entity.InventoryItemEntity;
+import tw.niels.beverage_api_project.modules.inventory.repository.InventoryBatchJpaRepository;
+import tw.niels.beverage_api_project.modules.inventory.repository.InventoryItemJpaRepository;
+import tw.niels.beverage_api_project.modules.store.repository.StoreJpaRepository;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -28,10 +29,10 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class InventoryServiceTest {
 
-    @Mock private InventoryItemRepository itemRepository;
-    @Mock private InventoryBatchRepository batchRepository;
+    @Mock private InventoryItemJpaRepository itemRepository;
+    @Mock private InventoryBatchJpaRepository batchRepository;
     @Mock private InventoryBatchDAO inventoryBatchDAO;
-    @Mock private StoreRepository storeRepository; // InventoryDeductionService 依賴
+    @Mock private StoreJpaRepository storeRepository; // InventoryDeductionService 依賴
 
     // 注意：測試對象已改為 InventoryDeductionService（包含 4 參數的 deductInventory 方法）
     @InjectMocks
@@ -46,10 +47,10 @@ class InventoryServiceTest {
         Long itemId = 100L;
         BigDecimal deductQty = new BigDecimal("5.0");
 
-        InventoryItem mockItem = new InventoryItem();
+        InventoryItemEntity mockItem = new InventoryItemEntity();
         mockItem.setTotalQuantity(new BigDecimal("100.0")); // 總量足夠
 
-        InventoryBatch mockBatch = new InventoryBatch();
+        InventoryBatchEntity mockBatch = new InventoryBatchEntity();
         mockBatch.setId(555L);
         mockBatch.setCurrentQuantity(new BigDecimal("10.0")); // 批次足夠
         mockBatch.setExpiryDate(LocalDate.now().plusDays(10));
@@ -82,17 +83,17 @@ class InventoryServiceTest {
         Long itemId = 100L;
         BigDecimal deductQty = new BigDecimal("15.0"); // 要扣 15
 
-        InventoryItem mockItem = new InventoryItem();
+        InventoryItemEntity mockItem = new InventoryItemEntity();
         mockItem.setTotalQuantity(new BigDecimal("50.0"));
 
         // 批次 A: 剩 10 (過期日較早)
-        InventoryBatch batchA = new InventoryBatch();
+        InventoryBatchEntity batchA = new InventoryBatchEntity();
         batchA.setId(1L);
         batchA.setCurrentQuantity(new BigDecimal("10.0"));
         batchA.setExpiryDate(LocalDate.now().plusDays(1));
 
         // 批次 B: 剩 20 (過期日較晚)
-        InventoryBatch batchB = new InventoryBatch();
+        InventoryBatchEntity batchB = new InventoryBatchEntity();
         batchB.setId(2L);
         batchB.setCurrentQuantity(new BigDecimal("20.0"));
         batchB.setExpiryDate(LocalDate.now().plusDays(5));
@@ -124,7 +125,7 @@ class InventoryServiceTest {
         Long itemId = 100L;
         BigDecimal deductQty = new BigDecimal("100.0");
 
-        InventoryItem mockItem = new InventoryItem();
+        InventoryItemEntity mockItem = new InventoryItemEntity();
         mockItem.setTotalQuantity(new BigDecimal("50.0")); // 只有 50
 
         when(itemRepository.findByBrandIdAndIdForUpdate(brandId, itemId)).thenReturn(Optional.of(mockItem));

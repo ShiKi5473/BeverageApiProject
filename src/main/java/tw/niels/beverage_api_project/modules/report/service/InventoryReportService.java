@@ -38,11 +38,15 @@ public class InventoryReportService {
     private final InventoryTransactionJpaRepository transactionRepository;
     private final OrderJpaRepository orderRepository;
     private final RecipeJpaRepository RecipeJpaRepository;
+    // [B-7] 報表區間以營業時區計算，不使用 ZoneId.systemDefault() (Docker 預設 UTC 會偏移 8 小時)
+    private final ZoneId businessZoneId;
 
     public InventoryReportService(InventoryItemJpaRepository itemRepository,
                                   InventoryTransactionJpaRepository transactionRepository,
                                   OrderJpaRepository orderRepository,
-                                  RecipeJpaRepository RecipeJpaRepository) {
+                                  RecipeJpaRepository RecipeJpaRepository,
+                                  ZoneId businessZoneId) {
+        this.businessZoneId = businessZoneId;
         this.itemRepository = itemRepository;
         this.transactionRepository = transactionRepository;
         this.orderRepository = orderRepository;
@@ -51,8 +55,8 @@ public class InventoryReportService {
 
     @Transactional(readOnly = true)
     public List<InventoryVarianceReportDto> generateVarianceReport(Long brandId, Long storeId, LocalDate startDate, LocalDate endDate) {
-        Instant startInstant = startDate.atStartOfDay(ZoneId.systemDefault()).toInstant();
-        Instant endInstant = endDate.atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant();
+        Instant startInstant = startDate.atStartOfDay(businessZoneId).toInstant();
+        Instant endInstant = endDate.atTime(23, 59, 59).atZone(businessZoneId).toInstant();
 
         // 1. 取得該品牌所有原物料
         List<InventoryItemEntity> items = itemRepository.findByBrand_Id(brandId);

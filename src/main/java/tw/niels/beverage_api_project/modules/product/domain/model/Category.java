@@ -34,8 +34,14 @@ public class Category {
 
     /**
      * 由 Infrastructure Layer 在持久化後回填 ID。
+     * 修改：取代 package-private setId（原本需透過反射呼叫），只允許「尚未有 ID」時指派。
      */
-    void setId(Long id) { this.id = id; }
+    public void assignId(Long id) {
+        if (this.id != null && !this.id.equals(id)) {
+            throw new IllegalStateException("分類已有 ID，不可重新指派：" + this.id);
+        }
+        this.id = id;
+    }
 
     // ─── Getters ───────────────────────────────────────────────────────────
 

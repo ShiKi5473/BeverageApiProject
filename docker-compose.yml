@@ -4,7 +4,12 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - SPRING_PROFILES_ACTIVE=dev
+      # 不再寫死 dev：預設 dev 供本機 compose 使用；正式環境請設定 SPRING_PROFILES_ACTIVE=prod
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-dev}
+      # JWT 密鑰必須由環境變數 / .env 提供（512-bit Base64），未設定時 compose 直接報錯，不使用預設值
+      - JWT_SECRET=${JWT_SECRET:?請在環境變數或 .env 設定 JWT_SECRET (512-bit Base64)}
+      # 容器時區，與 Dockerfile 一致，確保訂單流水號與日結以台北時間計算
+      - TZ=Asia/Taipei
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/BeverageApiDatabase
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=password

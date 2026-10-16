@@ -1,18 +1,21 @@
 package tw.niels.beverage_api_project.config;
 
 import org.springframework.amqp.core.*;
-import org.springframework.amqp.rabbit.connection.ConnectionFactory;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.boot.autoconfigure.amqp.RabbitTemplateCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
 
 @Configuration
 public class RabbitConfig {
+
+    private static final Logger log = LoggerFactory.getLogger(RabbitConfig.class);
 
     // KDS 廣播用
     public static final String KDS_EXCHANGE = "kds.exchange";
@@ -35,11 +38,32 @@ public class RabbitConfig {
         return new Jackson2JsonMessageConverter();
     }
 
+    /**
+     * 移除自訂的 RabbitTemplate Bean：Spring Boot 自動配置的 RabbitTemplate
+     * 會自動套用上方的 MessageConverter Bean，並遵循 spring.rabbitmq.* 設定（含 publisher confirm/returns）。
+     * 自訂 Bean 之前開了 confirm/returns 卻沒有設定任何 callback，發送失敗時完全無聲無息。
+     *
+     * 改用 RabbitTemplateCustomizer 在自動配置的 template 上補充：
+     * - mandatory=true：訊息無法路由到任何佇列時會觸發 returns callback（而不是靜默丟棄）
+     * - confirm callback：Broker 拒收(nack)時記錄錯誤
+     * - returns callback：無法路由的訊息記錄錯誤
+     */
     @Bean
-    public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory) {
-        RabbitTemplate template = new RabbitTemplate(connectionFactory);
-        template.setMessageConverter(jsonMessageConverter());
-        return template;
+    public RabbitTemplateCustomizer rabbitTemplateCustomizer() {
+        return template -> {
+            template.setMandatory(true);
+            template.setConfirmCallback((correlationData, ack, cause) -> {
+                if (!ack) {
+                    log.error("RabbitMQ 發送確認失敗(nack)：correlationData={}, cause={}", correlationData, cause);
+                } else {
+                    log.debug("RabbitMQ 發送確認成功：correlationData={}", correlationData);
+                }
+            });
+            template.setReturnsCallback(returned ->
+                    log.error("RabbitMQ 訊息無法路由：exchange={}, routingKey={}, replyCode={}, replyText={}",
+                            returned.getExchange(), returned.getRoutingKey(),
+                            returned.getReplyCode(), returned.getReplyText()));
+        };
     }
 
     // --- 1. 死信佇列 (Dead Letter Queue) 基礎建設 ---

@@ -1,5 +1,7 @@
 package tw.niels.beverage_api_project.modules.brand.dto;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import tw.niels.beverage_api_project.modules.brand.entity.BrandEntity;
@@ -11,6 +13,8 @@ import java.util.Date;
 public class BrandResponseDto {
 
     @Schema(description = "品牌 ID", example = "1")
+    // ID 以字串輸出，避免 TSID 超過 JS 安全整數範圍而失真(P0-10)
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long brandId;
 
     @Schema(description = "品牌名稱", example = "品茶軒")

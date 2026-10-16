@@ -19,8 +19,10 @@ public class AuditLogService {
 
     /**
      * 非同步儲存日誌，避免阻塞主執行緒
+     * 改指定專用執行緒池 auditExecutor（由 AsyncConfig 建立），
+     * 與 KDS 推播的執行緒池分開，避免稽核日誌塞滿佇列時影響即時推播。
      */
-    @Async
+    @Async("auditExecutor")
     public void saveLog(AuditLogEntity log) {
         try {
             auditLogRepository.save(log);

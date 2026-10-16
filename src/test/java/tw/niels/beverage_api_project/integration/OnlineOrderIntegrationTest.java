@@ -14,11 +14,12 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tw.niels.beverage_api_project.AbstractIntegrationTest;
 import tw.niels.beverage_api_project.modules.order.dto.CreateOrderRequestDto;
 import tw.niels.beverage_api_project.modules.order.dto.OrderItemDto;
-import tw.niels.beverage_api_project.modules.order.entity.Order;
+// 修正：Entity 類別必須加上 Entity 後綴��Repository 必須加上 Jpa 前綴
+import tw.niels.beverage_api_project.modules.order.entity.OrderEntity;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
-import tw.niels.beverage_api_project.modules.order.repository.OrderRepository;
-import tw.niels.beverage_api_project.modules.product.entity.ProductVariant;
-import tw.niels.beverage_api_project.modules.product.repository.ProductVariantRepository;
+import tw.niels.beverage_api_project.modules.order.repository.OrderJpaRepository;
+import tw.niels.beverage_api_project.modules.product.entity.ProductVariantEntity;
+import tw.niels.beverage_api_project.modules.product.repository.ProductVariantJpaRepository;
 import tw.niels.beverage_api_project.security.BrandContextHolder;
 import tw.niels.beverage_api_project.security.jwt.JwtTokenProvider;
 
@@ -43,10 +44,10 @@ public class OnlineOrderIntegrationTest extends AbstractIntegrationTest {
     private ObjectMapper objectMapper;
 
     @Autowired
-    private OrderRepository orderRepository;
+    private OrderJpaRepository orderRepository;
 
     @Autowired
-    private ProductVariantRepository productVariantRepository; // 新增注入
+    private ProductVariantJpaRepository productVariantRepository;
 
     @Autowired
     private UserDetailsService customUserDetailsService;
@@ -76,7 +77,7 @@ public class OnlineOrderIntegrationTest extends AbstractIntegrationTest {
 
         // 1-2. 取得真實的 Product 與 Variant ID
         // 使用 findByProduct_Brand_IdAndIsDeletedFalse 代替 findAll()
-        ProductVariant variant = productVariantRepository.findByProduct_Brand_IdAndIsDeletedFalse(brandId)
+        ProductVariantEntity variant = productVariantRepository.findByProduct_Brand_IdAndIsDeletedFalse(brandId)
                 .stream()
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("整合測試失敗：資料庫中找不到任何商品規格 (BrandId=" + brandId + ")，請檢查 DataSeeder"));
@@ -113,12 +114,12 @@ public class OnlineOrderIntegrationTest extends AbstractIntegrationTest {
             transactionTemplate.execute(status -> {
                 BrandContextHolder.setBrandId(brandId);
                 try {
-                    List<Order> orders = orderRepository.findAllByBrand_IdAndStore_Id(brandId, storeId);
+                    List<OrderEntity> orders = orderRepository.findAllByBrand_IdAndStore_Id(brandId, storeId);
 
                     // 檢查是否有一筆訂單包含我們剛才送出的備註
                     boolean orderExists = orders.stream()
                             .anyMatch(o -> o.getItems().stream()
-                                    .anyMatch(i -> "非同步測試".equals(i.getNotes())));
+                                    .anyMatch(i -> "非同���測試".equals(i.getNotes())));
 
                     assertThat(orderExists).isTrue();
 

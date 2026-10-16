@@ -5,11 +5,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import tw.niels.beverage_api_project.AbstractIntegrationTest;
-import tw.niels.beverage_api_project.modules.brand.entity.Brand;
+// 修正：Entity 類別必須加上 Entity 後綴，Repository 必須加上 Jpa 前綴
+import tw.niels.beverage_api_project.modules.brand.entity.BrandEntity;
 import tw.niels.beverage_api_project.modules.brand.repository.BrandJpaRepository;
-import tw.niels.beverage_api_project.modules.inventory.entity.InventoryBatch;
-import tw.niels.beverage_api_project.modules.inventory.entity.InventoryItem;
-import tw.niels.beverage_api_project.modules.inventory.repository.InventoryBatchRepository;
+import tw.niels.beverage_api_project.modules.inventory.entity.InventoryBatchEntity;
+import tw.niels.beverage_api_project.modules.inventory.entity.InventoryItemEntity;
+import tw.niels.beverage_api_project.modules.inventory.repository.InventoryBatchJpaRepository;
 import tw.niels.beverage_api_project.modules.inventory.repository.InventoryItemJpaRepository;
 import tw.niels.beverage_api_project.modules.inventory.service.InventoryDeductionService;
 import tw.niels.beverage_api_project.modules.store.entity.StoreEntity;
@@ -33,7 +34,7 @@ public class InventoryConcurrencyIntegrationTest extends AbstractIntegrationTest
     @Autowired
     private InventoryItemJpaRepository itemRepository;
     @Autowired
-    private InventoryBatchRepository batchRepository;
+    private InventoryBatchJpaRepository batchRepository;
     @Autowired
     private StoreJpaRepository storeRepository;
     @Autowired
@@ -44,7 +45,7 @@ public class InventoryConcurrencyIntegrationTest extends AbstractIntegrationTest
     void testConcurrentInventoryDeduction() throws InterruptedException {
         // --- Arrange ---
         // 1. 準備基礎資料
-        Brand brand = new Brand();
+        BrandEntity brand = new BrandEntity();
         brand.setName("Test Brand");
         brand = brandRepository.save(brand);
 
@@ -53,7 +54,7 @@ public class InventoryConcurrencyIntegrationTest extends AbstractIntegrationTest
         store.setBrand(brand);
         store = storeRepository.save(store);
 
-        InventoryItem item = new InventoryItem();
+        InventoryItemEntity item = new InventoryItemEntity();
         item.setBrand(brand);
         item.setName("Concurrency Tea");
         item.setUnit("ml");
@@ -99,13 +100,13 @@ public class InventoryConcurrencyIntegrationTest extends AbstractIntegrationTest
         assertThat(failCount.get()).as("所有並發請求都應成功").isEqualTo(0);
 
         // 2. 驗證 Item 總庫存 (100 - 50 = 50)
-        InventoryItem updatedItem = itemRepository.findByBrand_IdAndId(brandId, itemId).orElseThrow();
+        InventoryItemEntity updatedItem = itemRepository.findByBrand_IdAndId(brandId, itemId).orElseThrow();
         assertThat(updatedItem.getTotalQuantity()).isEqualByComparingTo("50.00");
 
         // 3. 驗證 Batch FIFO (使用我們剛新增的 findByStore_Id)
-        List<InventoryBatch> batches = batchRepository.findByStore_Id(storeId).stream()
+        List<InventoryBatchEntity> batches = batchRepository.findByStore_Id(storeId).stream()
                 .filter(b -> b.getInventoryItem().getId().equals(itemId))
-                .sorted(Comparator.comparing(InventoryBatch::getExpiryDate))
+                .sorted(Comparator.comparing(InventoryBatchEntity::getExpiryDate))
                 .toList();
 
         assertThat(batches).hasSize(2);
@@ -117,8 +118,8 @@ public class InventoryConcurrencyIntegrationTest extends AbstractIntegrationTest
         assertThat(batches.get(1).getCurrentQuantity()).isEqualByComparingTo("50.00");
     }
 
-    private void createTestBatch(StoreEntity store, InventoryItem item, BigDecimal qty, LocalDate expiryDate) {
-        InventoryBatch batch = new InventoryBatch();
+    private void createTestBatch(StoreEntity store, InventoryItemEntity item, BigDecimal qty, LocalDate expiryDate) {
+        InventoryBatchEntity batch = new InventoryBatchEntity();
         batch.setStore(store);
         batch.setInventoryItem(item);
         batch.setQuantityReceived(qty);

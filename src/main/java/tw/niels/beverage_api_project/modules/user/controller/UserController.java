@@ -18,8 +18,7 @@ import tw.niels.beverage_api_project.modules.order.dto.MemberDto;
 import tw.niels.beverage_api_project.modules.user.application.command.RegisterStaffCommand;
 import tw.niels.beverage_api_project.modules.user.application.handler.UserCommandHandler;
 import tw.niels.beverage_api_project.modules.user.dto.CreateUserRequestDto;
-
-import java.util.Map;
+import tw.niels.beverage_api_project.modules.user.dto.CreateUserResponseDto;
 
 @RestController
 @RequestMapping(ApiPaths.API_V1 + ApiPaths.USERS)
@@ -58,8 +57,9 @@ public class UserController {
             userId = userCommandHandler.handle(new RegisterStaffCommand(currentBrandId, request));
         }
 
+        // 改用 CreateUserResponseDto：userId 以字串序列化，避免 TSID 超過 JS 安全整數範圍而失真(P0-10)
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(Map.of("message", "User created successfully", "userId", userId));
+                .body(new CreateUserResponseDto("User created successfully", userId));
     }
 
     @GetMapping("/member/by-phone/{phone}")

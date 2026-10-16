@@ -74,12 +74,12 @@ public class ProductController {
     @PutMapping(ApiPaths.PRODUCTS + "/{productId}/option-groups")
     @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER')")
     @Operation(summary = "將客製化選項和商品選項連結")
-    public ResponseEntity<ProductResponseDto> linkOptionGroupsToProduct(
+    public ResponseEntity<Void> linkOptionGroupsToProduct(
             @PathVariable Long productId,
             @RequestBody Set<Long> groupIds) {
         Long brandId = helperService.getCurrentBrandId();
         commandHandler.handle(new LinkOptionGroupsCommand(brandId, productId, groupIds));
-        return ResponseEntity.ok(null);
+        return ResponseEntity.ok().build();
     }
 
     @GetMapping("/categories")
@@ -97,12 +97,12 @@ public class ProductController {
     @PostMapping(ApiPaths.PRODUCTS + "/{productId}/variants")
     @PreAuthorize("hasRole('BRAND_ADMIN')")
     @Operation(summary = "新增商品規格")
-    public ResponseEntity<ProductResponseDto> addProductVariant(
+    public ResponseEntity<Void> addProductVariant(
             @PathVariable Long productId,
             @Valid @RequestBody CreateProductVariantDto requestDto) {
         Long brandId = helperService.getCurrentBrandId();
-        ProductResponseDto result = commandHandler.handle(new AddProductVariantCommand(brandId, productId, requestDto));
-        return ResponseEntity.status(HttpStatus.CREATED).body(result);
+        commandHandler.handle(new AddProductVariantCommand(brandId, productId, requestDto));
+        return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
     @PutMapping(ApiPaths.PRODUCTS + "/variants/{variantId}")

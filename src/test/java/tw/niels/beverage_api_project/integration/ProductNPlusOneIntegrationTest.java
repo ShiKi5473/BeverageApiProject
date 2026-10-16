@@ -5,23 +5,24 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.bean.override.mockito.MockitoBean; // 修改這裡
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Import;
 import tw.niels.beverage_api_project.AbstractIntegrationTest;
 import tw.niels.beverage_api_project.config.DataSeeder;
 import tw.niels.beverage_api_project.config.TestDataSourceConfig;
-import tw.niels.beverage_api_project.modules.brand.entity.Brand;
-import tw.niels.beverage_api_project.modules.brand.repository.BrandRepository;
+// 修正：Entity 類別必須加上 Entity 後綴，Repository 必須加上 Jpa 前綴
+import tw.niels.beverage_api_project.modules.brand.entity.BrandEntity;
+import tw.niels.beverage_api_project.modules.brand.repository.BrandJpaRepository;
 import tw.niels.beverage_api_project.modules.product.dto.ProductPosDto;
-import tw.niels.beverage_api_project.modules.product.entity.Category;
-import tw.niels.beverage_api_project.modules.product.entity.OptionGroup;
-import tw.niels.beverage_api_project.modules.product.entity.Product;
+import tw.niels.beverage_api_project.modules.product.entity.CategoryEntity;
+import tw.niels.beverage_api_project.modules.product.entity.OptionGroupEntity;
+import tw.niels.beverage_api_project.modules.product.entity.ProductEntity;
 import tw.niels.beverage_api_project.modules.product.enums.ProductStatus;
 import tw.niels.beverage_api_project.modules.product.enums.SelectionType;
-import tw.niels.beverage_api_project.modules.product.repository.CategoryRepository;
-import tw.niels.beverage_api_project.modules.product.repository.OptionGroupRepository;
-import tw.niels.beverage_api_project.modules.product.repository.ProductRepository;
+import tw.niels.beverage_api_project.modules.product.repository.CategoryJpaRepository;
+import tw.niels.beverage_api_project.modules.product.repository.OptionGroupJpaRepository;
+import tw.niels.beverage_api_project.modules.product.repository.ProductJpaRepository;
 import tw.niels.beverage_api_project.modules.product.service.ProductService;
 import tw.niels.beverage_api_project.modules.report.schedule.ReportRecoveryRunner;
 import tw.niels.beverage_api_project.modules.report.schedule.ReportScheduler;
@@ -35,16 +36,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Import(TestDataSourceConfig.class)
 public class ProductNPlusOneIntegrationTest extends AbstractIntegrationTest {
 
-    // 修改：使用 @MockitoBean
     @MockitoBean private DataSeeder dataSeeder;
     @MockitoBean private ReportRecoveryRunner reportRecoveryRunner;
     @MockitoBean private ReportScheduler reportScheduler;
 
     @Autowired private ProductService productService;
-    @Autowired private ProductRepository productRepository;
-    @Autowired private BrandRepository brandRepository;
-    @Autowired private CategoryRepository categoryRepository;
-    @Autowired private OptionGroupRepository optionGroupRepository;
+    @Autowired private ProductJpaRepository productRepository;
+    @Autowired private BrandJpaRepository brandRepository;
+    @Autowired private CategoryJpaRepository categoryRepository;
+    @Autowired private OptionGroupJpaRepository optionGroupRepository;
     @Autowired private CacheManager cacheManager;
 
     private Long brandId;
@@ -61,19 +61,19 @@ public class ProductNPlusOneIntegrationTest extends AbstractIntegrationTest {
         brandRepository.deleteAll();
 
         // 1. 建立品牌
-        Brand brand = new Brand();
+        BrandEntity brand = new BrandEntity();
         brand.setName("N+1 Test Brand");
         brand = brandRepository.save(brand);
         this.brandId = brand.getId();
 
         // 2. 建立關聯資料
-        OptionGroup iceGroup = new OptionGroup();
+        OptionGroupEntity iceGroup = new OptionGroupEntity();
         iceGroup.setBrand(brand);
         iceGroup.setName("Ice Level");
         iceGroup.setSelectionType(SelectionType.SINGLE);
         iceGroup = optionGroupRepository.save(iceGroup);
 
-        Category teaCategory = new Category();
+        CategoryEntity teaCategory = new CategoryEntity();
         teaCategory.setBrand(brand);
         teaCategory.setName("Tea");
         teaCategory = categoryRepository.save(teaCategory);
@@ -98,8 +98,8 @@ public class ProductNPlusOneIntegrationTest extends AbstractIntegrationTest {
         SQLStatementCountValidator.assertSelectCount(1);
     }
 
-    private void createProduct(Brand brand, String name, Category category, OptionGroup group) {
-        Product p = new Product();
+    private void createProduct(BrandEntity brand, String name, CategoryEntity category, OptionGroupEntity group) {
+        ProductEntity p = new ProductEntity();
         p.setBrand(brand);
         p.setName(name);
         p.setBasePrice(BigDecimal.valueOf(50));

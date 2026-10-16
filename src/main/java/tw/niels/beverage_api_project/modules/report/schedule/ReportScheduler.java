@@ -7,6 +7,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import tw.niels.beverage_api_project.modules.report.service.ReportAggregationService;
 
+import java.time.Clock;
 import java.time.LocalDate;
 
 @Component
@@ -14,23 +15,28 @@ public class ReportScheduler {
 
     private static final Logger logger = LoggerFactory.getLogger(ReportScheduler.class);
     private final ReportAggregationService reportAggregationService;
+    // [B-7] 以營業時區的 Clock 計算「昨天」，不依賴 JVM 預設時區
+    private final Clock clock;
 
-    public ReportScheduler(ReportAggregationService reportAggregationService) {
+    public ReportScheduler(ReportAggregationService reportAggregationService, Clock clock) {
         this.reportAggregationService = reportAggregationService;
+        this.clock = clock;
     }
 
     /**
-     * 每天凌晨 03:00 執行
+     * 每天凌晨 03:00 (營業時區) 執行
      * 加入 @SchedulerLock 確保叢集環境下單一執行
+     * [B-7] cron 明確指定時區 (預設 Asia/Taipei，可由 app.timezone 覆寫)，
+     * 否則在 UTC 的 Docker 容器中會變成台灣時間 11:00 才執行
      */
-    @Scheduled(cron = "0 0 3 * * ?")
+    @Scheduled(cron = "0 0 3 * * ?", zone = "${app.timezone:Asia/Taipei}")
     @SchedulerLock(
             name = "DailyReportAggregation",
             lockAtMostFor = "30m",    // 鎖最多持有 30 分鐘 (如果執行超過這時間，鎖會強制釋放)
             lockAtLeastFor = "1m"     // 鎖最少持有 1 分鐘 (防止時鐘不同步導致重複執行)
     )
     public void runDailyReportAggregation() {
-        LocalDate yesterday = LocalDate.now().minusDays(1);
+        LocalDate yesterday = LocalDate.now(clock).minusDays(1);
         logger.info("【排程啟動】開始執行日結報表計算 (含分散式鎖)，目標日期: {}", yesterday);
 
         try {

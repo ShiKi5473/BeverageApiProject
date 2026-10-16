@@ -3,9 +3,13 @@ package tw.niels.beverage_api_project.modules.member.infrastructure.persistence.
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 import tw.niels.beverage_api_project.modules.member.domain.model.Member;
+import tw.niels.beverage_api_project.modules.member.domain.model.PointTransaction;
 import tw.niels.beverage_api_project.modules.member.domain.repository.MemberRepository;
 import tw.niels.beverage_api_project.modules.member.infrastructure.mapper.MemberMapper;
 import tw.niels.beverage_api_project.modules.member.repository.MemberPointLogJpaRepository;
+import tw.niels.beverage_api_project.modules.user.entity.UserEntity;
+import tw.niels.beverage_api_project.modules.user.entity.profile.MemberProfileEntity;
+import tw.niels.beverage_api_project.modules.user.enums.Gender;
 import tw.niels.beverage_api_project.modules.user.repository.UserJpaRepository;
 import tw.niels.beverage_api_project.modules.user.repository.MemberProfileJpaRepository;
 
@@ -83,6 +87,62 @@ public class MemberRepositoryImpl implements MemberRepository {
     }
 
     /**
+     * 建立新會員（含 User 帳號與 MemberProfile）。
+     *
+     * 處理流程：
+     * 1. 建立 UserEntity（品牌關聯使用 Proxy 物件，避免額外查詢）
+     * 2. 建立 MemberProfileEntity，從 Member Domain Model 映射個人資料
+     * 3. 設定雙向關聯，透過 CascadeType.ALL 一次儲存
+     * 4. 回傳資料庫生成的新 User ID（即會員 ID）
+     *
+     * @param member       已初始化的 Member Domain Model（id 為 null）
+     * @param passwordHash 已雜湊的密碼（由 Application Layer 處理）
+     * @return 資料庫生成的新會員 ID
+     */
+    @Override
+    @Transactional
+    public Long create(Member member, String passwordHash) {
+        // ─── 步驟 1：建立 UserEntity ──────────────────────────────────────
+        var jpaUser = new UserEntity();
+
+        // 品牌關聯：使用 Proxy 物件，僅帶入 ID，避免額外查詢
+        var brandProxy = new tw.niels.beverage_api_project.modules.brand.entity.BrandEntity();
+        brandProxy.setId(member.getBrandId());
+        jpaUser.setBrand(brandProxy);
+
+        jpaUser.setPrimaryPhone(member.getProfile().phone());
+        jpaUser.setPasswordHash(passwordHash);
+        jpaUser.setIsActive(member.isActive());
+
+        // ─── 步驟 2：建立 MemberProfileEntity ────────────────────────────
+        var jpaProfile = new MemberProfileEntity();
+        jpaProfile.setFullName(member.getProfile().fullName());
+        jpaProfile.setEmail(member.getProfile().email());
+
+        // LocalDate → java.sql.Date
+        if (member.getProfile().birthday() != null) {
+            jpaProfile.setBirthDate(java.sql.Date.valueOf(member.getProfile().birthday()));
+        }
+
+        // String → Gender enum（MemberProfile VO 以 String 存儲，MemberProfileEntity 以 enum 存儲）
+        if (member.getProfile().gender() != null) {
+            try {
+                jpaProfile.setGender(Gender.valueOf(member.getProfile().gender()));
+            } catch (IllegalArgumentException ignored) {
+                // 無效的性別值直接略過，保持 null
+            }
+        }
+
+        jpaProfile.setTotalPoints(member.getPoints() != null ? member.getPoints().value() : 0L);
+
+        // ─── 步驟 3：設定雙向關聯並儲存（CascadeType.ALL 自動儲存 MemberProfile）
+        jpaUser.setMemberProfile(jpaProfile);
+        var saved = userJpaRepo.save(jpaUser);
+
+        return saved.getId();
+    }
+
+    /**
      * 儲存會員（含積點餘額更新與積點交易紀錄）
      *
      * 流程：
@@ -98,7 +158,9 @@ public class MemberRepositoryImpl implements MemberRepository {
         // ─── 步驟 1：更新 User（isActive）─────────────────────────────────
         // 查詢現有 User Entity（不用 Proxy，需要完整 Entity 才能更新）
         if (member.getId() != null) {
-            userJpaRepo.findById(member.getId()).ifPresent(jpaUser -> {
+            // 修正(P0-6)：UserJpaRepository 已覆寫 findById() 並直接拋出 UnsupportedOperationException，
+            // 改用帶 brandId 的 findByBrand_IdAndId()，同時維持多租戶隔離。
+            userJpaRepo.findByBrand_IdAndId(member.getBrandId(), member.getId()).ifPresent(jpaUser -> {
                 jpaUser.setIsActive(member.isActive());
                 userJpaRepo.save(jpaUser);
             });
@@ -119,18 +181,22 @@ public class MemberRepositoryImpl implements MemberRepository {
             memberProfileJpaRepo.save(jpaProfile);
         }
 
-        // ─── 步驟 3：儲存新增的積點交易紀錄 ──────────────────────────────
+        // ─── 步驟 3：儲存新增的積點交易紀錄 ─────────────────────────────
         // pullPointTransactions() 取出並清空 domain 中的待處理交易
         var newTransactions = member.pullPointTransactions();
         if (!newTransactions.isEmpty()) {
             // 最後一筆交易後的餘額 = 當前積點餘額
             long finalBalance = member.getPoints() != null ? member.getPoints().value() : 0L;
 
-            for (int i = newTransactions.size() - 1; i >= 0; i--) {
-                // 最後一筆使用 finalBalance，往前推算各筆交易後餘額（簡化：全用 finalBalance）
-                // 精確計算需要從前往後累加，此處簡化為統一使用最終餘額
-                var tx = newTransactions.get(i);
-                tw.niels.beverage_api_project.modules.member.entity.MemberPointLogEntity logEntity = MemberMapper.toPointLogEntity(tx, finalBalance);
+            // 修正(P0-6)：逐筆累計 balance_after，而不是全部沿用最終餘額。
+            // 起始餘額 = 最終餘額 - 這批交易的異動總和；再依發生順序（由前往後）累加，
+            // 每筆紀錄的 balance_after 即為「該筆交易完成後」的正確餘額。
+            long totalChange = newTransactions.stream().mapToLong(PointTransaction::getAmount).sum();
+            long runningBalance = finalBalance - totalChange;
+
+            for (PointTransaction tx : newTransactions) {
+                runningBalance += tx.getAmount();
+                tw.niels.beverage_api_project.modules.member.entity.MemberPointLogEntity logEntity = MemberMapper.toPointLogEntity(tx, runningBalance);
                 if (logEntity != null) {
                     pointLogJpaRepo.save(logEntity);
                 }

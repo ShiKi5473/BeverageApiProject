@@ -2,44 +2,69 @@ package tw.niels.beverage_api_project.modules.store.application.handler;
 
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-
+import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
+import tw.niels.beverage_api_project.modules.brand.domain.repository.BrandRepository;
 import tw.niels.beverage_api_project.modules.store.application.command.CreateStoreCommand;
-import tw.niels.beverage_api_project.modules.store.entity.StoreEntity;
-import tw.niels.beverage_api_project.modules.store.service.StoreService;
+import tw.niels.beverage_api_project.modules.store.domain.model.Store;
+import tw.niels.beverage_api_project.modules.store.domain.repository.StoreRepository;
 
 /**
- * 分店相關命令處理器
+ * ============================================================
+ * Bounded Context: Brand & Store
+ * Layer: Application - Command Handler
+ * ============================================================
  *
- * 處理流程：
- * 1. 接收 CreateStoreCommand
- * 2. 委派 StoreService 執行建立邏輯（過渡期）
- * 3. 回傳新建分店的 ID
+ * 分店相關命令處理器（Phase 3 重構完成版）
  *
- * 備註：過渡期直接委派 StoreService，待 Phase 3 Infrastructure 分離後
- * 改為操作 Domain Model + Domain Repository。
+ * 全部操作透過 {@link StoreRepository}（Domain 介面）操作 Domain Model，
+ * 不再委派 StoreService，符合 DDD Application Layer 職責。
+ *
+ * 處理流程（CreateStore）：
+ * 1. 驗證品牌存在（BrandRepository）
+ * 2. 建立 Store Domain Model
+ * 3. 透過 StoreRepository 持久化
+ * 4. 回傳新建分店 ID
+ * ============================================================
  */
 @Component
 public class StoreCommandHandler {
 
-    private final StoreService storeService;
+    private final BrandRepository brandRepository;
+    private final StoreRepository storeRepository;
 
-    public StoreCommandHandler(StoreService storeService) {
-        this.storeService = storeService;
+    public StoreCommandHandler(BrandRepository brandRepository, StoreRepository storeRepository) {
+        this.brandRepository = brandRepository;
+        this.storeRepository = storeRepository;
     }
 
     /**
-     * 處理建立分店命令
+     * 建立分店。
      *
      * 處理流程：
-     * 1. 設定 brandId 至 DTO
-     * 2. 委派 StoreService 建立分店
-     * 3. 回傳新建分店 ID
+     * 1. 驗證品牌存在（不存在拋出 ResourceNotFoundException）
+     * 2. 建立 Store Domain Model（含名稱、地址、電話，isActive 預設 true）
+     * 3. 透過 StoreRepository 持久化（StoreMapper 轉換，Brand 以 Proxy 設定）
+     * 4. 回傳新建分店 ID
+     *
+     * @param command 包含品牌 ID 與分店建立資料
+     * @return 新建分店的 ID
      */
     @Transactional
     public Long handle(CreateStoreCommand command) {
-        // 設定 brandId（由 Controller 從 SecurityContext 取得）
-        command.requestDto().setBrandId(command.brandId());
-        StoreEntity store = storeService.createStore(command.requestDto());
+        Long brandId = command.brandId();
+        var req = command.requestDto();
+
+        // 1. 驗證品牌存在
+        brandRepository.findById(brandId)
+            .orElseThrow(() -> new ResourceNotFoundException("找不到品牌，ID：" + brandId));
+
+        // 2. 建立 Store Domain Model
+        Store store = new Store(null, brandId, req.getName(), req.getAddress(), req.getPhone(), true);
+
+        // 3. 持久化（StoreRepositoryImpl 負責 ID 同步回 Domain Model）
+        storeRepository.save(store);
+
+        // 4. 回傳新建分店 ID
         return store.getId();
     }
 }

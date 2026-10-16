@@ -36,8 +36,10 @@ public interface InventoryItemJpaRepository extends JpaRepository<InventoryItemE
     @Query("SELECT i FROM InventoryItemEntity i WHERE i.brand.id = :brandId AND i.id = :id")
     Optional<InventoryItemEntity> findByBrandIdAndIdForUpdate(Long brandId, Long id);
 
+    // [B-5 修正] 加上 ORDER BY i.id：多個交易同時鎖多個品項時，一律依 id 由小到大取得鎖，
+    // 避免 A 交易先鎖 1 再鎖 2、B 交易先鎖 2 再鎖 1 造成的死鎖 (deadlock)
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT i FROM InventoryItemEntity i WHERE i.brand.id = :brandId AND i.id IN :ids")
+    @Query("SELECT i FROM InventoryItemEntity i WHERE i.brand.id = :brandId AND i.id IN :ids ORDER BY i.id ASC")
     List<InventoryItemEntity> findByBrandIdAndIdInForUpdate(Long brandId, Set<Long> ids);
 
     // 系統專用查詢（供 InventoryRepositoryImpl 內部使用，取得 unit）

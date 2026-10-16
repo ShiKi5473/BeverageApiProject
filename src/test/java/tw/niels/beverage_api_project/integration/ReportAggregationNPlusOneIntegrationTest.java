@@ -160,9 +160,3 @@ public class ReportAggregationNPlusOneIntegrationTest extends AbstractIntegratio
         orderRepository.save(order);
     }
 }
-        // 這裡設定 ProductEntitySnapshot 是為了模擬真實情況，但報表統計是關聯 ProductEntity ID
-
-        order.getItems().add(item);
-        orderRepository.save(order);
-    }
-}

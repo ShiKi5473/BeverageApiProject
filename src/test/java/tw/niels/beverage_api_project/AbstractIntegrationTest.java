@@ -4,7 +4,10 @@ import com.redis.testcontainers.RedisContainer;
 import org.junit.jupiter.api.AfterEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.redis.core.RedisCallback;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
@@ -16,6 +19,9 @@ import org.testcontainers.utility.DockerImageName;
 
 import java.time.Duration;
 
+// 啟用 dev profile：application.properties 已移除預設的 spring.profiles.active=dev，
+// 而整合測試需要 DataSeeder（僅 dev profile）建立的種子資料與 application-dev.properties 的設定。
+@ActiveProfiles("dev")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public abstract class AbstractIntegrationTest {
 
@@ -28,7 +34,8 @@ public abstract class AbstractIntegrationTest {
             .withStartupTimeout(Duration.ofMinutes(3))
             .withReuse(true);
 
-    static final GenericContainer<?> minio = new GenericContainer<>(DockerImageName.parse("minio/minio:latest"))
+    // 鎖定固定的 MinIO release tag（不用 latest），避免上游更新造成測試結果不可重現
+    static final GenericContainer<?> minio = new GenericContainer<>(DockerImageName.parse("minio/minio:RELEASE.2025-04-22T22-12-26Z"))
             .withEnv("MINIO_ROOT_USER", "minioadmin")
             .withEnv("MINIO_ROOT_PASSWORD", "minioadmin")
             .withCommand("server /data")
@@ -80,11 +87,23 @@ public abstract class AbstractIntegrationTest {
         registry.add("minio.access-key", () -> "minioadmin");
         registry.add("minio.secret-key", () -> "minioadmin");
         registry.add("minio.bucket-name", () -> "test-bucket");
+
+        // JWT 密鑰：application.properties 已移除寫死的預設值（缺少時啟動失敗），
+        // 因此測試必須自行提供。此為「僅供測試」的 512-bit Base64 值，請勿用於任何實際環境。
+        registry.add("app.jwt.secret", () -> TEST_JWT_SECRET);
     }
+
+    /** 測試專用 JWT 密鑰（Base64，解碼後 72 bytes = 576 bits，滿足 HS512 需求） */
+    private static final String TEST_JWT_SECRET =
+            "aW50ZWdyYXRpb24tdGVzdC1vbmx5LWp3dC1zZWNyZXQta2V5LWRvLW5vdC11c2UtaW4tcHJvZHVjdGlvbi0wMTIzNDU2Nzg5";
 
     // 注入 JdbcTemplate 用於執行原生 SQL
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    // 注入 StringRedisTemplate 用於每個測試後清空 Redis
+    @Autowired
+    private StringRedisTemplate redisTemplate;
 
     /**
      * 全域清理方法：在每個測試方法結束後執行。
@@ -106,5 +125,12 @@ public abstract class AbstractIntegrationTest {
                 "CASCADE"; // CASCADE 是關鍵，它會自動處理關聯刪除
 
         jdbcTemplate.execute(truncateSql);
+
+        // 同步清空 Redis：訂單流水號計數器、冪等鍵、快取、速率限制計數等都存在 Redis，
+        // 不清除的話前一個測試的計數會洩漏到下一個測試（也會掩蓋訂單號碼衝突之類的問題）。
+        redisTemplate.execute((RedisCallback<Object>) connection -> {
+            connection.serverCommands().flushDb();
+            return null;
+        });
     }
 }

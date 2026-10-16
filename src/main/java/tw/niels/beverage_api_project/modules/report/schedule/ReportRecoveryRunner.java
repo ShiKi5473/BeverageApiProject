@@ -12,8 +12,8 @@ import tw.niels.beverage_api_project.modules.report.entity.DailyStoreStatsEntity
 import tw.niels.beverage_api_project.modules.report.repository.DailyStoreStatsJpaRepository;
 import tw.niels.beverage_api_project.modules.report.service.ReportAggregationService;
 
+import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.concurrent.Executors;
@@ -26,13 +26,17 @@ public class ReportRecoveryRunner implements ApplicationRunner {
     private final ReportAggregationService reportAggregationService;
     private final DailyStoreStatsJpaRepository DailyStoreStatsJpaRepository;
     private final LockProvider lockProvider; // 注入 LockProvider
+    // [B-7] 以營業時區 (TimeConfig) 的 Clock 判斷「今天 / 昨天」，不依賴 JVM 預設時區
+    private final Clock clock;
 
     public ReportRecoveryRunner(ReportAggregationService reportAggregationService,
                                 DailyStoreStatsJpaRepository DailyStoreStatsJpaRepository,
-                                LockProvider lockProvider) {
+                                LockProvider lockProvider,
+                                Clock clock) {
         this.reportAggregationService = reportAggregationService;
         this.DailyStoreStatsJpaRepository = DailyStoreStatsJpaRepository;
         this.lockProvider = lockProvider;
+        this.clock = clock;
     }
 
     @Override
@@ -42,7 +46,7 @@ public class ReportRecoveryRunner implements ApplicationRunner {
         // lockAtMostFor: 鎖最多持有 10 分鐘 (預防程式當掉鎖死)
         // lockAtLeastFor: 鎖最少持有 10 秒
         LockConfiguration lockConfig = new LockConfiguration(
-                Instant.now(),
+                clock.instant(),
                 "ReportStartupRecovery",
                 Duration.ofMinutes(10),
                 Duration.ofSeconds(10)
@@ -67,10 +71,14 @@ public class ReportRecoveryRunner implements ApplicationRunner {
 
     private void performRecoveryLogic() {
         // 1. 目標：結算到「昨天」
-        LocalDate yesterday = LocalDate.now().minusDays(1);
+        LocalDate today = LocalDate.now(clock);
+        LocalDate yesterday = today.minusDays(1);
 
         // 2. 查詢資料庫
-        Optional<DailyStoreStatsEntity> lastStatOpt = DailyStoreStatsJpaRepository.findTopByOrderByDateDesc();
+        // [B-6 修正] 即時統計 Handler 會寫入「今天」的資料列；若用全域最新日期，
+        // 只要今天有任何訂單完成，startDate 就會是明天而永遠略過補跑。
+        // 因此只找「嚴格早於今天」的最新一筆，才是真正的最後一次完整日結。
+        Optional<DailyStoreStatsEntity> lastStatOpt = DailyStoreStatsJpaRepository.findTopByDateLessThanOrderByDateDesc(today);
         LocalDate startDate;
 
         if (lastStatOpt.isPresent()) {

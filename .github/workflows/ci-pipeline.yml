@@ -23,13 +23,17 @@ jobs:
           cache: maven
 
       - name: Build and Test with Maven
-        # 這裡執行 mvn verify 會自動觸發我們剛寫好的 TestContainers 測試
+        # 這裡執行 ./mvnw verify 會自動觸發我們剛寫好的 TestContainers 測試
         env:
           # 1. 強制限制 JVM Heap 為 1.5GB (避免 Java 吃光所有 RAM)
           # 2. 停用 Ryuk (Testcontainers 的資源回收車)，CI 跑完會自動銷毀環境，不需要它佔用資源
           MAVEN_OPTS: "-Xmx1536m -Xms512m -XX:+TieredCompilation -XX:TieredStopAtLevel=1"
           TESTCONTAINERS_RYUK_DISABLED: "true"
-        run: mvn verify
+        # 改用 Maven Wrapper（./mvnw），確保 CI 與本機使用相同的 Maven 版本；
+        # 先 chmod +x 以防 Windows 提交的檔案沒有執行權限
+        run: |
+          chmod +x mvnw
+          ./mvnw -B verify
 
       - name: Check for OOM Killer logs
         if: failure() # 只有在前一個步驟失敗時才執行

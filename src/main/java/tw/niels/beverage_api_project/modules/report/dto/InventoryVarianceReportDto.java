@@ -1,5 +1,7 @@
 package tw.niels.beverage_api_project.modules.report.dto;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -13,7 +15,9 @@ import java.math.BigDecimal;
 @Schema(description = "庫存耗損分析報告")
 public class InventoryVarianceReportDto {
 
-    @Schema(description = "原物料 ID")
+    // [P0-10] 回應中的 ID 序列化為字串，避免 JS 精度遺失
+    @Schema(description = "原物料 ID (字串)")
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long itemId;
 
     @Schema(description = "原物料名稱")

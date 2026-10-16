@@ -6,15 +6,17 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import tw.niels.beverage_api_project.common.constants.ApiPaths;
+import tw.niels.beverage_api_project.common.constants.AuthorityConstants;
 import tw.niels.beverage_api_project.common.service.ControllerHelperService;
 import tw.niels.beverage_api_project.modules.report.dto.BrandSalesSummaryDto;
+import tw.niels.beverage_api_project.modules.report.dto.DailyStoreStatsResponseDto;
 import tw.niels.beverage_api_project.modules.report.dto.InventoryVarianceReportDto;
 import tw.niels.beverage_api_project.modules.report.dto.ProductSalesStatsDto;
 import tw.niels.beverage_api_project.modules.report.dto.StoreRankingDto;
-import tw.niels.beverage_api_project.modules.report.entity.DailyStoreStatsEntity;
 import tw.niels.beverage_api_project.modules.report.repository.DailyProductStatsJpaRepository;
 import tw.niels.beverage_api_project.modules.report.repository.DailyStoreStatsJpaRepository;
 import tw.niels.beverage_api_project.modules.report.service.InventoryReportService;
@@ -65,7 +67,7 @@ public class ReportController {
             summary = "查詢分店日結明細",
             description = "取得指定分店在特定日期區間內的每日營收統計 (權限: 該分店員工或品牌管理員)"
     )
-    public ResponseEntity<List<DailyStoreStatsEntity>> getStoreDailyStats(
+    public ResponseEntity<List<DailyStoreStatsResponseDto>> getStoreDailyStats(
             @RequestParam Long storeId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
@@ -73,8 +75,12 @@ public class ReportController {
         // 驗證權限：確保該員工有權限查看此分店
         helperService.validateStoreAccess(storeId);
 
-        List<DailyStoreStatsEntity> stats = DailyStoreStatsJpaRepository
-                .findByStoreIdAndDateBetweenOrderByDateAsc(storeId, startDate, endDate);
+        // [P0-10] 回傳 DTO（ID 為字串），不再直接把 JPA Entity 序列化給前端
+        List<DailyStoreStatsResponseDto> stats = DailyStoreStatsJpaRepository
+                .findByStoreIdAndDateBetweenOrderByDateAsc(storeId, startDate, endDate)
+                .stream()
+                .map(DailyStoreStatsResponseDto::from)
+                .toList();
 
         return ResponseEntity.ok(stats);
     }
@@ -171,17 +177,30 @@ public class ReportController {
      * URL: POST /api/v1/reports/trigger-aggregation?date=2023-10-20
      */
     @PostMapping("/trigger-aggregation")
-    @PreAuthorize("hasRole('BRAND_ADMIN')") // 暫時開放給品牌管理員測試，正式環境建議只給 PLATFORM_ADMIN
+    // [S-1 修正] 原本任何 BRAND_ADMIN 都能重算「全平台所有品牌」的分店。
+    // 現在：PLATFORM_ADMIN 重算全部；BRAND_ADMIN 只重算自己品牌的分店。
+    @PreAuthorize("hasAnyRole('PLATFORM_ADMIN', 'BRAND_ADMIN')")
     @Operation(
             summary = "手動觸發日結計算",
-            description = "手動執行指定日期的報表結算，用於補漏或測試 (權限: 品牌管理員)"
+            description = "手動執行指定日期的報表結算，用於補漏或測試 (權限: 平台管理員可結算全部品牌；品牌管理員只能結算自己品牌的分店)"
     )
     public ResponseEntity<String> triggerAggregation(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            Authentication authentication) {
 
-        reportAggregationService.generateDailyStats(date);
+        boolean isPlatformAdmin = authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(a -> AuthorityConstants.ROLE_PLATFORM_ADMIN.equals(a.getAuthority()));
 
-        return ResponseEntity.ok("已手動觸發 " + date + " 的報表結算。");
+        if (isPlatformAdmin) {
+            // 平台管理員：全部品牌
+            reportAggregationService.generateDailyStats(date);
+            return ResponseEntity.ok("已手動觸發 " + date + " 全部品牌的報表結算。");
+        }
+
+        // 品牌管理員：只結算自己品牌的分店
+        Long brandId = helperService.getCurrentBrandId();
+        reportAggregationService.generateDailyStatsForBrand(brandId, date);
+        return ResponseEntity.ok("已手動觸發 " + date + " 的報表結算（僅限所屬品牌）。");
     }
 
     /**

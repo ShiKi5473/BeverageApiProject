@@ -1,5 +1,7 @@
 package tw.niels.beverage_api_project.modules.user.dto;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import tw.niels.beverage_api_project.modules.user.entity.UserEntity;
@@ -15,6 +17,8 @@ import tw.niels.beverage_api_project.modules.user.enums.StaffRole;
 public class StaffDto {
 
     @Schema(description = "使用者 ID", example = "10")
+    // 所有 ID 欄位以字串輸出，避免 TSID 超過 JS 安全整數範圍而失真(P0-10)
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long userId;
 
     @Schema(description = "登入帳號 (手機)", example = "0912345678")
@@ -30,12 +34,14 @@ public class StaffDto {
     private boolean isActive;
 
     @Schema(description = "所屬分店 ID", example = "1")
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long storeId;
 
     @Schema(description = "所屬分店名稱", example = "台北信義店")
     private String storeName;
 
     @Schema(description = "所屬品牌 ID", example = "1")
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long brandId;
 
     /**

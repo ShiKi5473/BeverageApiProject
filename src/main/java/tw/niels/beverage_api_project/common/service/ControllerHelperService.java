@@ -11,6 +11,10 @@ import tw.niels.beverage_api_project.modules.store.repository.StoreJpaRepository
 import tw.niels.beverage_api_project.modules.user.entity.UserEntity;
 import tw.niels.beverage_api_project.modules.user.repository.UserJpaRepository;
 import tw.niels.beverage_api_project.security.AppUserDetails;
+import tw.niels.beverage_api_project.security.GuestPrincipal;
+import tw.niels.beverage_api_project.security.TenantPrincipal;
+
+import java.util.Optional;
 
 @Service // 標註為 Spring Bean，使其可以被注入
 public class ControllerHelperService {
@@ -61,12 +65,38 @@ public class ControllerHelperService {
     }
 
     /**
-     * 獲取當前使用者所屬的 BrandEntity ID
-     * 
+     * 取得當前的多租戶身分（員工／會員為 AppUserDetails，訪客為 GuestPrincipal）。
+     * 供同時開放給訪客與會員的 API（如線上點餐）使用。
+     *
+     * @return 當前 TenantPrincipal
+     */
+    public TenantPrincipal getCurrentTenantPrincipal() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof TenantPrincipal principal) {
+            return principal;
+        }
+        throw new ResourceNotFoundException("無法獲取當前使用者認證資訊");
+    }
+
+    /**
+     * 若當前為訪客則回傳 GuestPrincipal，否則回傳 empty。
+     */
+    public Optional<GuestPrincipal> getCurrentGuestPrincipal() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof GuestPrincipal guest) {
+            return Optional.of(guest);
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * 獲取當前使用者所屬的品牌 ID（員工、會員、訪客皆適用）
+     *
      * @return 品牌 ID (Long)
      */
     public Long getCurrentBrandId() {
-        return getCurrentUserDetails().brandId();
+        // 改用 TenantPrincipal，讓訪客也能取得品牌（線上點餐唯讀 API 需要）
+        return getCurrentTenantPrincipal().brandId();
     }
 
     /**

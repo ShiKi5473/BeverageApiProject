@@ -72,7 +72,9 @@ public class StaffController {
         // 簡單權限檢查：店長不能隨意調動員工到別店 (UserService 內部會檢查 Store 是否存在於 Brand)
         // 更細緻的權限 (如：店長不能修改 BRAND_ADMIN) 可在 Service 層擴充
 
-        helperService.validateStoreAccess(helperService.getCurrentStoreId()); // 確保發起請求的人有權限 (若是店長)
+        // 修正(B-9)：移除 validateStoreAccess(getCurrentStoreId())。
+        // 未綁定分店的 BRAND_ADMIN 呼叫時 storeId 為 null，會被誤判成找不到分店而回 404；
+        // 店長跨店 / 修改品牌管理員等權限檢查已在 UserService.updateStaff 內完成。
 
         StaffDto updatedStaff = commandHandler.handle(new UpdateStaffCommand(brandId, userId, requestDto));
         return ResponseEntity.ok(updatedStaff);

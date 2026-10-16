@@ -152,6 +152,30 @@ public class Member {
     }
 
     /**
+     * 人工調整積點（管理員手動補點或扣點）。
+     *
+     * 允許正數（增加積點）或負數（扣減積點）的調整。
+     * 零調整視為無效操作，直接忽略。
+     * 調整後餘額不得為負數（由 MemberPoint VO 的 subtract() 方法保護）。
+     *
+     * @param amount 調整數量（正數增加，負數扣減）；為 0 時略過
+     * @param reason 原因說明（如：「活動補償」、「誤點更正」）
+     * @throws IllegalStateException 若扣減後餘額不足
+     */
+    public void adjustPoints(Long amount, String reason) {
+        if (amount == null || amount == 0) return;
+        if (amount < 0 && !this.points.hasEnough(-amount)) {
+            throw new IllegalStateException(
+                "積點不足，無法扣減：現有 " + this.points.value() + " 點，嘗試扣減 " + (-amount) + " 點"
+            );
+        }
+        this.points = amount > 0 ? this.points.add(amount) : this.points.subtract(-amount);
+        pointTransactions.add(
+            PointTransaction.of(this.id, amount, PointTransactionType.ADMIN_ADJUST, reason)
+        );
+    }
+
+    /**
      * 停用此會員。
      */
     public void deactivate() {

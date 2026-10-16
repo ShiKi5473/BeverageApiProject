@@ -44,11 +44,11 @@ public class OrderItem {
     /** 購買數量，必須大於 0 */
     private final int quantity;
 
-    /** 單品售價（已含規格加價，未含選項加價） */
+    /** 單品售價（規格售價 + 所選選項加價，由 OrderItemFactory 計算） */
     private final Money unitPrice;
 
-    /** 小計 = unitPrice × quantity */
-    private final Money subtotal;
+    /** 小計 = unitPrice × quantity（非 final：reconstitute() 需還原資料庫中的原值） */
+    private Money subtotal;
 
     /** 顧客備註（如：少冰、半糖） */
     private final String notes;
@@ -117,16 +117,41 @@ public class OrderItem {
         return new OrderItem(productId, variantId, quantity, unitPrice, notes, optionIds, productSnapshot);
     }
 
+    /**
+     * 供 Infrastructure Mapper 從資料庫重建品項（不驗證不變量）。
+     *
+     * 新增方法：V5 之前建立的舊訂單沒有商品快照、早期資料也可能缺少規格，
+     * 若沿用 create() 會因驗證失敗而讀不出訂單；重建時應忠實還原資料庫內容，
+     * 因此不檢查 productSnapshot，並直接採用資料庫中的 subtotal（避免重新計算造成差異）。
+     * 同時取代原本以反射呼叫 setId() 的作法。
+     *
+     * @param id              品項 ID
+     * @param productId       商品 ID
+     * @param variantId       規格 ID（舊資料可能為 null）
+     * @param quantity        數量
+     * @param unitPrice       單價（null 時視為 0）
+     * @param subtotal        小計（null 時以單價 × 數量計算）
+     * @param notes           備註
+     * @param optionIds       選項 ID 清單
+     * @param productSnapshot 商品快照（舊資料可能為 null）
+     * @return 重建的 OrderItem
+     */
+    public static OrderItem reconstitute(Long id, Long productId, Long variantId, int quantity,
+                                         Money unitPrice, Money subtotal, String notes,
+                                         List<Long> optionIds, ProductSnapshot productSnapshot) {
+        Money safeUnitPrice = unitPrice != null ? unitPrice : Money.ZERO;
+        OrderItem item = new OrderItem(productId, variantId, quantity, safeUnitPrice, notes, optionIds, productSnapshot);
+        item.id = id;
+        if (subtotal != null) {
+            item.subtotal = subtotal;
+        }
+        return item;
+    }
+
     // ─── Getters（無 setters，確保不可變）─────────────────────────────────
 
-    /** 訂單品項 ID（在 Infrastructure Layer 持久化後由 Mapper 設定） */
+    /** 訂單品項 ID（由 reconstitute() 自資料庫還原；新建品項在持久化前為 null） */
     public Long getId() { return id; }
-
-    /**
-     * 由 Infrastructure Mapper 在持久化後回填 ID。
-     * package-private：僅允許同 package 的 Mapper 呼叫，防止外部任意修改 Entity ID。
-     */
-    void setId(Long id) { this.id = id; }
 
     public Long getProductId() { return productId; }
     public Long getVariantId() { return variantId; }

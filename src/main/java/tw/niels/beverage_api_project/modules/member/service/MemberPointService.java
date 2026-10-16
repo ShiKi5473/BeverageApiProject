@@ -105,7 +105,9 @@ public class MemberPointService {
         MemberProfileEntity profile = memberProfileRepository.findById(member.getUserId())
                 .orElseThrow(() -> new BadRequestException("使用者 ID " + member.getUserId() + " 不是會員"));
         if (profile == null) {
-            System.err.println("警告：試圖為非會員 UserEntity ID " + member.getUserId() + " 退還點數");
+            // System.err 改為 logger（P3 清理）
+            org.slf4j.LoggerFactory.getLogger(MemberPointService.class)
+                    .warn("試圖為非會員 UserEntity ID {} 退還點數", member.getUserId());
             return;
         }
 
@@ -172,7 +174,9 @@ public class MemberPointService {
                 .orElseThrow(() -> new BadRequestException("使用者 ID " + member.getUserId() + " 不是會員"));
         if (profile == null) {
             // 理論上此時 profile 不應為 null，但還是加上防禦性檢查
-            System.err.println("警告：試圖為非會員 UserEntity ID " + member.getUserId() + " 增加點數");
+            // System.err 改為 logger（P3 清理）
+            org.slf4j.LoggerFactory.getLogger(MemberPointService.class)
+                    .warn("試圖為非會員 UserEntity ID {} 增加點數", member.getUserId());
             return;
         }
 

@@ -14,18 +14,19 @@ import tw.niels.beverage_api_project.AbstractIntegrationTest;
 import tw.niels.beverage_api_project.common.service.ControllerHelperService;
 import tw.niels.beverage_api_project.config.DataSeeder;
 import tw.niels.beverage_api_project.config.TestDataSourceConfig;
-import tw.niels.beverage_api_project.modules.brand.entity.Brand;
+// 修正：Entity 類別必須加上 Entity 後綴，Repository 必須加上 Jpa 前綴
+import tw.niels.beverage_api_project.modules.brand.entity.BrandEntity;
 import tw.niels.beverage_api_project.modules.brand.repository.BrandJpaRepository;
 import tw.niels.beverage_api_project.modules.inventory.dto.AddShipmentRequestDto;
-import tw.niels.beverage_api_project.modules.inventory.entity.InventoryItem;
+import tw.niels.beverage_api_project.modules.inventory.entity.InventoryItemEntity;
 import tw.niels.beverage_api_project.modules.inventory.repository.InventoryItemJpaRepository;
 import tw.niels.beverage_api_project.modules.inventory.service.InventoryService;
 import tw.niels.beverage_api_project.modules.report.schedule.ReportRecoveryRunner;
 import tw.niels.beverage_api_project.modules.report.schedule.ReportScheduler;
 import tw.niels.beverage_api_project.modules.store.entity.StoreEntity;
 import tw.niels.beverage_api_project.modules.store.repository.StoreJpaRepository;
-import tw.niels.beverage_api_project.modules.user.entity.User;
-import tw.niels.beverage_api_project.modules.user.repository.UserRepository;
+import tw.niels.beverage_api_project.modules.user.entity.UserEntity;
+import tw.niels.beverage_api_project.modules.user.repository.UserJpaRepository;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -45,7 +46,7 @@ public class InventoryShipmentNPlusOneIntegrationTest extends AbstractIntegratio
     @Autowired private InventoryItemJpaRepository itemRepository;
     @Autowired private BrandJpaRepository brandRepository;
     @Autowired private StoreJpaRepository storeRepository;
-    @Autowired private UserRepository userRepository;
+    @Autowired private UserJpaRepository userRepository;
 
     private Long brandId;
     private Long storeId;
@@ -56,7 +57,7 @@ public class InventoryShipmentNPlusOneIntegrationTest extends AbstractIntegratio
         SQLStatementCountValidator.reset();
 
         // 1. 基礎資料
-        Brand brand = new Brand();
+        BrandEntity brand = new BrandEntity();
         brand.setName("Inv Test Brand");
         brand = brandRepository.save(brand);
         this.brandId = brand.getId();
@@ -67,7 +68,7 @@ public class InventoryShipmentNPlusOneIntegrationTest extends AbstractIntegratio
         store = storeRepository.save(store);
         this.storeId = store.getId();
 
-        User user = new User();
+        UserEntity user = new UserEntity();
         user.setBrand(brand);
         user.setPrimaryPhone("0900000000");
         user.setPasswordHash("dummy_hash_for_test");
@@ -78,7 +79,7 @@ public class InventoryShipmentNPlusOneIntegrationTest extends AbstractIntegratio
 
         // 2. 建立 5 個原物料 (Item)
         for (int i = 0; i < 5; i++) {
-            InventoryItem item = new InventoryItem();
+            InventoryItemEntity item = new InventoryItemEntity();
             item.setBrand(brand);
             item.setName("Item-" + i);
             item.setUnit("KG");
@@ -111,8 +112,8 @@ public class InventoryShipmentNPlusOneIntegrationTest extends AbstractIntegratio
         // 重置計數器
         SQLStatementCountValidator.reset();
 
-        // 執行進貨
-        inventoryService.addShipment(brandId, storeId, request);
+        // 執行進貨（需傳入 userId 參數）
+        inventoryService.addShipment(brandId, storeId, helperService.getCurrentUserId(), request);
 
         // 斷言分析：
         // 目前實作 (InventoryService.java) 是跑迴圈：

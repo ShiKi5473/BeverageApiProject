@@ -1,4 +1,4 @@
-﻿package tw.niels.beverage_api_project.integration;
+package tw.niels.beverage_api_project.integration;
 
 import io.hypersistence.utils.jdbc.validator.SQLStatementCountValidator;
 import org.junit.jupiter.api.BeforeEach;
@@ -102,7 +102,7 @@ public class OrderCreationNPlusOneIntegrationTest extends AbstractIntegrationTes
             v.setName("Medium");
             v.setPrice(BigDecimal.valueOf(60));
             v.setSkuCode("LATTE-" + i + "-M");
-            v.setIsDeleted(false);
+            // isDeleted 預設為 false，無需手動設定
             v = productVariantJpaRepository.save(v);
 
             productInfos.add(new ProductInfo(p.getId(), v.getId()));

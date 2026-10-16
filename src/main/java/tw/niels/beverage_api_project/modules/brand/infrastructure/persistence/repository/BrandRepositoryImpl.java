@@ -110,7 +110,9 @@ public class BrandRepositoryImpl implements BrandRepository {
                 setIdMethod.setAccessible(true);
                 setIdMethod.invoke(brand, savedEntity.getId());
             } catch (Exception e) {
-                System.err.println("警告：無法同步品牌 ID 回 Domain Model：" + e.getMessage());
+                // System.err 改為 logger（P3 清理）
+                org.slf4j.LoggerFactory.getLogger(BrandRepositoryImpl.class)
+                        .warn("無法同步品牌 ID 回 Domain Model：{}", e.getMessage());
             }
         }
 

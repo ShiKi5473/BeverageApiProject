@@ -72,7 +72,9 @@ public class StoreRepositoryImpl implements StoreRepository {
                 setIdMethod.setAccessible(true);
                 setIdMethod.invoke(store, savedEntity.getId());
             } catch (Exception e) {
-                System.err.println("警告：無法同步門市 ID 回 Domain Model：" + e.getMessage());
+                // System.err 改為 logger（P3 清理）
+                org.slf4j.LoggerFactory.getLogger(StoreRepositoryImpl.class)
+                        .warn("無法同步門市 ID 回 Domain Model：{}", e.getMessage());
             }
         }
     }

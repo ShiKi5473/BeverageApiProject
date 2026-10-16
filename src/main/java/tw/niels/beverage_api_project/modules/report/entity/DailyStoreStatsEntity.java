@@ -55,6 +55,13 @@ public class DailyStoreStatsEntity extends BaseTsidEntity {
     @Column(name = "line_pay_total", precision = 12, scale = 2)
     private BigDecimal linePayTotal = BigDecimal.ZERO;
 
+    // [B-6 新增] 對應 V19：系統實際的付款方式代碼為 CASH / CREDIT_CARD / THIRD_PARTY
+    @Column(name = "credit_card_total", nullable = false, precision = 12, scale = 2)
+    private BigDecimal creditCardTotal = BigDecimal.ZERO;
+
+    @Column(name = "third_party_total", nullable = false, precision = 12, scale = 2)
+    private BigDecimal thirdPartyTotal = BigDecimal.ZERO;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private Instant createdAt;

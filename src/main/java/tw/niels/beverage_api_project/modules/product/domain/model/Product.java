@@ -3,6 +3,7 @@ package tw.niels.beverage_api_project.modules.product.domain.model;
 import tw.niels.beverage_api_project.common.domain.vo.Money;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -59,8 +60,15 @@ public class Product {
 
     /**
      * 由 Infrastructure Layer 在持久化後回填 ID。
+     * 修改：原為 package-private 的 setId，RepositoryImpl 只能用反射呼叫；
+     * 改為公開的 assignId，並且只允許「尚未有 ID」時指派，避免既有聚合的 ID 被覆寫。
      */
-    void setId(Long id) { this.id = id; }
+    public void assignId(Long id) {
+        if (this.id != null && !this.id.equals(id)) {
+            throw new IllegalStateException("商品已有 ID，不可重新指派：" + this.id);
+        }
+        this.id = id;
+    }
 
     // ─── Getters ───────────────────────────────────────────────────────────
 
@@ -96,4 +104,29 @@ public class Product {
 
     public void activate() { this.isActive = true; }
     public void deactivate() { this.isActive = false; }
+
+    /**
+     * 重新計算商品基礎售價（取所有有效規格中的最低價）。
+     * 在新增、更新或刪除規格後呼叫，維護 basePrice 不變量。
+     */
+    public void recalculateBasePrice() {
+        this.basePrice = variants.stream()
+            .filter(ProductVariant::isActive)
+            .map(ProductVariant::getPrice)
+            .min(Comparator.comparing(Money::amount))
+            .orElse(this.basePrice);
+    }
+
+    /**
+     * 替換全部選項群組連結（用於 LinkOptionGroupsCommand）。
+     * 清除現有連結後透過 {@link #linkOptionGroup} 逐一加入，保留去重邏輯。
+     *
+     * @param groupIds 新的選項群組 ID 清單
+     */
+    public void replaceOptionGroups(List<Long> groupIds) {
+        this.optionGroupIds.clear();
+        if (groupIds != null) {
+            groupIds.forEach(this::linkOptionGroup);
+        }
+    }
 }
