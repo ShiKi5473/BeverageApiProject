@@ -2,8 +2,8 @@ package tw.niels.beverage_api_project.modules.member.infrastructure.mapper;
 
 import tw.niels.beverage_api_project.modules.member.domain.model.*;
 
+import java.time.Instant;
 import java.time.ZoneId;
-import java.util.ArrayList;
 
 /**
  * ============================================================
@@ -18,9 +18,9 @@ import java.util.ArrayList;
  *   + MemberProfile（fullName、email、birthday、gender、totalPoints）
  * - MemberLevel：JPA 無對應欄位，預設 REGULAR
  *   （TODO：待 member_profiles 表加入 level 欄位後更新）
- * - MemberPointLog ↔ PointTransaction：
- *   - JPA 無 type 欄位，依 pointsChange 正負推斷 PointTransactionType
- *   - pointsChange > 0 → EARN_ORDER，< 0 → REDEEM_ORDER，= 0 → ADMIN_ADJUST
+ * - PointTransaction → MemberPointLog（單向，積點紀錄為 append-only 稽核日誌）：
+ *   - JPA 無 type 欄位，交易類型以 reason 字串留存
+ *   - 會員關聯由呼叫端傳入受管實體／getReference 代理
  * ============================================================
  */
 public class MemberMapper {
@@ -46,8 +46,12 @@ public class MemberMapper {
                 jpaUser.getPrimaryPhone(),     // phone 在 users 表
                 jpaProfile.getEmail(),
                 // Date/Timestamp → LocalDate
+                // 修正：java.sql.Date 的 toInstant() 會直接拋 UnsupportedOperationException，
+                // 改用 Instant.ofEpochMilli(getTime())，不論 Hibernate 回傳 java.util.Date / Timestamp / java.sql.Date 都安全。
+                // 時區刻意沿用 JVM 預設：寫入端 java.sql.Date.valueOf(LocalDate) 也是以 JVM 預設時區換算，兩端才會對稱
+                // （Docker 映像已設 TZ=Asia/Taipei）。
                 jpaProfile.getBirthDate() != null
-                    ? jpaProfile.getBirthDate().toInstant()
+                    ? Instant.ofEpochMilli(jpaProfile.getBirthDate().getTime())
                           .atZone(ZoneId.systemDefault()).toLocalDate()
                     : null,
                 jpaProfile.getGender() != null ? jpaProfile.getGender().name() : null
@@ -81,20 +85,19 @@ public class MemberMapper {
      *
      * @param domain      Domain PointTransaction
      * @param balanceAfter 異動後的餘額（由 RepositoryImpl 在 save() 時傳入）
+     * @param memberRef   該會員的 UserEntity（受管實體或 getReference 取得的代理）
      * @return JPA MemberPointLog Entity
      */
     public static tw.niels.beverage_api_project.modules.member.entity.MemberPointLogEntity toPointLogEntity(
-            PointTransaction domain, Long balanceAfter) {
+            PointTransaction domain, Long balanceAfter,
+            tw.niels.beverage_api_project.modules.user.entity.UserEntity memberRef) {
         if (domain == null) return null;
 
         var log = new tw.niels.beverage_api_project.modules.member.entity.MemberPointLogEntity();
 
-        // Member（User）Proxy
-        if (domain.getMemberId() != null) {
-            var user = new tw.niels.beverage_api_project.modules.user.entity.UserEntity();
-            user.setId(domain.getMemberId());
-            log.setMember(user);
-        }
+        // 修正(P3)：會員關聯改由呼叫端傳入受管實體／getReference 代理，
+        // 不再 new UserEntity() + setId()（那會讓 Hibernate flush 時多一次「是否存在」查詢，每筆積點日誌都要查一次）。
+        log.setMember(memberRef);
 
         // Order Proxy（可為 null）- 註：PointTransaction Domain 目前無 orderId 欄位，暫不進行映射
         // 若未來 domain 加入此欄位，需取消註解下方
@@ -113,42 +116,7 @@ public class MemberMapper {
         return log;
     }
 
-    /**
-     * JPA MemberPointLog → Domain PointTransaction
-     *
-     * PointTransactionType 依 pointsChange 推斷：
-     * - > 0 → EARN_ORDER（累積積點）
-     * - < 0 → REDEEM_ORDER（使用積點）
-     * - = 0 → ADMIN_ADJUST（管理員調整）
-     */
-    public static PointTransaction toPointTransactionDomain(
-            tw.niels.beverage_api_project.modules.member.entity.MemberPointLogEntity jpa) {
-        if (jpa == null) return null;
-
-        // 依 pointsChange 推斷 type（JPA 無對應欄位）
-        PointTransactionType type;
-        if (jpa.getPointsChange() == null || jpa.getPointsChange() == 0) {
-            type = PointTransactionType.ADMIN_ADJUST;
-        } else if (jpa.getPointsChange() > 0) {
-            type = PointTransactionType.EARN_ORDER;
-        } else {
-            type = PointTransactionType.REDEEM_ORDER;
-        }
-
-        var domain = PointTransaction.of(
-            jpa.getMember() != null ? jpa.getMember().getId() : null,
-            jpa.getPointsChange(),
-            type,
-            jpa.getReason()
-        );
-        
-        if (jpa.getId() != null) {
-            try {
-                var setIdMethod = PointTransaction.class.getDeclaredMethod("setId", Long.class);
-                setIdMethod.setAccessible(true);
-                setIdMethod.invoke(domain, jpa.getId());
-            } catch (Exception e) {}
-        }
-        return domain;
-    }
+    // 已移除(P3 清理)：原 toPointTransactionDomain(MemberPointLogEntity)。
+    // 該方法沒有任何呼叫端，且用「反射 + setAccessible」呼叫 PointTransaction 的 package-private setId、
+    // 失敗時還吞掉例外（catch (Exception e) {}）。積點紀錄是 append-only 的稽核日誌，不需要從 JPA 還原回 Domain。
 }

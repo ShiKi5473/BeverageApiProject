@@ -48,24 +48,25 @@ public class StaffDto {
      * 靜態工廠方法，用於將 UserEntity 實體轉換為 StaffDto。
      * 這種設計確保了 DTO 的建立邏輯被封裝起來。
      *
-     * @param UserEntity 包含員工資料的 UserEntity 實體
+     * @param user 包含員工資料的 UserEntity 實體
      * @return 轉換後的 StaffDto 物件
      */
-    public static StaffDto fromEntity(UserEntity UserEntity) {
-        // 基本的防呆處理，如果傳入的 UserEntity 是 null 或沒有 staffProfile，則不進行轉換
-        if (UserEntity == null || UserEntity.getStaffProfile() == null) {
+    // 清理(P3)：參數原本與型別同名（UserEntity UserEntity），改為 user
+    public static StaffDto fromEntity(UserEntity user) {
+        // 基本的防呆處理，如果傳入的 user 是 null 或沒有 staffProfile，則不進行轉換
+        if (user == null || user.getStaffProfile() == null) {
             return null;
         }
 
         StaffDto dto = new StaffDto();
-        StaffProfileEntity profile = UserEntity.getStaffProfile();
+        StaffProfileEntity profile = user.getStaffProfile();
 
         // 從 UserEntity 實體中映射資料
-        dto.setUserId(UserEntity.getUserId());
-        dto.setPrimaryPhone(UserEntity.getPrimaryPhone());
-        dto.setActive(UserEntity.getIsActive());
-        if (UserEntity.getBrand() != null) {
-            dto.setBrandId(UserEntity.getBrand().getId());
+        dto.setUserId(user.getUserId());
+        dto.setPrimaryPhone(user.getPrimaryPhone());
+        dto.setActive(user.getIsActive());
+        if (user.getBrand() != null) {
+            dto.setBrandId(user.getBrand().getId());
         }
 
         // 從 StaffProfile 實體中映射資料

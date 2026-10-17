@@ -34,12 +34,15 @@ public class StoreQueryHandler {
      * 查詢品牌下所有分店
      *
      * 處理流程：
-     * 1. 依 brandId 查詢分店列表
-     * 2. 將 Entity 轉為 DTO
+     * 1. 依 brandId 查詢分店列表（一律帶 brandId，只會回傳自己品牌的分店）
+     * 2. onlyActive = true 時（會員／訪客）只取營業中的分店
+     * 3. 將 Entity 轉為 DTO（只含公開欄位）
      */
     @Transactional(readOnly = true)
     public List<StoreResponseDto> handle(GetStoresByBrandQuery query) {
-        List<StoreEntity> stores = storeRepository.findByBrand_Id(query.brandId());
+        List<StoreEntity> stores = query.onlyActive()
+            ? storeRepository.findByBrand_IdAndIsActiveTrue(query.brandId())
+            : storeRepository.findByBrand_Id(query.brandId());
         return stores.stream()
             .map(StoreResponseDto::fromEntity)
             .collect(Collectors.toList());

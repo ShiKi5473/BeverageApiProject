@@ -8,7 +8,7 @@ import java.util.Optional;
 
 /**
  * ============================================================
- * Bounded Context: BrandEntity & StoreEntity
+ * Bounded Context: Brand & Store
  * Layer: Infrastructure - Spring Data JPA Repository
  * ============================================================
  *

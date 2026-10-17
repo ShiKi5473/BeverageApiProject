@@ -2,8 +2,10 @@ package tw.niels.beverage_api_project.modules.brand.infrastructure.persistence.r
 
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
+import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
 import tw.niels.beverage_api_project.modules.brand.domain.model.Brand;
 import tw.niels.beverage_api_project.modules.brand.domain.repository.BrandRepository;
+import tw.niels.beverage_api_project.modules.brand.entity.BrandEntity;
 import tw.niels.beverage_api_project.modules.brand.infrastructure.mapper.BrandMapper;
 import tw.niels.beverage_api_project.modules.brand.repository.BrandJpaRepository;
 import tw.niels.beverage_api_project.modules.brand.repository.BrandPointConfigJpaRepository;
@@ -86,46 +88,45 @@ public class BrandRepositoryImpl implements BrandRepository {
     }
 
     /**
-     * 儲存品牌（含積點設定）
+     * 儲存品牌（含積點設定；新增或更新）
      *
      * 流程：
-     * 1. 儲存 Brand（brands 表）
-     * 2. 若有 pointConfig，儲存 BrandPointConfig（brand_point_configs 表）
-     * 3. 若為新增，使用反射同步資料庫生成的 ID 回 Domain Model
+     * 1. 更新：載入「受管」的 BrandEntity 後套用欄位；新增：建立新的 BrandEntity 並 save
+     * 2. 若有 pointConfig，更新（或新增）brand_point_configs 表
+     * 3. 若為新增，用 Brand.assignId() 同步資料庫實體的 ID 回 Domain Model
+     *
+     * 修正(P0-1 同類問題 / 清理)：
+     * - 原本更新時 new 一個帶舊 ID 的 BrandEntity 去 persist，PUT /brands/point-config 必然失敗（409）。
+     * - 原本用反射呼叫不存在的 private setId，失敗只記警告，新增品牌後 Domain 的 ID 永遠是 null。
      *
      * @param brand 要儲存的 Domain Brand
      */
     @Override
     @Transactional
     public void save(Brand brand) {
-        // 轉換並儲存 Brand Entity
-        var jpaEntity = BrandMapper.toEntity(brand);
-        var savedEntity = brandJpaRepository.save(jpaEntity);
+        BrandEntity entity;
+        if (brand.getId() != null) {
+            // 更新既有品牌：以受管實體套用欄位
+            entity = brandJpaRepository.findById(brand.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("找不到品牌，ID：" + brand.getId()));
+            BrandMapper.applyTo(entity, brand);
+        } else {
+            // 新增品牌
+            entity = BrandMapper.toNewEntity(brand);
+        }
+        BrandEntity savedEntity = brandJpaRepository.save(entity);
 
-        // 若是新增（無 ID），同步資料庫生成的 TSID 回 Domain Model
-        if (brand.getId() == null && savedEntity.getId() != null) {
-            try {
-                // Brand.id 是 final，透過反射設定
-                var setIdMethod = Brand.class.getDeclaredMethod("setId", Long.class);
-                setIdMethod.setAccessible(true);
-                setIdMethod.invoke(brand, savedEntity.getId());
-            } catch (Exception e) {
-                // System.err 改為 logger（P3 清理）
-                org.slf4j.LoggerFactory.getLogger(BrandRepositoryImpl.class)
-                        .warn("無法同步品牌 ID 回 Domain Model：{}", e.getMessage());
-            }
+        // 若是新增（Domain 尚無 ID），把資料庫實體的 TSID 回填給 Domain Model
+        if (brand.getId() == null) {
+            brand.assignId(savedEntity.getId());
         }
 
         // 儲存 BrandPointConfig（若 pointConfig 存在）
-        if (brand.getPointConfig() != null && savedEntity.getId() != null) {
-            // 查詢現現有設定（UPDATE）或建立新設定（INSERT）
+        if (brand.getPointConfig() != null) {
+            // 查詢既有設定（UPDATE）或建立新設定（INSERT）；新增時關聯直接使用剛儲存的受管 BrandEntity
             var existingConfig = pointConfigRepository.findById(savedEntity.getId()).orElse(null);
-            var configEntity = BrandMapper.toPointConfigEntity(brand, existingConfig);
+            var configEntity = BrandMapper.toPointConfigEntity(brand, existingConfig, savedEntity);
             if (configEntity != null) {
-                // 確保 brand 關聯使用正確的儲存後 ID
-                var brandProxy = new tw.niels.beverage_api_project.modules.brand.entity.BrandEntity();
-                brandProxy.setId(savedEntity.getId());
-                configEntity.setBrand(brandProxy);
                 pointConfigRepository.save(configEntity);
             }
         }

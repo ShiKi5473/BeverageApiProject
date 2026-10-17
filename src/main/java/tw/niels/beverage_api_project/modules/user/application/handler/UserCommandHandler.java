@@ -44,8 +44,9 @@ public class UserCommandHandler {
         // 提權防護（S-1）：只在 UserController -> UserCommandHandler 這條路徑檢查，
         // 不放進 UserService.createUser，因為 PlatformController 建立首位品牌管理員也會用到它。
         authorizeStaffCreation(command.requestDto());
-        UserEntity UserEntity = userService.createUser(command.requestDto());
-        return UserEntity.getId();
+        // 清理(P3)：區域變數原本與型別同名（UserEntity UserEntity），改為 createdUser
+        UserEntity createdUser = userService.createUser(command.requestDto());
+        return createdUser.getId();
     }
 
     /**

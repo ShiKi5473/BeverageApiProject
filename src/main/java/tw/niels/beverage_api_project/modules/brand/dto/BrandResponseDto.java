@@ -32,15 +32,16 @@ public class BrandResponseDto {
     @Schema(description = "更新時間")
     private Date updatedAt;
 
-    public static BrandResponseDto fromEntity(BrandEntity BrandEntity) {
-        if (BrandEntity == null) return null;
+    // 清理(P3)：參數原本與型別同名（BrandEntity BrandEntity），改為 brand
+    public static BrandResponseDto fromEntity(BrandEntity brand) {
+        if (brand == null) return null;
         BrandResponseDto dto = new BrandResponseDto();
-        dto.setBrandId(BrandEntity.getId());
-        dto.setName(BrandEntity.getName());
-        dto.setContactPerson(BrandEntity.getContactPerson());
-        dto.setIsActive(BrandEntity.getIsActive());
-        dto.setCreatedAt(BrandEntity.getCreatedAt());
-        dto.setUpdatedAt(BrandEntity.getUpdatedAt());
+        dto.setBrandId(brand.getId());
+        dto.setName(brand.getName());
+        dto.setContactPerson(brand.getContactPerson());
+        dto.setIsActive(brand.getIsActive());
+        dto.setCreatedAt(brand.getCreatedAt());
+        dto.setUpdatedAt(brand.getUpdatedAt());
         return dto;
     }
 }

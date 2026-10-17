@@ -1,8 +1,14 @@
 package tw.niels.beverage_api_project.modules.store.infrastructure.persistence.repository;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
+import tw.niels.beverage_api_project.modules.brand.entity.BrandEntity;
 import tw.niels.beverage_api_project.modules.store.domain.model.Store;
 import tw.niels.beverage_api_project.modules.store.domain.repository.StoreRepository;
+import tw.niels.beverage_api_project.modules.store.entity.StoreEntity;
 import tw.niels.beverage_api_project.modules.store.infrastructure.mapper.StoreMapper;
 import tw.niels.beverage_api_project.modules.store.repository.StoreJpaRepository;
 
@@ -23,6 +29,10 @@ import java.util.stream.Collectors;
 public class StoreRepositoryImpl implements StoreRepository {
 
     private final StoreJpaRepository jpaRepository;
+
+    // 用於取得品牌關聯的 getReference 代理（不觸發查詢）
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public StoreRepositoryImpl(StoreJpaRepository jpaRepository) {
         this.jpaRepository = jpaRepository;
@@ -56,26 +66,35 @@ public class StoreRepositoryImpl implements StoreRepository {
     }
 
     /**
-     * 儲存門市
+     * 儲存門市（新增或更新）
+     *
+     * 修正(P0-1 同類問題 / 清理)：
+     * - 更新：先以 brandId + id 載入「受管」的 StoreEntity，再套用欄位（dirty checking），
+     *   不再 new 一個帶舊 ID 的 StoreEntity 去 persist（必定 PK 衝突 / NonUniqueObjectException）。
+     * - 新增：以 EntityManager.getReference 取得品牌參照後建立新實體，並用 Store.assignId() 回填 ID，
+     *   取代原本呼叫不存在的 private setId 的反射（失敗只記警告，導致 StoreCommandHandler 回傳 null ID）。
      *
      * @param store 要儲存的 Domain Store
      */
     @Override
+    @Transactional
     public void save(Store store) {
-        var jpaEntity = StoreMapper.toEntity(store);
-        var savedEntity = jpaRepository.save(jpaEntity);
+        StoreEntity entity;
+        if (store.getId() != null) {
+            // 更新既有門市：帶 brandId 查詢，同時維持多租戶隔離
+            entity = jpaRepository.findByBrand_IdAndId(store.getBrandId(), store.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("找不到分店，ID：" + store.getId()));
+            StoreMapper.applyTo(entity, store);
+        } else {
+            // 新增門市
+            entity = StoreMapper.toNewEntity(store, entityManager.getReference(BrandEntity.class, store.getBrandId()));
+        }
 
-        // 若是新增（無 ID），同步資料庫生成的 TSID 回 Domain Model
-        if (store.getId() == null && savedEntity.getId() != null) {
-            try {
-                var setIdMethod = Store.class.getDeclaredMethod("setId", Long.class);
-                setIdMethod.setAccessible(true);
-                setIdMethod.invoke(store, savedEntity.getId());
-            } catch (Exception e) {
-                // System.err 改為 logger（P3 清理）
-                org.slf4j.LoggerFactory.getLogger(StoreRepositoryImpl.class)
-                        .warn("無法同步門市 ID 回 Domain Model：{}", e.getMessage());
-            }
+        StoreEntity saved = jpaRepository.save(entity);
+
+        // 若是新增（Domain 尚無 ID），把資料庫實體的 TSID 回填給 Domain Model
+        if (store.getId() == null) {
+            store.assignId(saved.getId());
         }
     }
 }

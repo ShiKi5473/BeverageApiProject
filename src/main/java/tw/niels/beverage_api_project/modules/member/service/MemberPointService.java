@@ -16,12 +16,22 @@ import tw.niels.beverage_api_project.modules.user.entity.UserEntity;
 import tw.niels.beverage_api_project.modules.user.entity.profile.MemberProfileEntity;
 import tw.niels.beverage_api_project.modules.user.repository.MemberProfileJpaRepository;
 
+/**
+ * 舊架構的會員積點服務（直接操作 JPA Entity）。
+ * <p>
+ * 清理(P3)：目前專案內已沒有任何呼叫端，新流程一律透過 {@code Member} Aggregate
+ * （consumePoints / earnPoints / refundPoints / adjustPoints）搭配 {@code MemberRepository.save()} 處理，
+ * 點數異動與積點日誌都由 Domain Model 與 RepositoryImpl 統一負責。此類別僅為過渡期保留，後續可直接刪除。
+ * 本次只把「欄位／參數名稱與型別同名」的批次改名殘留（OrderEntity OrderEntity、BrandPointConfigJpaRepository
+ * BrandPointConfigJpaRepository）改回正常的小駝峰命名。
+ * </p>
+ */
 @Service
 public class MemberPointService {
 
     private final MemberProfileJpaRepository memberProfileRepository;
     private final MemberPointLogJpaRepository memberPointLogRepository;
-    private final BrandPointConfigJpaRepository BrandPointConfigJpaRepository;
+    private final BrandPointConfigJpaRepository brandPointConfigRepository;
 
     // 預設規則 (當品牌沒有設定檔時使用)
     private static final BigDecimal DEFAULT_EARN_RATE = BigDecimal.ONE;
@@ -29,10 +39,10 @@ public class MemberPointService {
 
     public MemberPointService(MemberProfileJpaRepository memberProfileRepository,
                               MemberPointLogJpaRepository memberPointLogRepository,
-                              BrandPointConfigJpaRepository BrandPointConfigJpaRepository) {
+                              BrandPointConfigJpaRepository brandPointConfigRepository) {
         this.memberProfileRepository = memberProfileRepository;
         this.memberPointLogRepository = memberPointLogRepository;
-        this.BrandPointConfigJpaRepository = BrandPointConfigJpaRepository;
+        this.brandPointConfigRepository = brandPointConfigRepository;
     }
 
     /**
@@ -41,14 +51,14 @@ public class MemberPointService {
      * @param pointsToUse 要使用的點數
      * @return 可折抵的金額
      */
-    public BigDecimal calculateDiscountAmount(Long pointsToUse, OrderEntity OrderEntity) {
+    public BigDecimal calculateDiscountAmount(Long pointsToUse, OrderEntity order) {
         if (pointsToUse == null || pointsToUse <= 0) return BigDecimal.ZERO;
         // 取得規則
         BigDecimal rate = DEFAULT_REDEEM_RATE;
-        if (OrderEntity.getBrand() != null) {
+        if (order.getBrand() != null) {
             BrandPointConfigEntity config = null;
-            if (OrderEntity.getBrand().getId() != null) {
-                config = BrandPointConfigJpaRepository.findById(OrderEntity.getBrand().getId())
+            if (order.getBrand().getId() != null) {
+                config = brandPointConfigRepository.findById(order.getBrand().getId())
                         .orElse(null);
             }
 
@@ -65,15 +75,15 @@ public class MemberPointService {
      * @param finalAmount 訂單最終金額
      * @return 應獲得的點數
      */
-    public Long calculatePointsEarned(BigDecimal finalAmount, OrderEntity OrderEntity) {
+    public Long calculatePointsEarned(BigDecimal finalAmount, OrderEntity order) {
         if (finalAmount == null || finalAmount.compareTo(BigDecimal.ZERO) <= 0) return 0L;
 
         // 取得規則
         BigDecimal rate = DEFAULT_EARN_RATE;
-        if (OrderEntity.getBrand() != null) {
+        if (order.getBrand() != null) {
             BrandPointConfigEntity config = null;
-            if (OrderEntity.getBrand().getId() != null) {
-                config = BrandPointConfigJpaRepository.findById(OrderEntity.getBrand().getId())
+            if (order.getBrand().getId() != null) {
+                config = brandPointConfigRepository.findById(order.getBrand().getId())
                         .orElse(null);
             }
 
@@ -92,11 +102,11 @@ public class MemberPointService {
      * 【新方法】
      * 退還點數 (在訂單取消時呼叫)
      * * @param member 會員 UserEntity 實體
-     * @param OrderEntity  相關訂單
+     * @param order  相關訂單
      */
     @Transactional(propagation = Propagation.MANDATORY) // 確保此方法在現有交易中執行
-    public void refundPoints(UserEntity member, OrderEntity OrderEntity) {
-        Long pointsToRefund = OrderEntity.getPointsUsed();
+    public void refundPoints(UserEntity member, OrderEntity order) {
+        Long pointsToRefund = order.getPointsUsed();
 
         if (member == null || pointsToRefund == null || pointsToRefund <= 0) {
             return; // 沒有會員或沒有使用點數，直接返回
@@ -117,7 +127,8 @@ public class MemberPointService {
         memberProfileRepository.save(profile); // 儲存更新後的 Profile
 
         // 記錄 Log
-        String reason = "訂單取消點數返還 (單號: " + OrderEntity.getOrderNumber() + ")";        MemberPointLogEntity log = new MemberPointLogEntity(member, OrderEntity, pointsToRefund, newTotalPoints, reason);
+        String reason = "訂單取消點數返還 (單號: " + order.getOrderNumber() + ")";
+        MemberPointLogEntity log = new MemberPointLogEntity(member, order, pointsToRefund, newTotalPoints, reason);
         memberPointLogRepository.save(log);
     }
 
@@ -125,12 +136,12 @@ public class MemberPointService {
      * 使用點數 (在創建訂單時呼叫)
      * 
      * @param member      會員 UserEntity 實體
-     * @param OrderEntity       相關訂單
+     * @param order       相關訂單
      * @param pointsToUse 要使用的點數
      * @throws BadRequestException 如果點數不足
      */
     @Transactional(propagation = Propagation.MANDATORY) // 確保此方法在現有交易中執行
-    public void usePoints(UserEntity member, OrderEntity OrderEntity, Long pointsToUse) {
+    public void usePoints(UserEntity member, OrderEntity order, Long pointsToUse) {
         if (member == null || pointsToUse == null || pointsToUse <= 0) {
             return; // 沒有會員或沒使用點數，直接返回
         }
@@ -152,8 +163,8 @@ public class MemberPointService {
         memberProfileRepository.save(profile); // 儲存更新後的 Profile
 
         // 記錄 Log
-        String reason = "訂單折抵 (單號: " + (OrderEntity != null ? OrderEntity.getOrderNumber() : "N/A") + ")";
-        MemberPointLogEntity log = new MemberPointLogEntity(member, OrderEntity, -pointsToUse, newTotalPoints, reason);
+        String reason = "訂單折抵 (單號: " + (order != null ? order.getOrderNumber() : "N/A") + ")";
+        MemberPointLogEntity log = new MemberPointLogEntity(member, order, -pointsToUse, newTotalPoints, reason);
         memberPointLogRepository.save(log);
     }
 
@@ -161,11 +172,11 @@ public class MemberPointService {
      * 賺取點數 (在訂單完成時呼叫)
      * 
      * @param member       會員 UserEntity 實體
-     * @param OrderEntity        相關訂單
+     * @param order        相關訂單
      * @param pointsEarned 賺取的點數
      */
     @Transactional(propagation = Propagation.MANDATORY) // 確保此方法在現有交易中執行
-    public void earnPoints(UserEntity member, OrderEntity OrderEntity, Long pointsEarned) {
+    public void earnPoints(UserEntity member, OrderEntity order, Long pointsEarned) {
         if (member == null || pointsEarned == null || pointsEarned <= 0) {
             return; // 沒有會員或沒賺取點數，直接返回
         }
@@ -186,8 +197,8 @@ public class MemberPointService {
         memberProfileRepository.save(profile); // 儲存更新後的 Profile
 
         // 記錄 Log
-        String reason = "訂單消費獲得 (單號: " + (OrderEntity != null ? OrderEntity.getOrderNumber() : "N/A") + ")";
-        MemberPointLogEntity log = new MemberPointLogEntity(member, OrderEntity, pointsEarned, newTotalPoints, reason);
+        String reason = "訂單消費獲得 (單號: " + (order != null ? order.getOrderNumber() : "N/A") + ")";
+        MemberPointLogEntity log = new MemberPointLogEntity(member, order, pointsEarned, newTotalPoints, reason);
         memberPointLogRepository.save(log);
     }
 

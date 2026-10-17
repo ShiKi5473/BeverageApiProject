@@ -45,13 +45,17 @@ public class MembershipCommandHandler {
     private final BrandRepository brandRepository;
     private final MemberRepository memberRepository;
     private final PasswordEncoder passwordEncoder;
+    // 營業時區（TimeConfig.businessZoneId）：生日等日期欄位以此時區換算成 LocalDate
+    private final ZoneId businessZoneId;
 
     public MembershipCommandHandler(BrandRepository brandRepository,
                                     MemberRepository memberRepository,
-                                    PasswordEncoder passwordEncoder) {
+                                    PasswordEncoder passwordEncoder,
+                                    ZoneId businessZoneId) {
         this.brandRepository = brandRepository;
         this.memberRepository = memberRepository;
         this.passwordEncoder = passwordEncoder;
+        this.businessZoneId = businessZoneId;
     }
 
     /**
@@ -88,10 +92,12 @@ public class MembershipCommandHandler {
             var mp = req.getMemberProfile();
 
             // java.util.Date → LocalDate（birthDate）
+            // 修正(B-7)：不再用 ZoneId.systemDefault()（Docker 映像預設 UTC，會讓 "2000-01-01" 變成前一天），
+            // 改用營業時區（與 spring.jackson.time-zone 解析 JSON 日期時採用的時區一致）。
             LocalDate birthday = null;
             if (mp.getBirthDate() != null) {
                 birthday = mp.getBirthDate().toInstant()
-                    .atZone(ZoneId.systemDefault()).toLocalDate();
+                    .atZone(businessZoneId).toLocalDate();
             }
 
             // Gender enum → String（MemberProfile VO 以 String 儲存）

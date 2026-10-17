@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,7 +33,8 @@ import tw.niels.beverage_api_project.security.TokenRevocationService;
 @Service
 public class UserService {
 
-    private final UserJpaRepository UserJpaRepository;
+    // 清理(P3)：欄位原本與型別同名（UserJpaRepository UserJpaRepository），改為 userRepository
+    private final UserJpaRepository userRepository;
 
     private final BrandJpaRepository brandRepository;
 
@@ -47,13 +49,13 @@ public class UserService {
     // 員工角色／分店／啟用狀態變更時，用來撤銷舊 token
     private final TokenRevocationService tokenRevocationService;
 
-    public UserService(UserJpaRepository UserJpaRepository, BrandJpaRepository brandRepository, StoreJpaRepository storeRepository,
+    public UserService(UserJpaRepository userRepository, BrandJpaRepository brandRepository, StoreJpaRepository storeRepository,
             PasswordEncoder passwordEncoder,
                        StaffProfileJpaRepository staffProfileRepository,
                        ControllerHelperService helperService,
                        TokenRevocationService tokenRevocationService) {
         this.tokenRevocationService = tokenRevocationService;
-        this.UserJpaRepository = UserJpaRepository;
+        this.userRepository = userRepository;
         this.brandRepository = brandRepository;
         this.storeRepository = storeRepository;
         this.passwordEncoder = passwordEncoder;
@@ -64,21 +66,23 @@ public class UserService {
     @Transactional
     public UserEntity createUser(CreateUserRequestDto requestDto) {
         // 1. 檢查品牌是否存在
-        BrandEntity BrandEntity = brandRepository.findById(requestDto.getBrandId())
+        // 清理(P3)：區域變數原本與型別同名（BrandEntity BrandEntity / UserEntity UserEntity / StoreEntity StoreEntity），
+        // 改為 brand / newUser / store
+        BrandEntity brand = brandRepository.findById(requestDto.getBrandId())
                 .orElseThrow(() -> new ResourceNotFoundException("找不到品牌，ID：" + requestDto.getBrandId()));
 
         // 2. 檢查手機號碼是否已在該品牌下註冊
-        UserJpaRepository.findByPrimaryPhoneAndBrandId(requestDto.getPrimaryPhone(), requestDto.getBrandId())
+        userRepository.findByPrimaryPhoneAndBrandId(requestDto.getPrimaryPhone(), requestDto.getBrandId())
                 .ifPresent(existingUser -> {
                     throw new DomainException("手機號碼已被使用：" + requestDto.getPrimaryPhone());
                 });
 
         // 3. 建立核心 UserEntity 物件
-        UserEntity UserEntity = new UserEntity();
-        UserEntity.setBrand(BrandEntity);
-        UserEntity.setPrimaryPhone(requestDto.getPrimaryPhone());
-        UserEntity.setPasswordHash(passwordEncoder.encode(requestDto.getPassword()));
-        UserEntity.setIsActive(true);
+        UserEntity newUser = new UserEntity();
+        newUser.setBrand(brand);
+        newUser.setPrimaryPhone(requestDto.getPrimaryPhone());
+        newUser.setPasswordHash(passwordEncoder.encode(requestDto.getPassword()));
+        newUser.setIsActive(true);
 
         // 4. 根據請求，建立對應的 Profile
         // 建立員工 Profile
@@ -92,12 +96,12 @@ public class UserService {
 
             if (staffDto.getStoreId() != null) {
                 // 修改：改拋出 ResourceNotFoundException
-                StoreEntity StoreEntity = storeRepository.findByBrand_IdAndId(BrandEntity.getId(), staffDto.getStoreId())
+                StoreEntity store = storeRepository.findByBrand_IdAndId(brand.getId(), staffDto.getStoreId())
                         .orElseThrow(() -> new ResourceNotFoundException("找不到分店，ID：" + staffDto.getStoreId()));
-                staffProfile.setStore(StoreEntity);
+                staffProfile.setStore(store);
             }
             // 建立雙向關聯
-            UserEntity.setStaffProfile(staffProfile);
+            newUser.setStaffProfile(staffProfile);
         }
 
         // 建立會員 Profile
@@ -109,11 +113,11 @@ public class UserService {
             memberProfile.setBirthDate(memberDto.getBirthDate());
             memberProfile.setGender(memberDto.getGender());
             memberProfile.setNotes(memberDto.getNotes());
-            UserEntity.setMemberProfile(memberProfile);
+            newUser.setMemberProfile(memberProfile);
         }
 
         // 5. 儲存 UserEntity (由於 CascadeType.ALL, Profile 會一併被儲存)
-        return UserJpaRepository.save(UserEntity);
+        return userRepository.save(newUser);
     }
 
     /**
@@ -122,7 +126,7 @@ public class UserService {
      */
     @Transactional(readOnly = true)
     public UserEntity getUser(Long brandId, Long userId) {
-        return UserJpaRepository.findByBrand_IdAndId(brandId, userId)
+        return userRepository.findByBrand_IdAndId(brandId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("找不到使用者 (ID: " + userId + ")"));
     }
 
@@ -133,7 +137,7 @@ public class UserService {
      */
     @Transactional(readOnly = true)
     public UserEntity getMember(Long brandId, Long memberId) {
-        return UserJpaRepository.findByBrand_IdAndId(brandId, memberId)
+        return userRepository.findByBrand_IdAndId(brandId, memberId)
                 .filter(u -> u.getMemberProfile() != null)
                 .orElseThrow(() -> new ResourceNotFoundException("找不到會員，ID：" + memberId));
     }
@@ -145,10 +149,11 @@ public class UserService {
      * @param brandId 當前操作的品牌 ID
      * @return 包含會員資訊的 Optional<MemberDto>
      */
-    @Transactional
+    // 純查詢，改為唯讀交易（原本是一般 @Transactional）
+    @Transactional(readOnly = true)
     public Optional<MemberDto> findMemberByPhone(String phone, Long brandId) {
-        return UserJpaRepository.findByPrimaryPhoneAndBrandId(phone, brandId)
-                .filter(UserEntity -> UserEntity.getMemberProfile() != null)
+        return userRepository.findByPrimaryPhoneAndBrandId(phone, brandId)
+                .filter(user -> user.getMemberProfile() != null)
                 .map(MemberDto::fromEntity);
     }
 
@@ -190,19 +195,26 @@ public class UserService {
 
         // 如果當前操作者「不是」品牌管理員 (即為店長 MANAGER)
         if (!isCurrentUserBrandAdmin) {
+            // 修正(S-1)：以下權限不足的情況原本拋 DomainException（HTTP 422），語意不對；
+            // 改拋 AccessDeniedException，由 GlobalExceptionHandler 轉成 403。
             // A. 禁止修改 BRAND_ADMIN 的資料
             if (targetProfile.getRole() == StaffRole.BRAND_ADMIN) {
-                throw new DomainException("權限不足：店長無法修改品牌管理員的資料");
+                throw new AccessDeniedException("權限不足：店長無法修改品牌管理員的資料");
             }
             // B. 禁止將任何人提升為 BRAND_ADMIN
             if (dto.getRole() == StaffRole.BRAND_ADMIN) {
-                throw new DomainException("權限不足：店長無法指派品牌管理員角色");
+                throw new AccessDeniedException("權限不足：店長無法指派品牌管理員角色");
             }
-            // C. 禁止跨店操作 (雖然 Controller 層有檢查，這裡做雙重保險)
+            // C. 禁止跨店操作：目標員工必須屬於店長自己的分店。
+            // 修正：原本「目標員工沒有分店(null)」時會直接放行；改成 Objects.equals，沒有分店的員工只能由品牌管理員調整。
             Long targetStoreId = targetProfile.getStore() != null ? targetProfile.getStore().getId() : null;
             Long currentStoreId = currentUser.storeId();
-            if (targetStoreId != null && !targetStoreId.equals(currentStoreId)) {
-                throw new DomainException("權限不足：無法修改非本店員工資料");
+            if (!java.util.Objects.equals(targetStoreId, currentStoreId)) {
+                throw new AccessDeniedException("權限不足：無法修改非本店員工資料");
+            }
+            // D. 禁止把員工調到別的分店（原本 Controller 註解宣稱「店長不能隨意調動員工到別店」，但實際上沒有檢查）
+            if (dto.getStoreId() != null && !dto.getStoreId().equals(currentStoreId)) {
+                throw new AccessDeniedException("權限不足：店長無法將員工調動到其他分店");
             }
         }
 
@@ -223,9 +235,9 @@ public class UserService {
 
         // 4. 更新所屬分店 (調店)
         if (dto.getStoreId() != null) {
-            StoreEntity StoreEntity = storeRepository.findByBrand_IdAndId(brandId, dto.getStoreId())
+            StoreEntity store = storeRepository.findByBrand_IdAndId(brandId, dto.getStoreId())
                     .orElseThrow(() -> new ResourceNotFoundException("找不到分店 ID: " + dto.getStoreId()));
-            targetProfile.setStore(StoreEntity);
+            targetProfile.setStore(store);
         } else if (dto.getRole() == StaffRole.BRAND_ADMIN) {
             // 只有品牌管理員允許沒有分店
             targetProfile.setStore(null);
@@ -237,7 +249,7 @@ public class UserService {
         }
 
         staffProfileRepository.save(targetProfile);
-        UserJpaRepository.save(targetUser);
+        userRepository.save(targetUser);
 
         // 角色、分店或啟用狀態有變動時，撤銷該員工既有的 JWT：
         // 因 token 內已含 role/storeId，且 Filter 不再查 DB，必須靠撤銷機制讓舊權限立即失效，

@@ -1,5 +1,7 @@
 package tw.niels.beverage_api_project.modules.member.domain.model;
 
+import tw.niels.beverage_api_project.common.exception.DomainException;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -93,11 +95,12 @@ public class Member {
      *
      * @param amount 累積數量（必須 > 0）
      * @param reason 原因說明（如：「訂單 #A001 結帳累積」）
-     * @throws IllegalStateException 若會員已停用
+     * @throws DomainException 若會員已停用
      */
     public void earnPoints(Long amount, String reason) {
         if (!this.isActive) {
-            throw new IllegalStateException("停用的會員無法累積積點");
+            // 修正：業務規則違反統一拋 DomainException（HTTP 422），不再用 IllegalStateException（會被轉成 409）
+            throw new DomainException("停用的會員無法累積積點");
         }
         if (amount != null && amount > 0) {
             this.points = this.points.add(amount);
@@ -110,13 +113,24 @@ public class Member {
     /**
      * 折抵使用積點（POS 結帳時呼叫）。
      *
-     * @param amount 使用數量（必須 > 0）
+     * <p>
+     * 結帳交易內「同步」扣點（見 CLAUDE.md §5.3）：餘額不足時拋出 {@link DomainException}（HTTP 422），
+     * 呼叫端所在的結帳交易整筆回滾，不會產生訂單。
+     * </p>
+     *
+     * @param amount 使用數量；null 或 <= 0 視為未使用積點，直接忽略（與 earnPoints / refundPoints 一致）
      * @param reason 原因說明（如：「訂單 #A001 積點折抵」）
-     * @throws IllegalStateException 若積點不足
+     * @throws DomainException 若積點不足
      */
     public void consumePoints(Long amount, String reason) {
+        // 修正：原本 amount 為 null / 0 時會 NPE 或在 PointTransaction 拋 IllegalArgumentException，
+        // 這裡先擋掉，讓「沒用點數」的結帳可以安全呼叫。
+        if (amount == null || amount <= 0) {
+            return;
+        }
         if (!this.points.hasEnough(amount)) {
-            throw new IllegalStateException(
+            // 修正：改拋 DomainException（HTTP 422），而不是 IllegalStateException（全域處理器會轉成 409）
+            throw new DomainException(
                     "會員積點不足，現有 " + this.points.value() + " 點，需要 " + amount + " 點"
             );
         }
@@ -160,12 +174,13 @@ public class Member {
      *
      * @param amount 調整數量（正數增加，負數扣減）；為 0 時略過
      * @param reason 原因說明（如：「活動補償」、「誤點更正」）
-     * @throws IllegalStateException 若扣減後餘額不足
+     * @throws DomainException 若扣減後餘額不足
      */
     public void adjustPoints(Long amount, String reason) {
         if (amount == null || amount == 0) return;
         if (amount < 0 && !this.points.hasEnough(-amount)) {
-            throw new IllegalStateException(
+            // 修正：改拋 DomainException（HTTP 422），與其他積點業務規則一致
+            throw new DomainException(
                 "積點不足，無法扣減：現有 " + this.points.value() + " 點，嘗試扣減 " + (-amount) + " 點"
             );
         }

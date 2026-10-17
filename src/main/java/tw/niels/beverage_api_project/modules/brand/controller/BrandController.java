@@ -25,13 +25,14 @@ import tw.niels.beverage_api_project.modules.brand.application.query.GetBrandByI
 import tw.niels.beverage_api_project.modules.brand.dto.BrandResponseDto;
 import tw.niels.beverage_api_project.modules.brand.dto.UpdatePointConfigDto;
 import tw.niels.beverage_api_project.common.constants.AuthorityConstants;
-import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 @RestController
 @RequestMapping(ApiPaths.API_V1 + ApiPaths.BRANDS)
-@Tag(name = "BrandEntity Management", description = "品牌資訊與設定 API")
+// 清理(P3)：批次改名殘留 "BrandEntity Management" → "Brand Management"
+@Tag(name = "Brand Management", description = "品牌資訊與設定 API")
 public class BrandController {
 
     private final BrandCommandHandler commandHandler;
@@ -62,7 +63,9 @@ public class BrandController {
         boolean isPlatformAdmin = authentication != null && authentication.getAuthorities().stream()
                 .anyMatch(a -> AuthorityConstants.ROLE_PLATFORM_ADMIN.equals(a.getAuthority()));
         if (!isPlatformAdmin && !id.equals(helperService.getCurrentBrandId())) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            // 改拋 AccessDeniedException：由 GlobalExceptionHandler 轉成 403 + 統一的 ErrorResponse 格式
+            // （原本回傳空 body 的 403，前端讀不到錯誤訊息）
+            throw new AccessDeniedException("無權限查詢其他品牌的資料");
         }
 
         return queryHandler.handle(new GetBrandByIdQuery(id))

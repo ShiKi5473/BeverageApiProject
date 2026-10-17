@@ -1,7 +1,11 @@
 package tw.niels.beverage_api_project.modules.member.infrastructure.persistence.repository;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
+import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
+import tw.niels.beverage_api_project.modules.brand.entity.BrandEntity;
 import tw.niels.beverage_api_project.modules.member.domain.model.Member;
 import tw.niels.beverage_api_project.modules.member.domain.model.PointTransaction;
 import tw.niels.beverage_api_project.modules.member.domain.repository.MemberRepository;
@@ -40,6 +44,10 @@ public class MemberRepositoryImpl implements MemberRepository {
     private final UserJpaRepository userJpaRepo;
     private final MemberProfileJpaRepository memberProfileJpaRepo;
     private final MemberPointLogJpaRepository pointLogJpaRepo;
+
+    // 用來以 getReference() 取得品牌關聯代理（取代 new BrandEntity() + setId()，避免 flush 時多餘的存在性查詢）
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public MemberRepositoryImpl(UserJpaRepository userJpaRepo,
                                  MemberProfileJpaRepository memberProfileJpaRepo,
@@ -105,10 +113,9 @@ public class MemberRepositoryImpl implements MemberRepository {
         // ─── 步驟 1：建立 UserEntity ──────────────────────────────────────
         var jpaUser = new UserEntity();
 
-        // 品牌關聯：使用 Proxy 物件，僅帶入 ID，避免額外查詢
-        var brandProxy = new tw.niels.beverage_api_project.modules.brand.entity.BrandEntity();
-        brandProxy.setId(member.getBrandId());
-        jpaUser.setBrand(brandProxy);
+        // 品牌關聯：改用 EntityManager.getReference()（P3 清理），僅帶入 ID 且不觸發額外查詢；
+        // 原本的 new BrandEntity() + setId() 是「未管理的暫態物件」，Hibernate flush 時會再查一次確認它是否存在。
+        jpaUser.setBrand(entityManager.getReference(BrandEntity.class, member.getBrandId()));
 
         jpaUser.setPrimaryPhone(member.getProfile().phone());
         jpaUser.setPasswordHash(passwordHash);
@@ -156,17 +163,21 @@ public class MemberRepositoryImpl implements MemberRepository {
     @Transactional
     public void save(Member member) {
         // ─── 步驟 1：更新 User（isActive）─────────────────────────────────
-        // 查詢現有 User Entity（不用 Proxy，需要完整 Entity 才能更新）
-        if (member.getId() != null) {
-            // 修正(P0-6)：UserJpaRepository 已覆寫 findById() 並直接拋出 UnsupportedOperationException，
-            // 改用帶 brandId 的 findByBrand_IdAndId()，同時維持多租戶隔離。
-            userJpaRepo.findByBrand_IdAndId(member.getBrandId(), member.getId()).ifPresent(jpaUser -> {
-                jpaUser.setIsActive(member.isActive());
-                userJpaRepo.save(jpaUser);
-            });
+        // 修正(P0-6)：UserJpaRepository 已覆寫 findById() 並直接拋出 UnsupportedOperationException，
+        // 改用帶 brandId 的 findByBrand_IdAndId()，同時維持多租戶隔離。
+        if (member.getId() == null) {
+            throw new IllegalArgumentException("儲存會員時 id 不可為 null（新增請改用 create()）");
         }
+        // 修正(多租戶隔離)：原本找不到該品牌下的 User 時只是略過，後續仍會「不分品牌」地用 id 去載入並更新
+        // MemberProfile，等於可以改到別的品牌的會員積點。找不到就直接拋 404，整筆交易回滾。
+        UserEntity jpaUser = userJpaRepo.findByBrand_IdAndId(member.getBrandId(), member.getId())
+            .orElseThrow(() -> new ResourceNotFoundException("找不到會員，ID：" + member.getId()));
+        // jpaUser 為受管實體，異動由 dirty checking 在 commit 時寫入，不需要再呼叫 save()
+        jpaUser.setIsActive(member.isActive());
 
         // ─── 步驟 2：更新 MemberProfile（totalPoints、個人資料）─────────────
+        // 併發保護：MemberProfileEntity 有 @Version（樂觀鎖），同時修改積點時後提交者會拋
+        // ObjectOptimisticLockingFailureException（→ HTTP 409，或由事件監聽器重試），不會靜默覆寫。
         var jpaProfile = memberProfileJpaRepo.findById(member.getId()).orElse(null);
         if (jpaProfile != null && member.getProfile() != null) {
             jpaProfile.setFullName(member.getProfile().fullName());
@@ -196,7 +207,8 @@ public class MemberRepositoryImpl implements MemberRepository {
 
             for (PointTransaction tx : newTransactions) {
                 runningBalance += tx.getAmount();
-                tw.niels.beverage_api_project.modules.member.entity.MemberPointLogEntity logEntity = MemberMapper.toPointLogEntity(tx, runningBalance);
+                // 會員關聯直接使用步驟 1 載入的受管 UserEntity，不再為每筆日誌 new 一個暫態 UserEntity
+                tw.niels.beverage_api_project.modules.member.entity.MemberPointLogEntity logEntity = MemberMapper.toPointLogEntity(tx, runningBalance, jpaUser);
                 if (logEntity != null) {
                     pointLogJpaRepo.save(logEntity);
                 }

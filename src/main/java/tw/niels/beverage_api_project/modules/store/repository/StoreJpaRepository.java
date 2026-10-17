@@ -14,7 +14,7 @@ import java.util.Optional;
 
 /**
  * ============================================================
- * Bounded Context: BrandEntity & StoreEntity
+ * Bounded Context: Brand & Store
  * Layer: Infrastructure - Spring Data JPA Repository
  * ============================================================
  *
@@ -28,6 +28,9 @@ public interface StoreJpaRepository extends JpaRepository<StoreEntity, Long> {
     Optional<StoreEntity> findByBrand_IdAndId(Long brandId, Long storeId);
 
     List<StoreEntity> findByBrand_Id(Long brandId);
+
+    // 只查營業中的分店（會員／訪客的線上點餐選店用）
+    List<StoreEntity> findByBrand_IdAndIsActiveTrue(Long brandId);
 
     List<StoreEntity> findByBrand_IdAndIdIn(Long brandId, Collection<Long> storeIds);
 

@@ -39,31 +39,41 @@ public class StoreMapper {
     }
 
     /**
-     * Domain Model → JPA Entity
+     * Domain Model → 全新的 JPA Entity（僅用於「新增」門市）。
      *
-     * @param domain Domain Store Aggregate
-     * @return JPA Store Entity，若 domain 為 null 回傳 null
+     * 修正(P0-1 同類問題)：原本不論新增或更新都 new 一個 StoreEntity 再 setId(既有 ID)。
+     * BaseTsidEntity 的 isNew 預設 true，save() 會走 persist()，對「已存在的列」必然 PK 衝突或
+     * NonUniqueObjectException。更新請改走 {@link #applyTo}（取得受管實體後套用欄位）。
+     *
+     * @param domain   Domain Store Aggregate
+     * @param brandRef 品牌關聯參照（EntityManager.getReference 取得，不觸發查詢）
+     * @return 新的 JPA Store Entity，若 domain 為 null 回傳 null
      */
-    public static tw.niels.beverage_api_project.modules.store.entity.StoreEntity toEntity(Store domain) {
+    public static tw.niels.beverage_api_project.modules.store.entity.StoreEntity toNewEntity(
+            Store domain, tw.niels.beverage_api_project.modules.brand.entity.BrandEntity brandRef) {
         if (domain == null) return null;
 
         var jpa = new tw.niels.beverage_api_project.modules.store.entity.StoreEntity();
-        // 設定 ID（若已有 ID 則為更新操作）
+        // BaseTsidEntity 建構時已自動產生 TSID；若 Domain 已指定 ID（例如資料匯入）則沿用
         if (domain.getId() != null) {
             jpa.setId(domain.getId());
         }
-
-        // Brand 關聯：使用 Proxy 物件，僅帶入 ID，避免額外查詢
-        if (domain.getBrandId() != null) {
-            var brand = new tw.niels.beverage_api_project.modules.brand.entity.BrandEntity();
-            brand.setId(domain.getBrandId());
-            jpa.setBrand(brand);
-        }
-
-        jpa.setName(domain.getName());
-        jpa.setAddress(domain.getAddress());
-        jpa.setPhoneNumber(domain.getPhoneNumber());
-        jpa.setIsActive(domain.isActive());
+        jpa.setBrand(brandRef);
+        applyTo(jpa, domain);
         return jpa;
+    }
+
+    /**
+     * 把 Domain 的可變欄位套用到「受管」的 JPA Entity（更新用）。
+     * 不動 id 與 brand（門市不能換品牌），由 Hibernate dirty checking 在 commit 時寫入。
+     *
+     * @param target 已載入的受管 StoreEntity
+     * @param domain Domain Store Aggregate
+     */
+    public static void applyTo(tw.niels.beverage_api_project.modules.store.entity.StoreEntity target, Store domain) {
+        target.setName(domain.getName());
+        target.setAddress(domain.getAddress());
+        target.setPhoneNumber(domain.getPhoneNumber());
+        target.setIsActive(domain.isActive());
     }
 }

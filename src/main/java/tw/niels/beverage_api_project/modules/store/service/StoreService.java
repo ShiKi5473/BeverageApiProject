@@ -32,11 +32,12 @@ public class StoreService {
 
     @Transactional
     public StoreEntity createStore(CreateStoreRequestDto requestDto) {
-        BrandEntity BrandEntity = brandRepository.findById(requestDto.getBrandId())
+        // 清理(P3)：區域變數原本與型別同名（BrandEntity BrandEntity），改為 brand
+        BrandEntity brand = brandRepository.findById(requestDto.getBrandId())
                 .orElseThrow(() -> new ResourceNotFoundException("找不到品牌，ID：" + requestDto.getBrandId()));
 
         StoreEntity newStore = new StoreEntity();
-        newStore.setBrand(BrandEntity);
+        newStore.setBrand(brand);
         newStore.setName(requestDto.getName());
         newStore.setAddress(requestDto.getAddress());
         newStore.setPhoneNumber(requestDto.getPhone());
