@@ -12,17 +12,21 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import tw.niels.beverage_api_project.AbstractIntegrationTest;
 import tw.niels.beverage_api_project.config.DataSeeder;
 import tw.niels.beverage_api_project.config.TestDataSourceConfig;
-// 修正：Entity 類別必須加上 Entity 後綴，Repository 必須��上 Jpa 前綴
+// Entity 類別使用 Entity 後綴，Spring Data Repository 使用 JpaRepository 後綴
 import tw.niels.beverage_api_project.modules.brand.entity.BrandEntity;
 import tw.niels.beverage_api_project.modules.brand.repository.BrandJpaRepository;
+import tw.niels.beverage_api_project.modules.order.application.handler.OrderQueryHandler;
+import tw.niels.beverage_api_project.modules.order.application.query.GetOrdersQuery;
+import tw.niels.beverage_api_project.modules.order.dto.OrderResponseDto;
 import tw.niels.beverage_api_project.modules.order.entity.OrderEntity;
 import tw.niels.beverage_api_project.modules.order.entity.OrderItemEntity;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
 import tw.niels.beverage_api_project.modules.order.repository.OrderJpaRepository;
-import tw.niels.beverage_api_project.modules.order.service.OrderService;
 import tw.niels.beverage_api_project.modules.product.entity.ProductEntity;
+import tw.niels.beverage_api_project.modules.product.entity.ProductVariantEntity;
 import tw.niels.beverage_api_project.modules.product.enums.ProductStatus;
 import tw.niels.beverage_api_project.modules.product.repository.ProductJpaRepository;
+import tw.niels.beverage_api_project.modules.product.repository.ProductVariantJpaRepository;
 import tw.niels.beverage_api_project.modules.report.schedule.ReportRecoveryRunner;
 import tw.niels.beverage_api_project.modules.report.schedule.ReportScheduler;
 import tw.niels.beverage_api_project.modules.store.entity.StoreEntity;
@@ -33,10 +37,19 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * 訂單列表查詢的 N+1 檢查。
+ *
+ * 修改說明：
+ * - 原本呼叫已刪除的 OrderService.getOrders，改用 CQRS 讀取端 OrderQueryHandler（直接由 OrderEntity 組 DTO）。
+ * - 列表分兩步查詢（先取 ID、再以 entity graph 一次載入明細），預期 SELECT 數為 2，且不隨訂單數成長。
+ * - 舊式（沒有商品快照）的訂單也必須能讀出：商品名稱以關聯的商品名稱備援，options 為空陣列而非 null。
+ * - 移除 setup 中的 deleteAll()：AbstractIntegrationTest 每個測試結束都會 TRUNCATE。
+ */
 @Import(TestDataSourceConfig.class)
 public class OrderNPlusOneIntegrationTest extends AbstractIntegrationTest {
 
-    // --- 關鍵修改：Mock 掉背景服務，防止它們執行 SQL 干擾計數 ---
+    // --- Mock 掉背景服務，防止它們執行 SQL 干擾計數 ---
     @MockitoBean
     private DataSeeder dataSeeder; // 禁止啟動時塞資料
 
@@ -48,7 +61,7 @@ public class OrderNPlusOneIntegrationTest extends AbstractIntegrationTest {
     // -------------------------------------------------------
 
     @Autowired
-    private OrderService orderService;
+    private OrderQueryHandler orderQueryHandler;
 
     @Autowired
     private OrderJpaRepository orderRepository;
@@ -62,6 +75,9 @@ public class OrderNPlusOneIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private ProductJpaRepository productRepository;
 
+    @Autowired
+    private ProductVariantJpaRepository productVariantRepository;
+
     private Long brandId;
     private Long storeId;
 
@@ -69,11 +85,6 @@ public class OrderNPlusOneIntegrationTest extends AbstractIntegrationTest {
     void setup() {
         // 先重置計數器，確保乾淨
         SQLStatementCountValidator.reset();
-
-        orderRepository.deleteAll();
-        productRepository.deleteAll();
-        storeRepository.deleteAll();
-        brandRepository.deleteAll();
 
         BrandEntity brand = new BrandEntity();
         brand.setName("Test Brand");
@@ -93,10 +104,17 @@ public class OrderNPlusOneIntegrationTest extends AbstractIntegrationTest {
         product.setStatus(ProductStatus.ACTIVE);
         product = productRepository.save(product);
 
-        // ���立 3 筆訂單
-        createOrder(brand, store, product, "ORD-001");
-        createOrder(brand, store, product, "ORD-002");
-        createOrder(brand, store, product, "ORD-003");
+        ProductVariantEntity variant = new ProductVariantEntity();
+        variant.setProduct(product);
+        variant.setName("Large");
+        variant.setPrice(new BigDecimal("50"));
+        variant.setSkuCode("MILK-TEA-L");
+        variant = productVariantRepository.save(variant);
+
+        // 建立 3 筆「舊式」訂單（沒有商品快照，模擬 V5 之前的資料）
+        createLegacyOrder(brand, store, product, variant, storeId + "-20250101-0001");
+        createLegacyOrder(brand, store, product, variant, storeId + "-20250101-0002");
+        createLegacyOrder(brand, store, product, variant, storeId + "-20250101-0003");
 
         // 強制寫入 DB，確保 setup 階段的 SQL 不會算在測試階段
         orderRepository.flush();
@@ -106,37 +124,42 @@ public class OrderNPlusOneIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("測試查詢訂單列表時不應產生 N+1 問題")
+    @DisplayName("測試查詢訂單列表時不應產生 N+1 問題（舊訂單沒有快照也能讀取）")
     void testGetOrders_ShouldNotProduceNPlusOne() {
-        System.out.println("========== 測試開始：執行查詢 ==========");
+        // 1. 執行查詢（預設最近 24 小時；DTO 組裝時會存取品項、商品、規格、選項、付款方式）
+        List<OrderResponseDto> orders = orderQueryHandler.handle(
+                new GetOrdersQuery(brandId, storeId, null, null, null));
 
-        // 1. 執行業務邏輯
-        List<OrderEntity> orders = orderService.getOrders(brandId, storeId, null);
-
-        // 2. 觸發 Lazy Loading (存取關聯物件)
-        // 驗證是否因為存取 product 而產生額外查詢
+        // 2. 驗證結果
         assertThat(orders).hasSize(3);
-        for (OrderEntity order : orders) {
-            for (OrderItemEntity item : order.getItems()) {
-                // 如果沒有 Fetch Join Product，這裡會觸發 SQL
-                item.getProduct().getName();
-            }
+        for (OrderResponseDto order : orders) {
+            assertThat(order.getItems()).hasSize(1);
+            OrderResponseDto.OrderItemResponseDto item = order.getItems().get(0);
+            // 沒有快照時以關聯的商品 / 規格名稱備援
+            assertThat(item.getProductName()).isEqualTo("Milk Tea");
+            assertThat(item.getVariantName()).isEqualTo("Large");
+            // options 永不為 null（KDS 依賴）
+            assertThat(item.getOptions()).isNotNull().isEmpty();
         }
 
-        System.out.println("========== 測試結束：準備斷言 ==========");
-
-        // 3. 斷言 SQL 數量
-        // 預期：1 條 (SELECT orders left join items left join products ...)
-        try {
-            SQLStatementCountValidator.assertSelectCount(1);
-        } catch (Exception e) {
-            // 如果失敗，印出失敗訊息以便除錯
-            System.err.println("N+1 檢測失敗: " + e.getMessage());
-            throw e;
-        }
+        // 3. 斷言 SQL 數量：1 條取 ID（含筆數上限）+ 1 條以 entity graph 載入明細
+        SQLStatementCountValidator.assertSelectCount(2);
     }
 
-    private void createOrder(BrandEntity brand, StoreEntity store, ProductEntity product, String orderNumber) {
+    @Test
+    @DisplayName("狀態篩選：只回傳指定狀態的訂單")
+    void testGetOrders_FilterByStatus() {
+        List<OrderResponseDto> pending = orderQueryHandler.handle(
+                new GetOrdersQuery(brandId, storeId, OrderStatus.PENDING, null, null));
+        List<OrderResponseDto> closed = orderQueryHandler.handle(
+                new GetOrdersQuery(brandId, storeId, OrderStatus.CLOSED, null, null));
+
+        assertThat(pending).hasSize(3);
+        assertThat(closed).isEmpty();
+    }
+
+    private void createLegacyOrder(BrandEntity brand, StoreEntity store, ProductEntity product,
+                                   ProductVariantEntity variant, String orderNumber) {
         OrderEntity order = new OrderEntity();
         order.setBrand(brand);
         order.setStore(store);
@@ -148,9 +171,11 @@ public class OrderNPlusOneIntegrationTest extends AbstractIntegrationTest {
         OrderItemEntity item = new OrderItemEntity();
         item.setOrder(order);
         item.setProduct(product);
+        item.setProductVariant(variant);
         item.setQuantity(2);
         item.setUnitPrice(new BigDecimal("50"));
         item.setSubtotal(new BigDecimal("100"));
+        // 刻意不設定 productSnapshot（舊資料）
 
         order.getItems().add(item);
 

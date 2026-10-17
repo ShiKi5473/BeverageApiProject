@@ -1,140 +1,221 @@
 package tw.niels.beverage_api_project.modules.inventory.service;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import tw.niels.beverage_api_project.common.exception.BadRequestException;
-import tw.niels.beverage_api_project.modules.inventory.dao.InventoryBatchDAO;
-// 修���：Entity 類別必��加上 Entity 後綴，Repository 必須加上 Jpa 前綴
+import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
+import tw.niels.beverage_api_project.modules.inventory.dto.AddShipmentRequestDto;
 import tw.niels.beverage_api_project.modules.inventory.entity.InventoryBatchEntity;
 import tw.niels.beverage_api_project.modules.inventory.entity.InventoryItemEntity;
+import tw.niels.beverage_api_project.modules.inventory.entity.InventorySnapshotEntity;
+import tw.niels.beverage_api_project.modules.inventory.entity.InventoryTransactionEntity;
 import tw.niels.beverage_api_project.modules.inventory.repository.InventoryBatchJpaRepository;
 import tw.niels.beverage_api_project.modules.inventory.repository.InventoryItemJpaRepository;
+import tw.niels.beverage_api_project.modules.inventory.repository.InventorySnapshotJpaRepository;
+import tw.niels.beverage_api_project.modules.inventory.repository.InventoryTransactionJpaRepository;
+import tw.niels.beverage_api_project.modules.inventory.repository.PurchaseShipmentJpaRepository;
+import tw.niels.beverage_api_project.modules.store.entity.StoreEntity;
 import tw.niels.beverage_api_project.modules.store.repository.StoreJpaRepository;
+import tw.niels.beverage_api_project.modules.user.entity.UserEntity;
+import tw.niels.beverage_api_project.modules.user.repository.UserJpaRepository;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.util.Arrays;
-import java.util.Collections;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.StreamSupport;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+/**
+ * InventoryService (進貨 / 查詢庫存) 單元測試。
+ *
+ * <p>[B-5] 涵蓋的修正：進貨會同步增加品牌層級 InventoryItem.totalQuantity，
+ * 且先以「依 id 排序的悲觀鎖」鎖定品項 (findByBrandIdAndIdInForUpdate)，避免與訂單扣減交錯而死鎖。</p>
+ */
 @ExtendWith(MockitoExtension.class)
 class InventoryServiceTest {
 
+    private static final Long BRAND_ID = 1L;
+    private static final Long STORE_ID = 2L;
+    private static final Long USER_ID = 3L;
+    private static final Long ITEM_A = 100L;
+    private static final Long ITEM_B = 200L;
+
     @Mock private InventoryItemJpaRepository itemRepository;
     @Mock private InventoryBatchJpaRepository batchRepository;
-    @Mock private InventoryBatchDAO inventoryBatchDAO;
-    @Mock private StoreJpaRepository storeRepository; // InventoryDeductionService 依賴
+    @Mock private PurchaseShipmentJpaRepository shipmentRepository;
+    @Mock private StoreJpaRepository storeRepository;
+    @Mock private UserJpaRepository userRepository;
+    @Mock private InventorySnapshotJpaRepository snapshotRepository;
+    @Mock private InventoryTransactionJpaRepository transactionRepository;
 
-    // 注意：測試對象已改為 InventoryDeductionService（包含 4 參數的 deductInventory 方法）
-    @InjectMocks
-    private InventoryDeductionService inventoryService;
+    private InventoryService inventoryService;
+
+    @BeforeEach
+    void setUp() {
+        // [B-7] 固定的營業時區時鐘，不依賴 JVM 預設時區
+        Clock clock = Clock.fixed(Instant.parse("2026-10-17T02:00:00Z"), ZoneId.of("Asia/Taipei"));
+        inventoryService = new InventoryService(itemRepository, batchRepository, shipmentRepository,
+                storeRepository, userRepository, snapshotRepository, transactionRepository, clock);
+    }
+
+    // ───────────── 測試資料輔助方法 ─────────────
+
+    private InventoryItemEntity item(Long id, String total) {
+        InventoryItemEntity item = new InventoryItemEntity();
+        item.setId(id);
+        item.setName("Item-" + id);
+        item.setTotalQuantity(new BigDecimal(total));
+        return item;
+    }
+
+    private InventorySnapshotEntity snapshot(InventoryItemEntity item, String qty) {
+        InventorySnapshotEntity snapshot = new InventorySnapshotEntity();
+        snapshot.setInventoryItem(item);
+        snapshot.setQuantity(new BigDecimal(qty));
+        return snapshot;
+    }
+
+    private AddShipmentRequestDto.BatchItemDto line(Long itemId, String qty) {
+        AddShipmentRequestDto.BatchItemDto dto = new AddShipmentRequestDto.BatchItemDto();
+        dto.setInventoryItemId(itemId);
+        dto.setQuantity(new BigDecimal(qty));
+        dto.setExpiryDate(LocalDate.of(2026, 12, 31));
+        return dto;
+    }
+
+    private <T> List<T> toList(Iterable<T> iterable) {
+        return StreamSupport.stream(iterable.spliterator(), false).toList();
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private <T> ArgumentCaptor<Iterable<T>> iterableCaptor() {
+        return ArgumentCaptor.forClass((Class) Iterable.class);
+    }
+
+    private void stubStoreAndUser() {
+        StoreEntity store = new StoreEntity();
+        store.setId(STORE_ID);
+        UserEntity staff = new UserEntity();
+        staff.setId(USER_ID);
+        when(storeRepository.findByBrand_IdAndId(BRAND_ID, STORE_ID)).thenReturn(Optional.of(store));
+        when(userRepository.findByBrand_IdAndId(BRAND_ID, USER_ID)).thenReturn(Optional.of(staff));
+        when(shipmentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+    }
+
+    // ───────────── 進貨 ─────────────
 
     @Test
-    @DisplayName("庫存扣減 - 成功 (單一批次足夠)")
-    void deductInventory_Success_SingleBatch() {
-        // Arrange
-        Long brandId = 1L;
-        Long storeId = 1L;
-        Long itemId = 100L;
-        BigDecimal deductQty = new BigDecimal("5.0");
+    @DisplayName("進貨 - 同步增加品牌總量、Snapshot，並先鎖定品項 (同一品項多筆會彙總)")
+    void addShipment_IncreasesTotalQuantityAndSnapshots() {
+        stubStoreAndUser();
 
-        InventoryItemEntity mockItem = new InventoryItemEntity();
-        mockItem.setTotalQuantity(new BigDecimal("100.0")); // 總量足夠
+        InventoryItemEntity itemA = item(ITEM_A, "5.00");
+        InventoryItemEntity itemB = item(ITEM_B, "0.00");
+        InventorySnapshotEntity snapA = snapshot(itemA, "5.00"); // ITEM_B 沒有快照 -> 應建立
 
-        InventoryBatchEntity mockBatch = new InventoryBatchEntity();
-        mockBatch.setId(555L);
-        mockBatch.setCurrentQuantity(new BigDecimal("10.0")); // 批次足夠
-        mockBatch.setExpiryDate(LocalDate.now().plusDays(10));
+        // [B-5] 必須使用「加鎖」版本的批次查詢
+        when(itemRepository.findByBrandIdAndIdInForUpdate(eq(BRAND_ID), eq(Set.of(ITEM_A, ITEM_B))))
+                .thenReturn(List.of(itemA, itemB));
+        when(snapshotRepository.findByStore_IdAndInventoryItem_IdIn(eq(STORE_ID), eq(Set.of(ITEM_A, ITEM_B))))
+                .thenReturn(List.of(snapA));
 
-        when(itemRepository.findByBrandIdAndIdForUpdate(brandId, itemId)).thenReturn(Optional.of(mockItem));
-        when(batchRepository.findAvailableBatchesForUpdate(storeId, itemId)).thenReturn(Collections.singletonList(mockBatch));
+        AddShipmentRequestDto request = new AddShipmentRequestDto();
+        request.setSupplier("Supplier A");
+        // 同一品項 A 出現兩次 (60 + 40)，另有品項 B (10)
+        request.setItems(new ArrayList<>(List.of(line(ITEM_A, "60.00"), line(ITEM_A, "40.00"), line(ITEM_B, "10.00"))));
 
-        // Act
-        inventoryService.deductInventory(brandId, storeId, itemId, deductQty);
+        inventoryService.addShipment(BRAND_ID, STORE_ID, USER_ID, request);
 
-        // Assert
-        // 1. 驗證總庫存有更新 (100 - 5 = 95)
-        assertThat(mockItem.getTotalQuantity()).isEqualByComparingTo("95.0");
-        verify(itemRepository).save(mockItem);
+        // 品牌層級 totalQuantity：A = 5 + 100 = 105；B = 0 + 10 = 10
+        assertThat(itemA.getTotalQuantity()).isEqualByComparingTo("105.00");
+        assertThat(itemB.getTotalQuantity()).isEqualByComparingTo("10.00");
+        verify(itemRepository).saveAll(any());
+        // 不再使用沒有加鎖的查詢
+        verify(itemRepository, never()).findByBrand_IdAndIdIn(any(), any());
 
-        // 2. 驗證 DAO 被呼叫，且更新值正確 (10 - 5 = 5)
-        verify(inventoryBatchDAO).batchUpdateQuantities(argThat(list ->
-                list.size() == 1 &&
-                        list.getFirst().batchId().equals(555L) &&
-                        list.getFirst().newQuantity().compareTo(new BigDecimal("5.0")) == 0
-        ));
+        // 快照：A = 5 + 100 = 105；B 新建立 = 10
+        assertThat(snapA.getQuantity()).isEqualByComparingTo("105.00");
+        ArgumentCaptor<Iterable<InventorySnapshotEntity>> snapCaptor = iterableCaptor();
+        verify(snapshotRepository).saveAll(snapCaptor.capture());
+        List<InventorySnapshotEntity> savedSnapshots = toList(snapCaptor.getValue());
+        assertThat(savedSnapshots).hasSize(2);
+        assertThat(savedSnapshots).anyMatch(s -> s != snapA && s.getQuantity().compareTo(new BigDecimal("10.00")) == 0);
+
+        // 三筆批次，剩餘量 = 進貨量
+        ArgumentCaptor<Iterable<InventoryBatchEntity>> batchCaptor = iterableCaptor();
+        verify(batchRepository).saveAll(batchCaptor.capture());
+        List<InventoryBatchEntity> batches = toList(batchCaptor.getValue());
+        assertThat(batches).hasSize(3);
+        assertThat(batches).allSatisfy(b -> assertThat(b.getCurrentQuantity()).isEqualByComparingTo(b.getQuantityReceived()));
+
+        // 三筆異動紀錄：A 的餘額依序 65 -> 105，B = 10
+        ArgumentCaptor<Iterable<InventoryTransactionEntity>> trxCaptor = iterableCaptor();
+        verify(transactionRepository).saveAll(trxCaptor.capture());
+        List<InventoryTransactionEntity> transactions = toList(trxCaptor.getValue());
+        assertThat(transactions).hasSize(3);
+        assertThat(transactions.get(0).getBalanceAfter()).isEqualByComparingTo("65.00");
+        assertThat(transactions.get(1).getBalanceAfter()).isEqualByComparingTo("105.00");
+        assertThat(transactions.get(2).getBalanceAfter()).isEqualByComparingTo("10.00");
     }
 
     @Test
-    @DisplayName("庫存扣減 - 成功 (跨批次 FIFO)")
-    void deductInventory_Success_MultiBatch() {
-        // Arrange
-        Long brandId = 1L;
-        Long storeId = 1L;
-        Long itemId = 100L;
-        BigDecimal deductQty = new BigDecimal("15.0"); // 要扣 15
+    @DisplayName("進貨 - 品項不存在或不屬於該品牌時整筆拒絕")
+    void addShipment_Fail_WhenItemNotInBrand() {
+        stubStoreAndUser();
 
-        InventoryItemEntity mockItem = new InventoryItemEntity();
-        mockItem.setTotalQuantity(new BigDecimal("50.0"));
+        InventoryItemEntity itemA = item(ITEM_A, "5.00");
+        // 鎖定查詢只找得到 A，B 不屬於此品牌
+        when(itemRepository.findByBrandIdAndIdInForUpdate(eq(BRAND_ID), eq(Set.of(ITEM_A, ITEM_B))))
+                .thenReturn(List.of(itemA));
 
-        // 批次 A: 剩 10 (過期日較早)
-        InventoryBatchEntity batchA = new InventoryBatchEntity();
-        batchA.setId(1L);
-        batchA.setCurrentQuantity(new BigDecimal("10.0"));
-        batchA.setExpiryDate(LocalDate.now().plusDays(1));
+        AddShipmentRequestDto request = new AddShipmentRequestDto();
+        request.setItems(new ArrayList<>(List.of(line(ITEM_A, "1.00"), line(ITEM_B, "1.00"))));
 
-        // 批次 B: 剩 20 (過期日較晚)
-        InventoryBatchEntity batchB = new InventoryBatchEntity();
-        batchB.setId(2L);
-        batchB.setCurrentQuantity(new BigDecimal("20.0"));
-        batchB.setExpiryDate(LocalDate.now().plusDays(5));
+        assertThrows(ResourceNotFoundException.class,
+                () -> inventoryService.addShipment(BRAND_ID, STORE_ID, USER_ID, request));
 
-        when(itemRepository.findByBrandIdAndIdForUpdate(brandId, itemId)).thenReturn(Optional.of(mockItem));
-        // 模擬 Repository 依效期排序回傳
-        when(batchRepository.findAvailableBatchesForUpdate(storeId, itemId)).thenReturn(Arrays.asList(batchA, batchB));
+        verify(batchRepository, never()).saveAll(any());
+        assertThat(itemA.getTotalQuantity()).isEqualByComparingTo("5.00");
+    }
 
-        // Act
-        inventoryService.deductInventory(brandId, storeId, itemId, deductQty);
+    // ───────────── 查詢庫存 ─────────────
 
-        // Assert
-        // 驗證 DAO 呼叫參數
-        verify(inventoryBatchDAO).batchUpdateQuantities(argThat(list -> {
-            if (list.size() != 2) return false;
-            // 批次 A 應該被扣光 (變 0)
-            boolean batchAOk = list.stream().anyMatch(t -> t.batchId().equals(1L) && t.newQuantity().compareTo(BigDecimal.ZERO) == 0);
-            // 批次 B 應該扣掉剩餘的 5 (20 - 5 = 15)
-            boolean batchBOk = list.stream().anyMatch(t -> t.batchId().equals(2L) && t.newQuantity().compareTo(new BigDecimal("15.0")) == 0);
-            return batchAOk && batchBOk;
-        }));
+    @Test
+    @DisplayName("查詢庫存 - 以本店批次總和為準")
+    void getCurrentStock_UsesBatchSum() {
+        when(batchRepository.sumQuantityByStoreAndItem(STORE_ID, ITEM_A)).thenReturn(Optional.of(new BigDecimal("42.00")));
+
+        assertThat(inventoryService.getCurrentStock(STORE_ID, ITEM_A)).isEqualByComparingTo("42.00");
+        verify(snapshotRepository, never()).findByStore_IdAndInventoryItem_Id(any(), any());
     }
 
     @Test
-    @DisplayName("庫存扣減 - 失敗 (總量不足)")
-    void deductInventory_Fail_InsufficientTotal() {
-        Long brandId = 1L;
-        Long storeId = 1L;
-        Long itemId = 100L;
-        BigDecimal deductQty = new BigDecimal("100.0");
+    @DisplayName("查詢庫存 - 沒有批次時退回 Snapshot，皆無則為 0")
+    void getCurrentStock_FallsBackToSnapshotThenZero() {
+        InventorySnapshotEntity snap = snapshot(item(ITEM_A, "0"), "7.00");
+        when(batchRepository.sumQuantityByStoreAndItem(STORE_ID, ITEM_A)).thenReturn(Optional.empty());
+        when(snapshotRepository.findByStore_IdAndInventoryItem_Id(STORE_ID, ITEM_A)).thenReturn(Optional.of(snap));
+        assertThat(inventoryService.getCurrentStock(STORE_ID, ITEM_A)).isEqualByComparingTo("7.00");
 
-        InventoryItemEntity mockItem = new InventoryItemEntity();
-        mockItem.setTotalQuantity(new BigDecimal("50.0")); // 只有 50
-
-        when(itemRepository.findByBrandIdAndIdForUpdate(brandId, itemId)).thenReturn(Optional.of(mockItem));
-
-        assertThrows(BadRequestException.class, () ->
-                inventoryService.deductInventory(brandId, storeId, itemId, deductQty)
-        );
-
-        // 確保沒有執行後續 DB 更新
-        verify(inventoryBatchDAO, never()).batchUpdateQuantities(any());
+        when(batchRepository.sumQuantityByStoreAndItem(STORE_ID, ITEM_B)).thenReturn(Optional.empty());
+        when(snapshotRepository.findByStore_IdAndInventoryItem_Id(STORE_ID, ITEM_B)).thenReturn(Optional.empty());
+        assertThat(inventoryService.getCurrentStock(STORE_ID, ITEM_B)).isEqualByComparingTo("0");
     }
 }

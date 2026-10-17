@@ -28,12 +28,16 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * Order Aggregate Root 單元測試
  *
  * 測試範圍：
- * - 靜態工廠方法 place()
+ * - 靜態工廠方法 place() / placeOnline()（id 由 OrderRepository.nextId() 預先指派）
  * - 所有狀態轉換業務方法
  * - 非法狀態轉換應拋出 OrderDomainException
  * - 領域事件的收集與清空（pullDomainEvents）
  * - 品項更新邏輯
  * - 取消訂單的積點資訊攜帶
+ * - 舊訂單（無商品快照）可透過 OrderItem.reconstitute() 重建
+ *
+ * 修改說明：配合 Order.place(id, ...) 新簽章（id 必須在建立時指派），
+ * 並新增 placeOnline()、事件攜帶 orderId、OrderItem.reconstitute() 的測試。
  *
  * 注意：此為純粹的 POJO 單元測試，不需要 Spring Context，執行速度極快。
  */
@@ -42,6 +46,8 @@ class OrderTest {
 
     // ─── 測試用固定資料 ──────────────────────────────────────────────────────
 
+    /** 預先指派的訂單 ID（模擬 OrderRepository.nextId()） */
+    private static final Long ORDER_ID = 900_000_000_000_000_001L;
     private static final Long BRAND_ID = 1L;
     private static final Long STORE_ID = 10L;
     private static final Long STAFF_ID = 100L;
@@ -68,12 +74,11 @@ class OrderTest {
 
     /**
      * 建立一個初始狀態為 PENDING 的標準測試訂單。
-     * 注意：place() 的訂單 id 為 null（由 Infrastructure 設定），
-     * 因此事件中的 orderId 也會是 null。
+     * 修改：id 改為建立時預先指派（原本為 null，事件的 orderId 也是 null）。
      */
     private Order createPendingOrder() {
         return Order.place(
-                BRAND_ID, STORE_ID, STAFF_ID,
+                ORDER_ID, BRAND_ID, STORE_ID, STAFF_ID,
                 OrderNumber.of("A001"),
                 List.of(sampleItem),
                 "測試備註"
@@ -98,6 +103,9 @@ class OrderTest {
             assertThat(order.getStoreId()).isEqualTo(STORE_ID);
             assertThat(order.getOrderNumber().value()).isEqualTo("A001");
             assertThat(order.getItems()).hasSize(1);
+            // 新增：id 於建立時即指派，且為尚未持久化的新聚合
+            assertThat(order.getId()).isEqualTo(ORDER_ID);
+            assertThat(order.isNew()).isTrue();
         }
 
         @Test
@@ -125,6 +133,8 @@ class OrderTest {
             assertThat(events.get(0)).isInstanceOf(OrderPlacedEvent.class);
 
             OrderPlacedEvent event = (OrderPlacedEvent) events.get(0);
+            // 新增：事件必須攜帶非 null 的 orderId（KDS / 通知監聽者依此載入訂單）
+            assertThat(event.orderId()).isEqualTo(ORDER_ID);
             assertThat(event.brandId()).isEqualTo(BRAND_ID);
             assertThat(event.storeId()).isEqualTo(STORE_ID);
             assertThat(event.orderNumber()).isEqualTo("A001");
@@ -134,7 +144,7 @@ class OrderTest {
         @DisplayName("空品項應拋出 OrderDomainException")
         void shouldThrowExceptionWhenItemsAreEmpty() {
             assertThatThrownBy(() ->
-                    Order.place(BRAND_ID, STORE_ID, STAFF_ID,
+                    Order.place(ORDER_ID, BRAND_ID, STORE_ID, STAFF_ID,
                             OrderNumber.of("A002"), List.of(), null)
             )
                     .isInstanceOf(OrderDomainException.class)
@@ -145,10 +155,184 @@ class OrderTest {
         @DisplayName("null 品項應拋出 OrderDomainException")
         void shouldThrowExceptionWhenItemsAreNull() {
             assertThatThrownBy(() ->
-                    Order.place(BRAND_ID, STORE_ID, STAFF_ID,
+                    Order.place(ORDER_ID, BRAND_ID, STORE_ID, STAFF_ID,
                             OrderNumber.of("A003"), null, null)
             )
                     .isInstanceOf(OrderDomainException.class);
+        }
+
+        @Test
+        @DisplayName("新增：未預先指派 id 應拋出 OrderDomainException")
+        void shouldThrowExceptionWhenIdIsNull() {
+            assertThatThrownBy(() ->
+                    Order.place(null, BRAND_ID, STORE_ID, STAFF_ID,
+                            OrderNumber.of("A004"), List.of(sampleItem), null)
+            )
+                    .isInstanceOf(OrderDomainException.class)
+                    .hasMessageContaining("nextId");
+        }
+
+        @Test
+        @DisplayName("新增：狀態轉換事件同樣攜帶預先指派的 orderId")
+        void shouldCarryOrderIdInStatusChangedEvent() {
+            Order order = createPendingOrder();
+            order.pullDomainEvents();
+
+            order.processPayment(PAYMENT_METHOD_ID, Money.ZERO, 0L, null, null);
+            OrderStatusChangedEvent event = (OrderStatusChangedEvent) order.pullDomainEvents().get(0);
+
+            assertThat(event.orderId()).isEqualTo(ORDER_ID);
+            assertThat(event.oldStatus()).isEqualTo(OrderStatus.PENDING);
+            assertThat(event.newStatus()).isEqualTo(OrderStatus.PREPARING);
+        }
+    }
+
+    // ─── 測試：placeOnline() ────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("placeOnline() - 建立線上訂單（新增）")
+    class PlaceOnline {
+
+        @Test
+        @DisplayName("訪客線上訂單：初始狀態固定為 AWAITING_ACCEPTANCE，綁定 guestRef 與 requestId")
+        void shouldCreateGuestOnlineOrderAwaitingAcceptance() {
+            Order order = Order.placeOnline(
+                    ORDER_ID, BRAND_ID, STORE_ID,
+                    null, null,
+                    "GUEST:abc", "TICKET001",
+                    OrderNumber.of("10-20261017-0001"),
+                    List.of(sampleItem),
+                    "多拿吸管");
+
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.AWAITING_ACCEPTANCE);
+            assertThat(order.getGuestRef()).isEqualTo("GUEST:abc");
+            assertThat(order.getRequestId()).isEqualTo("TICKET001");
+            assertThat(order.getMemberId()).isNull();
+            assertThat(order.getStaffId()).isNull();
+            assertThat(order.getCustomerNote()).isEqualTo("多拿吸管");
+            assertThat(order.isNew()).isTrue();
+
+            List<Object> events = order.pullDomainEvents();
+            assertThat(events).hasSize(1);
+            OrderPlacedEvent event = (OrderPlacedEvent) events.get(0);
+            assertThat(event.orderId()).isEqualTo(ORDER_ID);
+        }
+
+        @Test
+        @DisplayName("會員線上訂單：綁定 memberId 與會員快照，接單後進入 PREPARING")
+        void shouldCreateMemberOnlineOrderAndAccept() {
+            MemberSnapshot snapshot = new MemberSnapshot(MEMBER_ID, "王小明", "0912345678", null);
+            Order order = Order.placeOnline(
+                    ORDER_ID, BRAND_ID, STORE_ID,
+                    MEMBER_ID, snapshot,
+                    null, "TICKET002",
+                    OrderNumber.of("10-20261017-0002"),
+                    List.of(sampleItem),
+                    null);
+            order.pullDomainEvents();
+
+            assertThat(order.getMemberId()).isEqualTo(MEMBER_ID);
+            assertThat(order.getMemberSnapshot().fullName()).isEqualTo("王小明");
+
+            order.accept();
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.PREPARING);
+        }
+
+        @Test
+        @DisplayName("線上訂單不可直接結帳（必須先接單）")
+        void shouldNotAllowPaymentBeforeAcceptance() {
+            Order order = Order.placeOnline(
+                    ORDER_ID, BRAND_ID, STORE_ID, null, null, "GUEST:abc", "TICKET003",
+                    OrderNumber.of("10-20261017-0003"), List.of(sampleItem), null);
+
+            assertThatThrownBy(() -> order.processPayment(PAYMENT_METHOD_ID, Money.ZERO, 0L, null, null))
+                    .isInstanceOf(OrderDomainException.class)
+                    .hasMessageContaining("AWAITING_ACCEPTANCE");
+        }
+
+        @Test
+        @DisplayName("新增（item 5）：建立時套用促銷折扣，finalAmount = totalAmount - discountAmount，事件不變")
+        void shouldApplyPromotionDiscountOnCreation() {
+            Order order = Order.placeOnline(
+                    ORDER_ID, BRAND_ID, STORE_ID, null, null, "GUEST:abc", "TICKET004",
+                    OrderNumber.of("10-20261017-0004"), List.of(sampleItem), null,
+                    Money.of(new BigDecimal("10.00")));
+
+            assertThat(order.getTotalAmount().amount()).isEqualByComparingTo("50.00");
+            assertThat(order.getDiscountAmount().amount()).isEqualByComparingTo("10.00");
+            assertThat(order.getFinalAmount().amount()).isEqualByComparingTo("40.00");
+            assertThat(order.getPointsUsed()).isZero();
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.AWAITING_ACCEPTANCE);
+
+            // OrderPlacedEvent 行為不變：仍只發佈一個、帶有 orderId
+            List<Object> events = order.pullDomainEvents();
+            assertThat(events).hasSize(1);
+            assertThat(((OrderPlacedEvent) events.get(0)).orderId()).isEqualTo(ORDER_ID);
+        }
+
+        @Test
+        @DisplayName("新增（item 5）：促銷折扣超過總額時以總額為上限（應付 0 元）；null 視為無折扣")
+        void shouldCapPromotionDiscountAtTotalAndTreatNullAsZero() {
+            Order capped = Order.placeOnline(
+                    ORDER_ID, BRAND_ID, STORE_ID, null, null, "GUEST:abc", "TICKET005",
+                    OrderNumber.of("10-20261017-0005"), List.of(sampleItem), null,
+                    Money.of(new BigDecimal("80.00")));
+            assertThat(capped.getDiscountAmount().amount()).isEqualByComparingTo("50.00");
+            assertThat(capped.getFinalAmount().amount()).isEqualByComparingTo("0");
+
+            Order noDiscount = Order.placeOnline(
+                    ORDER_ID, BRAND_ID, STORE_ID, null, null, "GUEST:abc", "TICKET006",
+                    OrderNumber.of("10-20261017-0006"), List.of(sampleItem), null,
+                    null);
+            assertThat(noDiscount.getDiscountAmount().amount()).isEqualByComparingTo("0");
+            assertThat(noDiscount.getFinalAmount().amount()).isEqualByComparingTo("50.00");
+        }
+
+        @Test
+        @DisplayName("原簽章（不帶折扣）維持無折扣：discountAmount = 0、finalAmount = totalAmount")
+        void originalSignatureShouldHaveNoDiscount() {
+            Order order = Order.placeOnline(
+                    ORDER_ID, BRAND_ID, STORE_ID, null, null, "GUEST:abc", "TICKET007",
+                    OrderNumber.of("10-20261017-0007"), List.of(sampleItem), null);
+
+            assertThat(order.getDiscountAmount().amount()).isEqualByComparingTo("0");
+            assertThat(order.getFinalAmount().amount()).isEqualByComparingTo("50.00");
+        }
+    }
+
+    // ─── 測試：OrderItem.reconstitute()（舊訂單相容）────────────────────────
+
+    @Nested
+    @DisplayName("OrderItem.reconstitute() - 舊訂單重建（新增）")
+    class ReconstituteItem {
+
+        @Test
+        @DisplayName("沒有商品快照的舊品項也能重建，並保留資料庫中的小計")
+        void shouldReconstituteLegacyItemWithoutSnapshot() {
+            OrderItem legacy = OrderItem.reconstitute(
+                    5L, 999L, null, 2,
+                    Money.of(new BigDecimal("50.00")), Money.of(new BigDecimal("95.00")),
+                    null, List.of(), null);
+
+            assertThat(legacy.getId()).isEqualTo(5L);
+            assertThat(legacy.getProductSnapshot()).isNull();
+            assertThat(legacy.getVariantId()).isNull();
+            // 直接採用資料庫原值，不重新計算（50 × 2 = 100，但資料庫為 95）
+            assertThat(legacy.getSubtotal().amount()).isEqualByComparingTo("95.00");
+        }
+
+        @Test
+        @DisplayName("重建的訂單不是新聚合，不發布任何事件")
+        void shouldReconstituteOrderAsExisting() {
+            Order order = Order.reconstitute(
+                    ORDER_ID, BRAND_ID, STORE_ID, STAFF_ID, null,
+                    OrderNumber.of("A009"), OrderStatus.PENDING,
+                    Money.of(new BigDecimal("50.00")), Money.ZERO, Money.of(new BigDecimal("50.00")),
+                    0L, 0L, null, null, null, null,
+                    List.of(sampleItem), null);
+
+            assertThat(order.isNew()).isFalse();
+            assertThat(order.pullDomainEvents()).isEmpty();
         }
     }
 

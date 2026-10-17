@@ -5,7 +5,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 // 修正 Money import：Money VO 已移至 common 模組
 import tw.niels.beverage_api_project.common.domain.vo.Money;
-import tw.niels.beverage_api_project.modules.order.domain.exception.OrderDomainException;
+// 修正：Money 位於 common 模組，驗證失敗拋出的是 common 的 DomainException（不是 OrderDomainException）
+import tw.niels.beverage_api_project.common.exception.DomainException;
 
 import java.math.BigDecimal;
 
@@ -56,18 +57,18 @@ class MoneyTest {
         }
 
         @Test
-        @DisplayName("負數金額應拋出 OrderDomainException")
+        @DisplayName("負數金額應拋出 DomainException")
         void shouldThrowExceptionForNegativeAmount() {
             assertThatThrownBy(() -> Money.of(new BigDecimal("-0.01")))
-                    .isInstanceOf(OrderDomainException.class)
+                    .isInstanceOf(DomainException.class)
                     .hasMessageContaining("金額不得為負數");
         }
 
         @Test
-        @DisplayName("null 金額應拋出 OrderDomainException")
+        @DisplayName("null 金額應拋出 DomainException")
         void shouldThrowExceptionForNullAmount() {
             assertThatThrownBy(() -> new Money(null))
-                    .isInstanceOf(OrderDomainException.class)
+                    .isInstanceOf(DomainException.class)
                     .hasMessageContaining("金額不得為 null");
         }
 

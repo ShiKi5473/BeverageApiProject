@@ -1,6 +1,7 @@
 package tw.niels.beverage_api_project.integration;
 
 import io.hypersistence.utils.jdbc.validator.SQLStatementCountValidator;
+import net.ttddyy.dsproxy.QueryCountHolder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -9,16 +10,17 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import tw.niels.beverage_api_project.AbstractIntegrationTest;
-import tw.niels.beverage_api_project.common.service.ControllerHelperService;
 import tw.niels.beverage_api_project.config.DataSeeder;
 import tw.niels.beverage_api_project.config.TestDataSourceConfig;
 import tw.niels.beverage_api_project.modules.brand.entity.BrandEntity;
 import tw.niels.beverage_api_project.modules.brand.repository.BrandJpaRepository;
-import tw.niels.beverage_api_project.modules.order.dto.CreateOrderRequestDto;
+import tw.niels.beverage_api_project.modules.order.application.command.PlaceOrderCommand;
+import tw.niels.beverage_api_project.modules.order.application.handler.OrderQueryHandler;
+import tw.niels.beverage_api_project.modules.order.application.handler.PlaceOrderHandler;
+import tw.niels.beverage_api_project.modules.order.application.query.GetOrderQuery;
 import tw.niels.beverage_api_project.modules.order.dto.OrderItemDto;
+import tw.niels.beverage_api_project.modules.order.dto.OrderResponseDto;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
-import tw.niels.beverage_api_project.modules.order.facade.OrderProcessFacade;
-import tw.niels.beverage_api_project.modules.order.service.OrderService;
 import tw.niels.beverage_api_project.modules.product.entity.CategoryEntity;
 import tw.niels.beverage_api_project.modules.product.entity.ProductEntity;
 import tw.niels.beverage_api_project.modules.product.entity.ProductVariantEntity;
@@ -37,18 +39,32 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * 建立訂單的 N+1 查詢檢查。
+ *
+ * 修改說明：
+ * - 原本呼叫已刪除的 OrderProcessFacade / OrderService，改用新的 PlaceOrderHandler
+ *   （內部由 OrderItemFactory 依品牌批次查詢商品、規格、選項）。
+ * - 初始狀態改為 PENDING（建立訂單僅允許 PENDING / HELD，原本送 PREPARING）。
+ * - 斷言改為「1 個品項與 5 個品項的 SELECT 數量相同」：查詢數不隨品項數成長即代表沒有 N+1，
+ *   比寫死精確數字更不易因無關的實作細節而失敗；另外設定合理上限。
+ * - 額外驗證品項快照為真實資料、訂單號碼符合 {storeId}-{yyyyMMdd}-{seq:04d}。
+ */
 @Import(TestDataSourceConfig.class)
 public class OrderCreationNPlusOneIntegrationTest extends AbstractIntegrationTest {
+
+    /** 建立訂單允許的 SELECT 上限（店家 1 + 商品 1 + 規格 1，保留少量餘裕） */
+    private static final long MAX_SELECTS = 4;
 
     @MockitoBean private DataSeeder dataSeeder;
     @MockitoBean private ReportRecoveryRunner reportRecoveryRunner;
     @MockitoBean private ReportScheduler reportScheduler;
-    @MockitoBean private ControllerHelperService helperService;
 
-    @Autowired private OrderService orderService;
-    @Autowired private OrderProcessFacade orderProcessFacade;
+    @Autowired private PlaceOrderHandler placeOrderHandler;
+    @Autowired private OrderQueryHandler orderQueryHandler;
     @Autowired private BrandJpaRepository brandJpaRepository;
     @Autowired private StoreJpaRepository storeJpaRepository;
     @Autowired private ProductJpaRepository productJpaRepository;
@@ -60,7 +76,7 @@ public class OrderCreationNPlusOneIntegrationTest extends AbstractIntegrationTes
     private Long storeId;
     private Long staffUserId;
     private record ProductInfo(Long productId, Long variantId) {}
-    private List<ProductInfo> productInfos = new ArrayList<>();
+    private final List<ProductInfo> productInfos = new ArrayList<>();
 
     @BeforeEach
     void setup() {
@@ -113,29 +129,44 @@ public class OrderCreationNPlusOneIntegrationTest extends AbstractIntegrationTes
     }
 
     @Test
-    @DisplayName("建立訂單 - 檢查 OrderItemProcessor 是否有 N+1 商品查詢")
+    @DisplayName("建立訂單 - OrderItemFactory 批次查詢商品，SELECT 數量不隨品項數成長")
     void testCreateOrder_ShouldBatchProductQueries() {
-        CreateOrderRequestDto request = new CreateOrderRequestDto();
-        request.setStatus(OrderStatus.PREPARING);
-
-        List<OrderItemDto> items = new ArrayList<>();
-        for (ProductInfo info : productInfos) {
-            OrderItemDto item = new OrderItemDto(
-                    info.productId(),
-                    info.variantId(),
-                    1,
-                    null,
-                    Collections.emptyList()
-            );
-            items.add(item);
-        }
-        request.setItems(items);
-
+        // 1. 只有 1 個品項
         SQLStatementCountValidator.reset();
+        Long singleItemOrderId = placeOrderHandler.handle(command(productInfos.subList(0, 1)));
+        long selectsForOneItem = QueryCountHolder.getGrandTotal().getSelect();
 
-        orderProcessFacade.createOrder(brandId, storeId, staffUserId, request);
+        // 2. 5 個品項
+        SQLStatementCountValidator.reset();
+        Long fiveItemOrderId = placeOrderHandler.handle(command(productInfos));
+        long selectsForFiveItems = QueryCountHolder.getGrandTotal().getSelect();
 
-        // 預期查詢數
-        SQLStatementCountValidator.assertSelectCount(6);
+        // 查詢數不隨品項數成長（沒有 N+1），且在合理上限內
+        assertThat(selectsForFiveItems).isEqualTo(selectsForOneItem);
+        assertThat(selectsForFiveItems).isLessThanOrEqualTo(MAX_SELECTS);
+
+        // 3. 驗證品項資料：真實快照（取代原本的 "Snapshot Name"）、訂單號碼格式
+        OrderResponseDto single = orderQueryHandler.handle(new GetOrderQuery(brandId, singleItemOrderId));
+        OrderResponseDto five = orderQueryHandler.handle(new GetOrderQuery(brandId, fiveItemOrderId));
+
+        assertThat(single.getStatus()).isEqualTo(OrderStatus.PENDING);
+        assertThat(single.getOrderNumber()).matches(storeId + "-\\d{8}-0001");
+        assertThat(five.getOrderNumber()).matches(storeId + "-\\d{8}-0002");
+        assertThat(five.getItems()).hasSize(5);
+        assertThat(five.getItems()).allSatisfy(item -> {
+            assertThat(item.getProductName()).startsWith("Latte ");
+            assertThat(item.getVariantName()).isEqualTo("Medium");
+            assertThat(item.getUnitPrice()).isEqualByComparingTo("60.00");
+            assertThat(item.getOptions()).isNotNull().isEmpty();
+        });
+        assertThat(five.getTotalAmount()).isEqualByComparingTo("300.00");
+    }
+
+    private PlaceOrderCommand command(List<ProductInfo> infos) {
+        List<OrderItemDto> items = new ArrayList<>();
+        for (ProductInfo info : infos) {
+            items.add(new OrderItemDto(info.productId(), info.variantId(), 1, null, Collections.emptyList()));
+        }
+        return new PlaceOrderCommand(brandId, storeId, staffUserId, OrderStatus.PENDING, items);
     }
 }
