@@ -235,7 +235,8 @@ src/main/resources/db/migration/
 ├── V17__add_order_version_column.sql
 ├── V18__online_order_fields_and_indexes.sql   # 線上訂單 guest_ref / request_id、訂單索引
 ├── V19__add_payment_breakdown_to_daily_store_stats.sql  # 日結付款方式拆分欄位
-└── V20__add_unspecified_total_to_daily_store_stats.sql  ← 目前最新版本（下一個請用 V21 以上）
+├── V20__add_unspecified_total_to_daily_store_stats.sql  # 日結「未指定付款方式」金額
+└── V21__add_is_active_to_categories.sql  ← 目前最新版本（下一個請用 V22 以上）
 ```
 
 **規則**：
@@ -263,8 +264,8 @@ src/main/resources/db/migration/
 
 ### 8.3 修改資料庫 Schema
 
-1. 確認最新 Flyway 版本號（目前最新：V20）
-2. 建立 `V21__{描述}.sql`（版本號 = 目前最新 + 1），只用 `snake_case` 命名
+1. 確認最新 Flyway 版本號（目前最新：V21）
+2. 建立 `V22__{描述}.sql`（版本號 = 目前最新 + 1），只用 `snake_case` 命名
 3. 若有新欄位，同步更新對應的 JPA Entity（`@Column`）
 
 ### 8.4 除錯編譯錯誤

@@ -34,8 +34,12 @@ public abstract class AbstractIntegrationTest {
             .withStartupTimeout(Duration.ofMinutes(3))
             .withReuse(true);
 
-    // 鎖定固定的 MinIO release tag（不用 latest），避免上游更新造成測試結果不可重現
-    static final GenericContainer<?> minio = new GenericContainer<>(DockerImageName.parse("minio/minio:RELEASE.2025-04-22T22-12-26Z"))
+    // 鎖定固定的 MinIO 映像（不用 latest），避免上游更新造成測試結果不可重現。
+    // 修正：MinIO 官方已停止在 Docker Hub / quay.io 公開提供映像（pull 會回 access denied / 401），
+    // 原本的 release tag 無法下載；改以 digest 鎖定（RELEASE.2025-09-07T16-13-09Z），
+    // 可使用本機已快取的映像。新環境或 CI 需先將此映像匯入或改用自有 registry 的鏡像。
+    static final GenericContainer<?> minio = new GenericContainer<>(DockerImageName.parse(
+            "minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e"))
             .withEnv("MINIO_ROOT_USER", "minioadmin")
             .withEnv("MINIO_ROOT_PASSWORD", "minioadmin")
             .withCommand("server /data")

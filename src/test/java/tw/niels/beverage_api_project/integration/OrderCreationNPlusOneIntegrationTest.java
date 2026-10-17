@@ -131,6 +131,10 @@ public class OrderCreationNPlusOneIntegrationTest extends AbstractIntegrationTes
     @Test
     @DisplayName("建立訂單 - OrderItemFactory 批次查詢商品，SELECT 數量不隨品項數成長")
     void testCreateOrder_ShouldBatchProductQueries() {
+        // 0. 暖機：當日第一筆訂單會因 Redis 流水號 key 不存在，多一次 SELECT 從資料庫播種序號
+        //    （OrderNumberService 的防重號機制，屬一次性成本、非 N+1）；先建立一筆，讓下面兩次量測條件一致
+        placeOrderHandler.handle(command(productInfos.subList(0, 1)));
+
         // 1. 只有 1 個品項
         SQLStatementCountValidator.reset();
         Long singleItemOrderId = placeOrderHandler.handle(command(productInfos.subList(0, 1)));
@@ -150,8 +154,9 @@ public class OrderCreationNPlusOneIntegrationTest extends AbstractIntegrationTes
         OrderResponseDto five = orderQueryHandler.handle(new GetOrderQuery(brandId, fiveItemOrderId));
 
         assertThat(single.getStatus()).isEqualTo(OrderStatus.PENDING);
-        assertThat(single.getOrderNumber()).matches(storeId + "-\\d{8}-0001");
-        assertThat(five.getOrderNumber()).matches(storeId + "-\\d{8}-0002");
+        // 序號 0001 為暖機訂單，量測的兩筆依序為 0002、0003
+        assertThat(single.getOrderNumber()).matches(storeId + "-\\d{8}-0002");
+        assertThat(five.getOrderNumber()).matches(storeId + "-\\d{8}-0003");
         assertThat(five.getItems()).hasSize(5);
         assertThat(five.getItems()).allSatisfy(item -> {
             assertThat(item.getProductName()).startsWith("Latte ");
