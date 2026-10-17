@@ -1,6 +1,5 @@
 package tw.niels.beverage_api_project.security.jwt;
 
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.messaging.Message;
@@ -10,6 +9,7 @@ import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
+import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -41,8 +41,9 @@ public class JwtAuthChannelInterceptor implements ChannelInterceptor {
         this.jwtPrincipalResolver = jwtPrincipalResolver;
     }
 
+    // 【修改】改用 Spring 的 @NonNull（原本的 org.jetbrains @NotNull 只是間接依賴，非專案宣告的相依套件）
     @Override
-    public Message<?> preSend(@NotNull Message<?> message, @NotNull MessageChannel channel) {
+    public Message<?> preSend(@NonNull Message<?> message, @NonNull MessageChannel channel) {
         StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
         if (accessor == null || accessor.getCommand() == null) {
             // 非 STOMP frame（例如 heartbeat）直接放行
@@ -91,7 +92,8 @@ public class JwtAuthChannelInterceptor implements ChannelInterceptor {
      * SUBSCRIBE：只允許已認證的 session 訂閱 /user/queue/orders。
      */
     private void authorizeSubscribe(StompHeaderAccessor accessor) {
-        if (accessor.getUser() == null) {
+        // 只接受 CONNECT 時由本攔截器設定的 StompPrincipal（principalKey），其他來源的 Principal 一律拒絕
+        if (!(accessor.getUser() instanceof StompPrincipal)) {
             throw new MessageDeliveryException("未認證的 session 不可訂閱");
         }
         String destination = accessor.getDestination();

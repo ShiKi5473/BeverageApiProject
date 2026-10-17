@@ -29,8 +29,11 @@ public class CacheConfig {
                 .disableCachingNullValues()
                 .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(valueSerializer));
 
+        // 修正：加上 transactionAware()，讓 @CacheEvict / put 延後到交易提交後才執行，
+        // 避免「已清快取、交易尚未提交」期間被並行讀取把舊資料重新寫回快取。
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(config)
+                .transactionAware()
                 .build();
     }
 }

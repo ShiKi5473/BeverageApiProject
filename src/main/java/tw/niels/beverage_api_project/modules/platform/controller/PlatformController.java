@@ -2,6 +2,7 @@ package tw.niels.beverage_api_project.modules.platform.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import tw.niels.beverage_api_project.common.constants.ApiPaths;
 import tw.niels.beverage_api_project.common.constants.AuthorityConstants;
 import tw.niels.beverage_api_project.common.exception.BadRequestException;
+import tw.niels.beverage_api_project.common.service.RateLimitService;
 import tw.niels.beverage_api_project.modules.auth.dto.JwtAuthResponseDto;
 import tw.niels.beverage_api_project.modules.brand.dto.BrandResponseDto;
 import tw.niels.beverage_api_project.modules.brand.dto.CreateBrandRequestDto;
@@ -22,19 +24,28 @@ import tw.niels.beverage_api_project.modules.user.dto.CreateUserResponseDto;
 import tw.niels.beverage_api_project.modules.user.entity.UserEntity;
 import tw.niels.beverage_api_project.modules.user.service.UserService;
 
+import java.time.Duration;
+
 @RestController
 @RequestMapping(ApiPaths.API_V1 + "/platform")
 @Tag(name = "Platform Admin", description = "平台超級管理員專用 API")
 public class PlatformController {
 
+    // 【新增】平台管理員登入速率限制：以「IP + 帳號」計數，平台帳號權限最高，上限比租戶登入更嚴格
+    private static final int PLATFORM_LOGIN_LIMIT = 5;
+    private static final Duration PLATFORM_LOGIN_WINDOW = Duration.ofMinutes(5);
+
     private final PlatformAuthService platformAuthService;
     private final BrandService brandService;
     private final UserService userService;
+    private final RateLimitService rateLimitService;
 
-    public PlatformController(PlatformAuthService platformAuthService, BrandService brandService, UserService userService) {
+    public PlatformController(PlatformAuthService platformAuthService, BrandService brandService, UserService userService,
+                              RateLimitService rateLimitService) {
         this.platformAuthService = platformAuthService;
         this.brandService = brandService;
         this.userService = userService;
+        this.rateLimitService = rateLimitService;
     }
 
     /**
@@ -42,7 +53,13 @@ public class PlatformController {
      */
     @PostMapping("/auth/login")
     @Operation(summary = "平台管理員登入", description = "取得平台管理權限的 JWT Token")
-    public ResponseEntity<JwtAuthResponseDto> authenticatePlatformAdmin(@Valid @RequestBody PlatformLoginRequestDto loginRequestDto) {
+    public ResponseEntity<JwtAuthResponseDto> authenticatePlatformAdmin(@Valid @RequestBody PlatformLoginRequestDto loginRequestDto,
+                                                                        HttpServletRequest request) {
+        // 【新增】速率限制（超過上限拋出 429，由 GlobalExceptionHandler 轉為 ErrorResponse），防止暴力破解
+        // 使用 getRemoteAddr()，不信任可偽造的 X-Forwarded-For
+        rateLimitService.checkOrThrow(
+                "platform-login:" + request.getRemoteAddr() + ":" + loginRequestDto.getUsername(),
+                PLATFORM_LOGIN_LIMIT, PLATFORM_LOGIN_WINDOW);
         // 這裡會呼叫 PlatformAuthService，進而使用 PlatformAdminDetailsService
         JwtAuthResponseDto jwt = platformAuthService.login(loginRequestDto);
         return ResponseEntity.ok(jwt);

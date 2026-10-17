@@ -30,7 +30,8 @@ public class FileController {
     }
 
     @PostMapping(value = "/upload/chunk", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
+    // 修改：TESTER（測試人員）比照 STAFF 權限（使用者決策）
+    @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF', 'TESTER')")
     @Operation(summary = "上傳檔案分片", description = "將大檔案切分後逐一上傳")
     // 加上 @Valid：啟用 DTO 內的 fileId / chunkNumber 驗證(S-6)
     public ResponseEntity<String> uploadChunk(@Valid @ModelAttribute FileChunkUploadDto requestDto) {
@@ -40,7 +41,8 @@ public class FileController {
     }
 
     @PostMapping("/upload/merge")
-    @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
+    // 修改：TESTER（測試人員）比照 STAFF 權限（使用者決策）
+    @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF', 'TESTER')")
     @Operation(summary = "合併分片", description = "所有分片上傳完成後，呼叫此接口進行合併")
     public ResponseEntity<Map<String, String>> mergeChunks(@Valid @RequestBody FileMergeRequestDto requestDto) {
         String objectName = fileService.mergeChunks(helperService.getCurrentBrandId(), requestDto);
