@@ -305,12 +305,42 @@ public class Order {
                                     String guestRef, String requestId,
                                     OrderNumber orderNumber, List<OrderItem> items,
                                     String customerNote) {
+        // 修改：保留原簽章（相容既有呼叫與測試），委派給含促銷折扣的版本，折扣為 0
+        return placeOnline(id, brandId, storeId, memberId, memberSnapshot, guestRef, requestId,
+                orderNumber, items, customerNote, Money.ZERO);
+    }
+
+    /**
+     * 建立一張線上訂單，並在建立時套用促銷折扣（新增多載，item 5：線上訂單享有與 POS / 試算相同的促銷）。
+     *
+     * 線上訂單不會經過 processPayment()（接單後直接 AWAITING_ACCEPTANCE → PREPARING），
+     * 因此促銷折扣必須在建立時就寫入聚合：
+     * - discountAmount = min(promotionDiscount, totalAmount)（null 視為 0；Money 本身保證不為負數）
+     * - finalAmount = totalAmount - discountAmount（最低為 0）
+     * 線上訂單不支援點數折抵，pointsUsed 維持 0。其餘行為（初始狀態、OrderPlacedEvent）與原版相同。
+     *
+     * @param promotionDiscount 促銷折扣（由 Application Layer 以 OrderCheckoutService 計算，可為 null）
+     * @return 狀態為 AWAITING_ACCEPTANCE 的新訂單
+     */
+    public static Order placeOnline(Long id, Long brandId, Long storeId,
+                                    Long memberId, MemberSnapshot memberSnapshot,
+                                    String guestRef, String requestId,
+                                    OrderNumber orderNumber, List<OrderItem> items,
+                                    String customerNote, Money promotionDiscount) {
         validateNewOrder(id, items);
         Money totalAmount = sumSubtotals(items);
 
         Order order = new Order(id, brandId, storeId, null, memberId, guestRef, requestId,
                 orderNumber, items, totalAmount, customerNote, OrderStatus.AWAITING_ACCEPTANCE);
         order.memberSnapshot = memberSnapshot;
+
+        // 新增：套用促銷折扣（上限為訂單總額），維持不變量 finalAmount = totalAmount - discountAmount
+        Money discount = promotionDiscount != null ? promotionDiscount : Money.ZERO;
+        if (discount.isGreaterThan(totalAmount)) {
+            discount = totalAmount;
+        }
+        order.discountAmount = discount;
+        order.finalAmount = totalAmount.subtract(discount);
 
         // 發布「訂單已建立」事件；KDS 監聽者會依載入後的狀態（AWAITING_ACCEPTANCE）推播 PENDING_ACCEPTANCE
         order.domainEvents.add(

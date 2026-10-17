@@ -1,6 +1,5 @@
 package tw.niels.beverage_api_project.modules.order.repository;
 
-import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -16,26 +15,23 @@ import org.springframework.stereotype.Repository;
 
 import tw.niels.beverage_api_project.modules.order.entity.OrderEntity;
 import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
-import tw.niels.beverage_api_project.modules.report.dto.OrderStatusStatsDto;
-import tw.niels.beverage_api_project.modules.report.dto.PaymentStatsDto;
-import tw.niels.beverage_api_project.modules.report.dto.ProductSalesStatsDto;
 
 /**
  * ============================================================
  * Bounded Context: Order
  * Layer: Infrastructure - Spring Data JPA Repository
  * ============================================================
+ *
+ * 修改說明：
+ * - 移除不限時間、不限筆數的 findAllByBrand_IdAndStore_Id / findAllByBrand_IdAndStore_IdAndStatus
+ *   （會載入整店歷史訂單）；列表改用 findIdsByStore...OrderTimeRange + findAllWithDetailsByBrandIdAndIdIn。
+ * - 移除報表統計查詢（findOrderStatusStats... / findPaymentStats... / findProductStats... /
+ *   countOrdersByStoreIdAndOrderTimeBetweenAndStatusIn）：已由 report 模組的 OrderReportQueryRepository 取代。
+ * - findByIdForSystem 的簽章與 entity graph 維持不變（庫存、報表、KDS 監聽者依賴）。
+ * ============================================================
  */
 @Repository
 public interface OrderJpaRepository extends JpaRepository<OrderEntity, Long> {
-    
-    @EntityGraph(attributePaths = {"items", "items.product", "items.productVariant", "items.options"})
-    @Query("SELECT DISTINCT o FROM OrderEntity o WHERE o.brand.id = :brandId AND o.store.id = :storeId AND o.status = :status")
-    List<OrderEntity> findAllByBrand_IdAndStore_IdAndStatus(Long brandId, Long storeId, OrderStatus status);
-
-    @EntityGraph(attributePaths = {"items", "items.product", "items.productVariant", "items.options"})
-    @Query("SELECT DISTINCT o FROM OrderEntity o WHERE o.brand.id = :brandId AND o.store.id = :storeId")
-    List<OrderEntity> findAllByBrand_IdAndStore_Id(Long brandId, Long storeId);
 
     // 修改：entity graph 加入 paymentMethod，讓查詢端組 OrderResponseDto 時不必再延遲載入付款方式
     @EntityGraph(attributePaths = {"items", "items.product", "items.productVariant", "items.options", "paymentMethod"})
@@ -49,6 +45,21 @@ public interface OrderJpaRepository extends JpaRepository<OrderEntity, Long> {
     @Query("SELECT o FROM OrderEntity o WHERE o.brand.id = :brandId AND o.requestId = :requestId")
     Optional<OrderEntity> findByBrand_IdAndRequestId(@Param("brandId") Long brandId,
                                                      @Param("requestId") String requestId);
+
+    /**
+     * 新增：依線上下單請求 ID 查詢訂單本體（不載入品項），供 GET /online-orders/{ticketId}
+     * 在 Redis ticket 尚未更新（仍為 QUEUED）時，以資料庫結果作為備援。
+     */
+    @Query("SELECT o FROM OrderEntity o WHERE o.brand.id = :brandId AND o.requestId = :requestId")
+    Optional<OrderEntity> findSummaryByBrandIdAndRequestId(@Param("brandId") Long brandId,
+                                                           @Param("requestId") String requestId);
+
+    /**
+     * 新增：只查詢訂單目前狀態（線上訂單 ticket 查詢用，避免載入整張訂單）。
+     */
+    @Query("SELECT o.status FROM OrderEntity o WHERE o.brand.id = :brandId AND o.id = :orderId")
+    Optional<OrderStatus> findStatusByBrandIdAndId(@Param("brandId") Long brandId,
+                                                   @Param("orderId") Long orderId);
 
     /**
      * 新增：訂單列表第一步 — 依店家與下單時間區間取出訂單 ID（依時間新到舊、以 Pageable 限制筆數）。
@@ -87,54 +98,28 @@ public interface OrderJpaRepository extends JpaRepository<OrderEntity, Long> {
                                                          @Param("ids") Collection<Long> ids);
 
     /**
+     * 新增（m-2 訂單流水號遺失）：查詢某分店某營業日「流水號最大」的訂單號碼，
+     * 供 OrderNumberService 在 Redis 計數器不存在（Redis 重啟未持久化、FLUSHALL）時，以資料庫的最大流水號重新播種。
+     *
+     * 訂單號碼格式為 {storeId}-{yyyyMMdd}-{seq:04d}，prefixPattern 傳入 "{storeId}-{yyyyMMdd}-%"。
+     * 先依長度、再依字串遞減排序：同一前綴下，流水號超過 4 位數（10000 以上）時字串較長，
+     * 只用字串排序會讓 "9999" 排在 "10000" 前面。以 Pageable 限制筆數（只需要最前面幾筆）。
+     * 系統內部用途：storeId 為全域唯一的 TSID，不需要 brandId 隔離（呼叫端只有訂單號碼產生器）。
+     */
+    @Query("SELECT o.orderNumber FROM OrderEntity o " +
+            "WHERE o.store.id = :storeId AND o.orderNumber LIKE :prefixPattern " +
+            "ORDER BY LENGTH(o.orderNumber) DESC, o.orderNumber DESC")
+    List<String> findTopOrderNumbersByStoreIdAndPrefix(@Param("storeId") Long storeId,
+                                                       @Param("prefixPattern") String prefixPattern,
+                                                       Pageable pageable);
+
+    /**
      * 系統內部用途：依訂單 ID 查詢（不含 brandId 隔離，僅供 Event Handler 等可信系統呼叫）
      * 包含品牌、店家、品項及規格關聯，供庫存扣減與報表統計使用。
      */
     @EntityGraph(attributePaths = {"brand", "store", "items", "items.productVariant", "items.options"})
     @Query("SELECT o FROM OrderEntity o WHERE o.id = :orderId")
     Optional<OrderEntity> findByIdForSystem(@Param("orderId") Long orderId);
-
-    @Query("SELECT new tw.niels.beverage_api_project.modules.report.dto.OrderStatusStatsDto(" +
-            "o.status, COUNT(o), SUM(o.totalAmount), SUM(o.discountAmount), SUM(o.finalAmount)) " +
-            "FROM OrderEntity o " +
-            "WHERE o.store.id = :storeId " +
-            "AND o.completedTime BETWEEN :start AND :end " +
-            "GROUP BY o.status")
-    List<OrderStatusStatsDto> findOrderStatusStatsByStoreAndDateRange(@Param("storeId") Long storeId,
-                                                                      @Param("start") LocalDateTime start,
-                                                                      @Param("end") LocalDateTime end);
-
-    @Query("SELECT new tw.niels.beverage_api_project.modules.report.dto.PaymentStatsDto(" +
-            "pm.code, SUM(o.finalAmount)) " +
-            "FROM OrderEntity o " +
-            "LEFT JOIN o.paymentMethod pm " +
-            "WHERE o.store.id = :storeId " +
-            "AND o.status = 'CLOSED' " +
-            "AND o.completedTime BETWEEN :start AND :end " +
-            "GROUP BY pm.code")
-    List<PaymentStatsDto> findPaymentStatsByStoreAndDateRange(@Param("storeId") Long storeId,
-                                                              @Param("start") LocalDateTime start,
-                                                              @Param("end") LocalDateTime end);
-
-    @Query("SELECT new tw.niels.beverage_api_project.modules.report.dto.ProductSalesStatsDto(" +
-            "i.product.id, i.product.name, SUM(i.quantity), SUM(i.subtotal)) " +
-            "FROM OrderItemEntity i " +
-            "JOIN i.order o " +
-            "WHERE o.store.id = :storeId " +
-            "AND o.status = 'CLOSED' " +
-            "AND o.completedTime BETWEEN :start AND :end " +
-            "GROUP BY i.product.id, i.product.name")
-    List<ProductSalesStatsDto> findProductStatsByStoreAndDateRange(@Param("storeId") Long storeId,
-                                                                   @Param("start") LocalDateTime start,
-                                                                   @Param("end") LocalDateTime end);
-
-    @Query("SELECT COUNT(o) FROM OrderEntity o WHERE o.store.id = :storeId AND o.orderTime BETWEEN :start AND :end AND o.status IN :statuses")
-    long countOrdersByStoreIdAndOrderTimeBetweenAndStatusIn(
-            @Param("storeId") Long storeId,
-            @Param("start") Date start,
-            @Param("end") Date end,
-            @Param("statuses") Collection<OrderStatus> statuses
-    );
 
     @Deprecated
     @Override

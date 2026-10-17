@@ -44,8 +44,18 @@ public class SseEmitterManager {
      * @param emitter 要管理的 SseEmitter 實例
      */
     public void addEmitter(Long storeId, SseEmitter emitter) {
-        storeEmitters.computeIfAbsent(storeId, k -> new CopyOnWriteArrayList<>()).add(emitter);
-        logger.debug("店家 {} 新增 SSE 連線。目前連線數: {}", storeId, storeEmitters.get(storeId).size());
+        if (storeId == null) {
+            // ConcurrentHashMap 不接受 null key；未綁定分店的帳號應在 Controller 就被拒絕
+            throw new IllegalArgumentException("storeId 不可為 null");
+        }
+        // 【修正】改用 compute（同一個 key 原子執行），避免與 removeEmitter「清掉空列表」交錯時，
+        // 新連線被加進一個剛從 Map 移除的列表而永遠收不到推播
+        storeEmitters.compute(storeId, (id, list) -> {
+            List<SseEmitter> emitters = (list != null) ? list : new CopyOnWriteArrayList<>();
+            emitters.add(emitter);
+            return emitters;
+        });
+        logger.debug("店家 {} 新增 SSE 連線。目前連線數: {}", storeId, getEmitters(storeId).size());
 
         // 連線結束時自動移除，避免 Map 中累積失效的 emitter
         emitter.onCompletion(() -> removeEmitter(storeId, emitter));
@@ -64,14 +74,15 @@ public class SseEmitterManager {
      * @param emitter 要移除的 SseEmitter 實例
      */
     public void removeEmitter(Long storeId, SseEmitter emitter) {
-        List<SseEmitter> emitters = storeEmitters.get(storeId);
-        if (emitters != null) {
-            emitters.remove(emitter);
-            // 清掉空列表，避免 Map 持續累積已無連線的店家
-            if (emitters.isEmpty()) {
-                storeEmitters.remove(storeId, emitters);
-            }
+        if (storeId == null) {
+            return;
         }
+        // 【修正】以 computeIfPresent 原子地移除並清掉空列表（回傳 null 即移除該 key），
+        // 避免 Map 持續累積已無連線的店家，也不會與 addEmitter 互相覆蓋
+        storeEmitters.computeIfPresent(storeId, (id, emitters) -> {
+            emitters.remove(emitter);
+            return emitters.isEmpty() ? null : emitters;
+        });
     }
 
     /**

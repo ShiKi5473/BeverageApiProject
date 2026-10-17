@@ -1,5 +1,7 @@
 package tw.niels.beverage_api_project.modules.order.dto;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import tw.niels.beverage_api_project.modules.user.entity.UserEntity;
@@ -8,7 +10,9 @@ import tw.niels.beverage_api_project.modules.user.entity.profile.MemberProfileEn
 @Data
 @Schema(description = "會員基本資訊 (用於 POS 查詢)")
 public class MemberDto {
-    @Schema(description = "會員 ID")
+    // 修改（P0-10）：會員 ID 為 TSID，超過 JS 安全整數範圍，改以字串輸出避免前端失真
+    @Schema(description = "會員 ID（字串）")
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long userId;
     @Schema(description = "手機號碼")
     private String primaryPhone;
@@ -21,9 +25,10 @@ public class MemberDto {
     @Schema(description = "備註")
     private String notes;
 
-    public static MemberDto fromEntity(UserEntity UserEntity) {
-        if (UserEntity == null || UserEntity.getMemberProfile() == null) return null;
-        MemberProfileEntity profile = UserEntity.getMemberProfile();
+    // 修改：參數名稱由批次改名殘留的 "UserEntity" 改回 user（避免與型別同名）
+    public static MemberDto fromEntity(UserEntity user) {
+        if (user == null || user.getMemberProfile() == null) return null;
+        MemberProfileEntity profile = user.getMemberProfile();
         MemberDto dto = new MemberDto();
         dto.setUserId(profile.getUserId());
         dto.setPrimaryPhone(profile.getUser().getPrimaryPhone());

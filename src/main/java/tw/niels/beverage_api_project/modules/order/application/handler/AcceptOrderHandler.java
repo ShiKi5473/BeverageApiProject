@@ -14,7 +14,7 @@ import tw.niels.beverage_api_project.modules.order.domain.repository.OrderReposi
  * 處理線上訂單的店家接單流程。
  *
  * 處理流程：
- * 1. 載入訂單 Aggregate
+ * 1. 載入訂單 Aggregate，並驗證訂單屬於呼叫者可操作的分店（StoreScope，不符 → 403；M-1 新增）
  * 2. 呼叫 order.accept()（AWAITING_ACCEPTANCE → PREPARING）
  * 3. 儲存 Aggregate
  * 4. 發佈領域事件
@@ -37,6 +37,9 @@ public class AcceptOrderHandler {
     public void handle(AcceptOrderCommand command) {
         Order order = orderRepository.findByBrandIdAndId(command.brandId(), command.orderId())
             .orElseThrow(() -> new ResourceNotFoundException("找不到訂單: " + command.orderId()));
+
+        // 新增（M-1）：綁店員工只能接自己分店的訂單；在交易內、狀態變更之前檢查，不符回 403
+        command.storeScope().verifyAccess(order.getStoreId());
 
         order.accept();
 

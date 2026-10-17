@@ -1,123 +1,92 @@
 package tw.niels.beverage_api_project.modules.order.application.handler;
 
-import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import tw.niels.beverage_api_project.common.domain.vo.Money;
-import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
-import tw.niels.beverage_api_project.modules.brand.entity.BrandPointConfigEntity;
-import tw.niels.beverage_api_project.modules.brand.repository.BrandPointConfigJpaRepository;
 import tw.niels.beverage_api_project.modules.order.application.command.PosCheckoutCommand;
+import tw.niels.beverage_api_project.modules.order.application.service.OrderCheckoutService;
+import tw.niels.beverage_api_project.modules.order.application.service.OrderItemFactory;
 import tw.niels.beverage_api_project.modules.order.domain.model.MemberSnapshot;
 import tw.niels.beverage_api_project.modules.order.domain.model.Order;
 import tw.niels.beverage_api_project.modules.order.domain.model.OrderItem;
 import tw.niels.beverage_api_project.modules.order.domain.model.OrderNumber;
-import tw.niels.beverage_api_project.modules.order.domain.model.ProductSnapshot;
 import tw.niels.beverage_api_project.modules.order.domain.repository.OrderRepository;
-import tw.niels.beverage_api_project.modules.order.domain.service.OrderPricingDomainService;
-import tw.niels.beverage_api_project.modules.order.dto.OrderItemDto;
 import tw.niels.beverage_api_project.modules.order.entity.PaymentMethodEntity;
 import tw.niels.beverage_api_project.modules.order.service.OrderNumberService;
 import tw.niels.beverage_api_project.modules.order.service.PaymentMethodService;
-import tw.niels.beverage_api_project.modules.product.domain.model.Product;
-import tw.niels.beverage_api_project.modules.product.domain.model.ProductVariant;
-import tw.niels.beverage_api_project.modules.product.domain.repository.ProductRepository;
-import tw.niels.beverage_api_project.modules.promotion.service.PromotionService;
 import tw.niels.beverage_api_project.modules.store.service.StoreService;
-import tw.niels.beverage_api_project.modules.user.entity.UserEntity;
-import tw.niels.beverage_api_project.modules.user.service.UserService;
 
 /**
  * POS 快速結帳 Handler（一步到位：建立 + 付款）
  *
- * 將訂單建立與付款合併為單一操作，適用於 POS 現場結帳場景。
+ * 將訂單建立與付款合併為單一交易，適用於 POS 現場結帳場景。
  *
  * 處理流程：
- * 1. 驗證店家、員工、付款方式
- * 2. 若有會員，查詢會員資料並建立 MemberSnapshot
- * 3. 將 OrderItemDto 轉為 Domain OrderItemEntity（含 ProductSnapshot）
- * 4. 產生訂單號碼
- * 5. 呼叫 OrderEntity.place() 建立 Aggregate（初始狀態 PENDING）
- * 6. 計算積點折扣（透過 OrderPricingDomainService）與促銷折扣
- * 7. 呼叫 OrderEntity.processPayment() 執行付款（狀態 PENDING → PREPARING）
- * 8. 透過 OrderRepository 儲存 Aggregate
- * 9. 發佈領域事件
+ * 1. 驗證店家、付款方式；若有會員，驗證會員（存在且未停用，停用 → 422，m-5 新增）並建立 MemberSnapshot
+ * 2. 以 OrderItemFactory 批次建立品項（真實快照、選項加價）
+ * 3. 產生訂單號碼與預先指派的訂單 ID，呼叫 Order.place()（PENDING）
+ * 4. 以 OrderCheckoutService 計算促銷折扣與點數折抵（點數折抵上限為扣除促銷後的金額）
+ * 5. 於同一交易內同步扣點（不足 → DomainException 422，整筆回滾、不建立訂單）
+ * 6. 呼叫 order.processPayment()（PENDING → PREPARING）
+ * 7. 儲存並發佈領域事件
  *
- * 發佈事件：OrderPlacedEvent（建立）、OrderStatusChangedEvent（PENDING → PREPARING）
+ * 發佈事件：OrderPlacedEvent（建立）、OrderStatusChangedEvent（PENDING → PREPARING，KDS 依此顯示新訂單）
  *
- * 已知待優化（C3）：積點扣減目前在事務內執行，應移至 AFTER_COMMIT 事件監聽。
+ * 修改說明：
+ * - 改用 OrderItemFactory、nextOrderNumber()、nextId()（P0-2、P0-3、P0-4）；
+ * - 促銷折扣改為實際呼叫 PromotionService（原本 TODO 固定 0，B-3）；
+ * - 點數改為交易內同步扣除（原本 AFTER_COMMIT 才扣、事前不驗證餘額，B-1）；
+ * - 修正區域變數命名殘留（原本 {@code Order OrderEntity}）。
  */
 @Component
 public class PosCheckoutHandler {
 
     private final OrderRepository orderRepository;
-    private final ProductRepository productRepository;
+    private final OrderItemFactory orderItemFactory;
     private final OrderNumberService orderNumberService;
+    private final OrderCheckoutService orderCheckoutService;
     private final StoreService storeService;
-    private final UserService userService;
     private final PaymentMethodService paymentMethodService;
-    private final PromotionService promotionService;
-    private final BrandPointConfigJpaRepository BrandPointConfigJpaRepository;
     private final ApplicationEventPublisher eventPublisher;
-    private final OrderPricingDomainService orderPricingDomainService = new OrderPricingDomainService();
 
     public PosCheckoutHandler(OrderRepository orderRepository,
-                              ProductRepository productRepository,
+                              OrderItemFactory orderItemFactory,
                               OrderNumberService orderNumberService,
+                              OrderCheckoutService orderCheckoutService,
                               StoreService storeService,
-                              UserService userService,
                               PaymentMethodService paymentMethodService,
-                              PromotionService promotionService,
-                              BrandPointConfigJpaRepository BrandPointConfigJpaRepository,
                               ApplicationEventPublisher eventPublisher) {
         this.orderRepository = orderRepository;
-        this.productRepository = productRepository;
+        this.orderItemFactory = orderItemFactory;
         this.orderNumberService = orderNumberService;
+        this.orderCheckoutService = orderCheckoutService;
         this.storeService = storeService;
-        this.userService = userService;
         this.paymentMethodService = paymentMethodService;
-        this.promotionService = promotionService;
-        this.BrandPointConfigJpaRepository = BrandPointConfigJpaRepository;
         this.eventPublisher = eventPublisher;
     }
 
+    /**
+     * 執行 POS 快速結帳
+     *
+     * @return 新訂單 ID
+     */
     @Transactional
     public Long handle(PosCheckoutCommand command) {
-        // 1. 驗證基礎資料
+        // 1. 驗證基礎資料（店家屬於本品牌、付款方式有效、會員存在）
         storeService.getStore(command.brandId(), command.storeId());
-        userService.getUser(command.brandId(), command.userId());
         PaymentMethodEntity paymentMethod = paymentMethodService.getByCode(command.paymentMethod());
+        MemberSnapshot memberSnapshot = orderCheckoutService.resolveMemberSnapshot(command.brandId(), command.memberId());
 
-        // 2. 處理成員與快照
-        UserEntity memberUser = null;
-        MemberSnapshot memberSnapshot = null;
-        if (command.memberId() != null) {
-            memberUser = userService.getMember(command.brandId(), command.memberId());
-            if (memberUser.getMemberProfile() != null) {
-                memberSnapshot = new MemberSnapshot(
-                    memberUser.getId(),
-                    memberUser.getMemberProfile().getFullName(),
-                    memberUser.getPrimaryPhone(), // UserEntity 實體有 primaryPhone
-                    memberUser.getMemberProfile().getEmail()
-                );
-            }
-        }
+        // 2. 批次建立品項
+        List<OrderItem> domainItems = orderItemFactory.createItems(command.brandId(), command.items());
 
-        // 3. 處理訂單品項
-        List<OrderItem> domainItems = processItems(command.brandId(), command.items());
-
-        // 4. 產生訂單號碼
-        long sequence = orderNumberService.getNextStoreDailySequence(command.storeId());
-        String orderNumStr = String.format("A%03d", sequence);
-        OrderNumber orderNumber = OrderNumber.of(orderNumStr);
-
-        // 5. 建立訂單 (初始狀態為 PENDING)
-        Order OrderEntity = Order.place(
+        // 3. 產生訂單號碼與 ID，建立訂單（初始狀態為 PENDING）
+        OrderNumber orderNumber = OrderNumber.of(orderNumberService.nextOrderNumber(command.storeId()));
+        Order order = Order.place(
+            orderRepository.nextId(),
             command.brandId(),
             command.storeId(),
             command.userId(),
@@ -126,74 +95,28 @@ public class PosCheckoutHandler {
             null
         );
 
-        // 6. 計算折扣 (積點與促銷)
-        Money pointsDiscount = Money.ZERO;
-        if (command.memberId() != null && command.pointsToUse() > 0) {
-            BigDecimal redeemRate = getRedeemRate(command.brandId());
-            pointsDiscount = orderPricingDomainService.calculateRedeemAmount(command.pointsToUse(), redeemRate);
-        }
+        // 4. 計算折扣（促銷 + 點數；點數折抵上限為扣除促銷後的金額，超出的點數不扣）
+        OrderCheckoutService.PricingResult pricing = orderCheckoutService.calculate(
+            command.brandId(), order.getItems(), order.getTotalAmount(),
+            command.memberId(), command.pointsToUse());
 
-        // 促銷折扣 (暫時傳回 0，直到 PromotionService 支援 Domain Model)
-        Money promoDiscount = Money.ZERO; 
-        // BigDecimal promoAmt = promotionService.calculateBestDiscount(jpaOrder);
-        // promoDiscount = Money.of(promoAmt);
+        // 5. 交易內同步扣點：不足時拋出 DomainException（422），整筆交易回滾
+        orderCheckoutService.deductPoints(command.brandId(), command.memberId(), pricing.pointsUsed(),
+            "訂單 " + orderNumber.value() + " 積點折抵");
 
-        Money totalDiscount = pointsDiscount.add(promoDiscount);
-
-        // 7. 執行付款流程 (狀態轉為 PREPARING)
-        OrderEntity.processPayment(
+        // 6. 執行付款流程（狀態轉為 PREPARING）
+        order.processPayment(
             paymentMethod.getPaymentMethodId().longValue(),
-            totalDiscount,
-            command.pointsToUse(),
+            pricing.totalDiscount(),
+            pricing.pointsUsed(),
             command.memberId(),
             memberSnapshot
         );
 
-        // 8. 儲存
-        orderRepository.save(OrderEntity);
+        // 7. 儲存並發布領域事件
+        orderRepository.save(order);
+        order.pullDomainEvents().forEach(eventPublisher::publishEvent);
 
-        // 9. 發布領域事件
-        OrderEntity.pullDomainEvents().forEach(eventPublisher::publishEvent);
-
-        return OrderEntity.getId();
-    }
-
-    private BigDecimal getRedeemRate(Long brandId) {
-        return BrandPointConfigJpaRepository.findById(brandId)
-            .map(BrandPointConfigEntity::getRedeemRate)
-            .orElse(new BigDecimal("0.1"));
-    }
-
-    private List<OrderItem> processItems(Long brandId, List<OrderItemDto> itemDtos) {
-        List<OrderItem> items = new ArrayList<>();
-        for (OrderItemDto dto : itemDtos) {
-            Product product = productRepository.findProductById(brandId, dto.productId())
-                .orElseThrow(() -> new ResourceNotFoundException("商品不存在: " + dto.productId()));
-            
-            ProductVariant variant = product.getVariants().stream()
-                .filter(v -> v.getId().equals(dto.variantId()))
-                .findFirst()
-                .orElseThrow(() -> new ResourceNotFoundException("規格不存在: " + dto.variantId()));
-
-            ProductSnapshot snapshot = new ProductSnapshot(
-                product.getId(),
-                product.getName(),
-                variant.getPrice(),
-                "CategoryEntity",
-                variant.getName()
-            );
-
-            OrderItem item = OrderItem.create(
-                product.getId(),
-                variant.getId(),
-                dto.quantity(),
-                variant.getPrice(),
-                dto.notes(),
-                dto.optionIds() != null ? dto.optionIds() : List.of(),
-                snapshot
-            );
-            items.add(item);
-        }
-        return items;
+        return order.getId();
     }
 }

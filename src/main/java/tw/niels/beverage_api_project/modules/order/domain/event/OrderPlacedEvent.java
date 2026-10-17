@@ -29,7 +29,7 @@ public record OrderPlacedEvent(
         /** 訂單所屬店家 ID */
         Long storeId,
 
-        /** 訂單號碼（人類可讀，如 A001） */
+        /** 訂單號碼（格式 {storeId}-{yyyyMMdd}-{seq:04d}，如 1-20261017-0001；修改：原註解的 A001 為已廢棄格式） */
         String orderNumber,
 
         /** 事件發生的時間戳記（UTC） */

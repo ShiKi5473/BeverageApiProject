@@ -1,6 +1,8 @@
 package tw.niels.beverage_api_project.modules.order.application.service;
 
 import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.safety.Cleaner;
 import org.jsoup.safety.Safelist;
 import org.springframework.stereotype.Component;
 import tw.niels.beverage_api_project.common.domain.vo.Money;
@@ -30,6 +32,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -47,7 +50,7 @@ import java.util.stream.Collectors;
  * - 依品牌批次查詢商品、規格、選項（多租戶隔離、避免 N+1）
  * - 規格必須屬於該商品；選項必須屬於該商品的選項群組
  * - 單價 = 規格售價 + 所選選項加價總和
- * - 備註以 Jsoup 清洗（防 XSS）
+ * - 備註以 Jsoup 移除 HTML 標籤後存成純文字（不跳脫實體，m-3 修改）
  * - 商品快照使用真實資料（商品名稱、分類名稱、規格售價、規格名稱）
  *
  * 使用者：PlaceOrderHandler、PosCheckoutHandler、UpdateHeldOrderHandler、
@@ -59,6 +62,18 @@ public class OrderItemFactory {
 
     /** 商品沒有分類時快照使用的分類名稱 */
     private static final String UNCATEGORIZED = "未分類";
+
+    // ─── 備註純文字化（m-3 新增）────────────────────────────────────────────
+    /** 標籤清除最多重複次數（處理多層實體編碼，例如 {@code "&amp;lt;b&amp;gt;"}） */
+    private static final int MAX_SANITIZE_PASSES = 3;
+    /** 視為換行的 HTML 標籤：br、br/、/p、/div、/li（不分大小寫） */
+    private static final Pattern HTML_LINE_BREAK = Pattern.compile("(?i)<br\\s*/?>|</(?:p|div|li)\\s*>");
+    /** 控制字元（保留換行與 Tab） */
+    private static final Pattern CONTROL_CHARS = Pattern.compile("[\\p{Cntrl}&&[^\\n\\t]]");
+    /** 行尾空白（半形空白、Tab、全形空白 U+3000） */
+    private static final Pattern TRAILING_LINE_SPACES = Pattern.compile("[ \\t\\x{3000}]+\\n");
+    /** 連續 3 個以上換行（壓成一個空行） */
+    private static final Pattern EXCESS_BLANK_LINES = Pattern.compile("\\n{3,}");
 
     private final OrderProductLookupJpaRepository productLookupRepository;
     private final ProductVariantJpaRepository productVariantJpaRepository;
@@ -135,15 +150,55 @@ public class OrderItemFactory {
     }
 
     /**
-     * 以 Jsoup 清除所有 HTML 標籤（防 XSS），並去除前後空白；空字串回傳 null。
-     * 供品項備註與訂單 customerNote 共用。
+     * 將備註轉為「純文字」：清除所有 HTML 標籤，但不做 HTML 實體跳脫；保留換行、去除前後空白；空字串回傳 null。
+     * 供品項備註與訂單 customerNote 共用（PlaceOnlineOrderHandler 也會呼叫，簽章不可變）。
+     *
+     * 修改（m-3）：原本 {@code Jsoup.clean(text, Safelist.none())} 輸出的是「HTML」，會把實體跳脫並重新排版
+     * （{@code "少冰 & 半糖"} 存成 {@code "少冰 &amp; 半糖"}、換行被壓掉），前端改以純文字顯示後會直接看到 {@code &amp;}。
+     * 現在：
+     * 1. 統一換行符號（\r\n、\r → \n），並把 &lt;br&gt;、&lt;/p&gt;、&lt;/div&gt;、&lt;/li&gt; 視為換行
+     * 2. Jsoup 解析後以 Safelist.none() 的 Cleaner 移除所有標籤（&lt;script&gt; 等內容一併丟棄），
+     *    再以 wholeText() 取回「已解碼、保留原始空白與換行」的純文字（不會產生 {@code &amp;}）
+     * 3. 重複步驟 2 直到結果不再改變（最多 {@value #MAX_SANITIZE_PASSES} 次）：例如使用者輸入 {@code "&lt;b&gt;"}
+     *    解碼後變成 {@code "<b>"} 會再被清除；同時確保 sanitize(sanitize(x)) == sanitize(x)，暫存單往返更新時備註不會一直變動
+     * 4. 移除控制字元（保留換行與 Tab；PostgreSQL text 欄位不接受 NUL 字元）、去除每行行尾空白、
+     *    連續 3 個以上換行壓成一個空行，最後以 strip() 去除前後空白（含全形空白）
+     * 原本沒有長度限制（DB 欄位為 text；customerNote 由 DTO @Size(max = 255) 限制），維持不變。
      */
     public static String sanitize(String text) {
         if (text == null) {
             return null;
         }
-        String cleaned = Jsoup.clean(text, Safelist.none()).trim();
-        return cleaned.isEmpty() ? null : cleaned;
+        // 1. 統一換行符號，並把常見的換行標籤轉成 \n（避免 "a<br>b" 被清成 "ab"）
+        String plain = text.replace("\r\n", "\n").replace('\r', '\n');
+        plain = HTML_LINE_BREAK.matcher(plain).replaceAll("\n");
+
+        // 2~3. 移除標籤並取回純文字，重複到結果穩定為止
+        for (int i = 0; i < MAX_SANITIZE_PASSES; i++) {
+            String next = stripHtmlTags(plain);
+            if (next.equals(plain)) {
+                break;
+            }
+            plain = next;
+        }
+
+        // 4. 移除控制字元、行尾空白、過多空行，最後去除前後空白
+        plain = CONTROL_CHARS.matcher(plain).replaceAll("");
+        plain = TRAILING_LINE_SPACES.matcher(plain).replaceAll("\n");
+        plain = EXCESS_BLANK_LINES.matcher(plain).replaceAll("\n\n");
+        plain = plain.strip();
+        return plain.isEmpty() ? null : plain;
+    }
+
+    /**
+     * 新增（m-3）：以 Jsoup 移除所有 HTML 標籤，回傳「未跳脫」的純文字（保留原始空白與換行）。
+     * Cleaner + Safelist.none() 只保留文字節點：一般標籤（如 &lt;b&gt;）保留內文，
+     * &lt;script&gt; / &lt;style&gt; 的內容與 HTML 註解則整段丟棄。
+     */
+    private static String stripHtmlTags(String text) {
+        Document dirty = Jsoup.parseBodyFragment(text);
+        Document clean = new Cleaner(Safelist.none()).clean(dirty);
+        return clean.body().wholeText();
     }
 
     // ─── 私有輔助方法 ─────────────────────────────────────────────────────

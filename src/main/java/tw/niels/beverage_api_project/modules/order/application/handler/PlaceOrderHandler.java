@@ -1,134 +1,105 @@
 package tw.niels.beverage_api_project.modules.order.application.handler;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import tw.niels.beverage_api_project.common.exception.ResourceNotFoundException;
+import tw.niels.beverage_api_project.common.exception.BadRequestException;
 import tw.niels.beverage_api_project.modules.order.application.command.PlaceOrderCommand;
+import tw.niels.beverage_api_project.modules.order.application.service.OrderItemFactory;
 import tw.niels.beverage_api_project.modules.order.domain.model.Order;
 import tw.niels.beverage_api_project.modules.order.domain.model.OrderItem;
 import tw.niels.beverage_api_project.modules.order.domain.model.OrderNumber;
-import tw.niels.beverage_api_project.modules.order.domain.model.ProductSnapshot;
 import tw.niels.beverage_api_project.modules.order.domain.repository.OrderRepository;
-import tw.niels.beverage_api_project.modules.order.dto.OrderItemDto;
+import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
 import tw.niels.beverage_api_project.modules.order.service.OrderNumberService;
-import tw.niels.beverage_api_project.modules.product.domain.model.Product;
-import tw.niels.beverage_api_project.modules.product.domain.model.ProductVariant;
-import tw.niels.beverage_api_project.modules.product.domain.repository.ProductRepository;
 import tw.niels.beverage_api_project.modules.store.service.StoreService;
-import tw.niels.beverage_api_project.modules.user.service.UserService;
 
 /**
- * 建立訂單 Handler
- *
- * 處理 POS 或線上渠道的訂單建立流程。
+ * 建立訂單 Handler（POS 現場：待付款或暫存）
  *
  * 處理流程：
- * 1. 驗證店家與員工資料是否存在
- * 2. 產生每日店家序號與訂單號碼
- * 3. 將 OrderItemDto 轉為 Domain OrderItem（查詢商品與規格）
- * 4. 呼叫 Order.place() 工廠方法建立 Aggregate
- * 5. 若目標狀態為 HELD，執行 order.hold() 轉換
- * 6. 透過 OrderRepository 儲存 Aggregate
- * 7. 發佈領域事件
+ * 1. 驗證目標狀態（僅允許 PENDING / HELD）與店家
+ * 2. 以 OrderItemFactory 批次建立品項（真實快照、選項加價、Jsoup 清洗備註）
+ * 3. 產生訂單號碼（{storeId}-{yyyyMMdd}-{seq:04d}）與預先指派的訂單 ID
+ * 4. 呼叫 Order.place() 建立 Aggregate；若目標為 HELD 再執行 order.hold()
+ * 5. 儲存並發佈領域事件
  *
- * 發佈事件：OrderPlacedEvent（訂單建立成功後）
+ * 發佈事件：OrderPlacedEvent（＋ HELD 時的 OrderStatusChangedEvent）
+ *
+ * 修改說明（P0-2、P0-3、P0-4）：
+ * - 移除逐項查詢商品、寫入假快照（"Snapshot Name"）的 processItems，改用 OrderItemFactory；
+ * - 訂單號碼由 "A%03d"（每店每日重置，違反品牌唯一鍵）改為 OrderNumberService.nextOrderNumber()；
+ * - 訂單 ID 改由 OrderRepository.nextId() 預先指派，事件的 orderId 不再為 null；
+ * - 不支援的初始狀態（如 PREPARING）改回 400，原本會被靜默當成 PENDING。
  */
 @Component
 public class PlaceOrderHandler {
 
     private final OrderRepository orderRepository;
-    private final ProductRepository productRepository;
+    private final OrderItemFactory orderItemFactory;
     private final OrderNumberService orderNumberService;
     private final StoreService storeService;
-    private final UserService userService;
     private final ApplicationEventPublisher eventPublisher;
 
     public PlaceOrderHandler(OrderRepository orderRepository,
-                             ProductRepository productRepository,
+                             OrderItemFactory orderItemFactory,
                              OrderNumberService orderNumberService,
                              StoreService storeService,
-                             UserService userService,
                              ApplicationEventPublisher eventPublisher) {
         this.orderRepository = orderRepository;
-        this.productRepository = productRepository;
+        this.orderItemFactory = orderItemFactory;
         this.orderNumberService = orderNumberService;
         this.storeService = storeService;
-        this.userService = userService;
         this.eventPublisher = eventPublisher;
     }
 
     /**
      * 執行建立訂單流程
+     *
+     * @return 新訂單 ID
      */
     @Transactional
     public Long handle(PlaceOrderCommand command) {
-        // 1. 驗證基礎資料
-        storeService.getStore(command.brandId(), command.storeId());
-        if (command.userId() != null) {
-            userService.getUser(command.brandId(), command.userId());
+        // 1. 驗證目標狀態：POS 建單只允許 PENDING（待付款）或 HELD（暫存）
+        OrderStatus targetStatus = command.status() != null ? command.status() : OrderStatus.PENDING;
+        if (targetStatus != OrderStatus.PENDING && targetStatus != OrderStatus.HELD) {
+            throw new BadRequestException("建立訂單僅允許 PENDING 或 HELD 狀態，收到：" + targetStatus);
         }
+        // 店家必須屬於本品牌（不存在則 404）
+        storeService.getStore(command.brandId(), command.storeId());
 
-        // 2. 產生成訂單號碼
-        long sequence = orderNumberService.getNextStoreDailySequence(command.storeId());
-        String orderNumStr = String.format("A%03d", sequence);
-        OrderNumber orderNumber = OrderNumber.of(orderNumStr);
+        // 2. 批次建立品項（取代原本逐項查詢與假快照）
+        List<OrderItem> domainItems = orderItemFactory.createItems(command.brandId(), command.items());
 
-        // 3. 處理訂單品項 (將 DTO 轉為 Domain Entity)
-        List<OrderItem> domainItems = processItems(command.brandId(), command.items());
+        // 3. 產生訂單號碼（品牌內唯一）與預先指派的訂單 ID
+        OrderNumber orderNumber = OrderNumber.of(orderNumberService.nextOrderNumber(command.storeId()));
+        Long orderId = orderRepository.nextId();
 
-        // 4. 建立訂單 Aggregate
+        // 4. 建立訂單 Aggregate（初始為 PENDING）
         Order order = Order.place(
+            orderId,
             command.brandId(),
             command.storeId(),
             command.userId(),
             orderNumber,
             domainItems,
-            null // customerNote 暫無
+            null // POS 建單沒有顧客備註
         );
 
-        // 5. 根據請求狀態調整 (PENDING 為預設，若為 HELD 則轉換)
-        if (command.status().name().equals("HELD")) {
+        // 5. 目標為 HELD 時轉為暫存
+        if (targetStatus == OrderStatus.HELD) {
             order.hold();
         }
 
         // 6. 儲存
         orderRepository.save(order);
 
-        // 7. 發布領域事件
+        // 7. 發布領域事件（AFTER_COMMIT 監聽者會在交易提交後收到）
         order.pullDomainEvents().forEach(eventPublisher::publishEvent);
 
         return order.getId();
-    }
-
-    private List<OrderItem> processItems(Long brandId, List<OrderItemDto> itemDtos) {
-        List<OrderItem> items = new ArrayList<>();
-        for (OrderItemDto dto : itemDtos) {
-            // 查詢商品、規格、選項 (Domain Model)
-            Product product = productRepository.findProductById(brandId, dto.productId())
-                .orElseThrow(() -> new ResourceNotFoundException("商品不存在: " + dto.productId()));
-            
-            ProductVariant variant = product.getVariants().stream()
-                .filter(v -> v.getId().equals(dto.variantId()))
-                .findFirst()
-                .orElseThrow(() -> new ResourceNotFoundException("規格不存在: " + dto.variantId()));
-
-            // 建立品項
-            OrderItem item = OrderItem.create(
-                product.getId(),
-                variant.getId(),
-                dto.quantity(),
-                variant.getPrice(), // 暫不計入選項
-                dto.notes(),
-                dto.optionIds() != null ? dto.optionIds() : List.<Long>of(),
-                new ProductSnapshot(product.getId(), "Snapshot Name", variant.getPrice(), "Snapshot Category", "Snapshot Variant") // 暫無 Snapshot 取值邏輯，傳入假資料
-            );
-            items.add(item);
-        }
-        return items;
     }
 }
