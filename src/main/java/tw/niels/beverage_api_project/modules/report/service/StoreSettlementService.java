@@ -45,20 +45,21 @@ public class StoreSettlementService {
     // [B-6] 報表專用的訂單查詢（綁定 java.util.Date），取代 OrderJpaRepository 內綁 LocalDateTime 的舊查詢
     private final OrderReportQueryRepository orderReportQueryRepository;
     private final ProductCategoryReportQueryRepository productCategoryReportQueryRepository;
-    private final DailyStoreStatsJpaRepository DailyStoreStatsJpaRepository;
-    private final DailyProductStatsJpaRepository DailyProductStatsJpaRepository;
+    // [命名修正] 欄位名稱原本與型別同名 (批次改名殘留)，改為 lowerCamelCase
+    private final DailyStoreStatsJpaRepository dailyStoreStatsRepository;
+    private final DailyProductStatsJpaRepository dailyProductStatsRepository;
     // [B-7] 營業時區：日結區間 (LocalDateTime) 要用它轉成 Date，而不是 JVM 預設時區
     private final ZoneId businessZoneId;
 
     public StoreSettlementService(OrderReportQueryRepository orderReportQueryRepository,
                                   ProductCategoryReportQueryRepository productCategoryReportQueryRepository,
-                                  DailyStoreStatsJpaRepository DailyStoreStatsJpaRepository,
-                                  DailyProductStatsJpaRepository DailyProductStatsJpaRepository,
+                                  DailyStoreStatsJpaRepository dailyStoreStatsRepository,
+                                  DailyProductStatsJpaRepository dailyProductStatsRepository,
                                   ZoneId businessZoneId) {
         this.orderReportQueryRepository = orderReportQueryRepository;
         this.productCategoryReportQueryRepository = productCategoryReportQueryRepository;
-        this.DailyStoreStatsJpaRepository = DailyStoreStatsJpaRepository;
-        this.DailyProductStatsJpaRepository = DailyProductStatsJpaRepository;
+        this.dailyStoreStatsRepository = dailyStoreStatsRepository;
+        this.dailyProductStatsRepository = dailyProductStatsRepository;
         this.businessZoneId = businessZoneId;
     }
 
@@ -72,11 +73,11 @@ public class StoreSettlementService {
     public void processStoreStats(Long storeId, Long brandId, LocalDate date, LocalDateTime start, LocalDateTime end) {
 
         // --- 步驟 0: 冪等性檢查 ---
-        if (DailyStoreStatsJpaRepository.existsByStoreIdAndDate(storeId, date)) {
+        if (dailyStoreStatsRepository.existsByStoreIdAndDate(storeId, date)) {
             logger.debug("分店 {} 在 {} 的報表已存在，正在刪除舊資料...", storeId, date);
-            DailyStoreStatsJpaRepository.deleteByStoreIdAndDate(storeId, date);
-            DailyProductStatsJpaRepository.deleteByStoreIdAndDate(storeId, date);
-            DailyStoreStatsJpaRepository.flush();
+            dailyStoreStatsRepository.deleteByStoreIdAndDate(storeId, date);
+            dailyProductStatsRepository.deleteByStoreIdAndDate(storeId, date);
+            dailyStoreStatsRepository.flush();
         }
 
         // [B-7] 以營業時區把日結區間轉成 java.util.Date（OrderEntity 的時間欄位型別）
@@ -118,28 +119,24 @@ public class StoreSettlementService {
 
         // --- 步驟 3: 查詢並統計付款方式 ---
         // [B-6 修正] 真實的付款代碼是 CASH / CREDIT_CARD / THIRD_PARTY（舊版只認 CASH 與不存在的 LINE_PAY）。
-        // 沒有付款方式的訂單不會出現在查詢結果中（INNER JOIN），即「忽略」；line_pay_total 欄位保留，維持 0。
+        // 查詢以 LEFT JOIN 依付款方式代碼分組；沒有付款方式 (代碼為 null) 或尚未列入細分的代碼，
+        // 一律歸入「未指定」(unspecified_total)，所以四個欄位加總 = 實收金額。
+        // line_pay_total 欄位保留不動 (維持 0)。對應規則與即時統計共用 PaymentBreakdown。
         List<PaymentStatsDto> paymentStats = orderReportQueryRepository.findClosedPaymentStats(storeId, startDate, endDate);
 
+        PaymentBreakdown payments = PaymentBreakdown.empty();
         for (PaymentStatsDto dto : paymentStats) {
-            String code = dto.getPaymentCode();
-            BigDecimal amount = dto.getTotalAmount();
-            if (code == null || amount == null) {
+            if (dto.getTotalAmount() == null) {
                 continue;
             }
-
-            if ("CASH".equalsIgnoreCase(code)) {
-                storeStats.setCashTotal(amount);
-            } else if ("CREDIT_CARD".equalsIgnoreCase(code)) {
-                storeStats.setCreditCardTotal(amount);
-            } else if ("THIRD_PARTY".equalsIgnoreCase(code)) {
-                storeStats.setThirdPartyTotal(amount);
-            } else {
-                logger.debug("分店 {} 在 {} 出現未列入細分的付款方式代碼: {}", storeId, date, code);
-            }
+            payments = payments.plus(PaymentBreakdown.of(dto.getPaymentCode(), dto.getTotalAmount()));
         }
+        storeStats.setCashTotal(payments.cash());
+        storeStats.setCreditCardTotal(payments.creditCard());
+        storeStats.setThirdPartyTotal(payments.thirdParty());
+        storeStats.setUnspecifiedTotal(payments.unspecified());
 
-        DailyStoreStatsJpaRepository.save(storeStats);
+        dailyStoreStatsRepository.save(storeStats);
 
         // --- 步驟 4: 計算並儲存商品銷售統計 ---
         List<ProductSalesStatsDto> productStats = orderReportQueryRepository.findClosedProductStats(storeId, startDate, endDate);
@@ -172,7 +169,7 @@ public class StoreSettlementService {
             prodStat.setCategoryName(categoryNameByProduct.getOrDefault(dto.getProductId(), UNCATEGORIZED));
             productStatsToSave.add(prodStat);
         }
-        DailyProductStatsJpaRepository.saveAll(productStatsToSave);
+        dailyProductStatsRepository.saveAll(productStatsToSave);
     }
 
     /** null 安全：金額為 null 時視為 0 */

@@ -49,15 +49,13 @@ public interface DailyStoreStatsJpaRepository extends JpaRepository<DailyStoreSt
                                                  @Param("endDate") LocalDate endDate);
 
     /**
-     * 查詢指定分店的指定日期統計（供即時累計更新使用）
+     * 查詢指定分店的指定日期統計（單筆）
      */
     Optional<DailyStoreStatsEntity> findByStoreIdAndDate(Long storeId, LocalDate date);
 
-    /**
-     * 系統用：取得資料庫中「日期最新」的一筆紀錄
-     * 用途：判斷最後一次成功結算是哪一天
-     */
-    Optional<DailyStoreStatsEntity> findTopByOrderByDateDesc();
+    // [程式碼品質] 已移除 findTopByOrderByDateDesc (取全域最新日期)：
+    // 即時統計會寫入「今天」的資料列，用它判斷最後一次完整日結一定會得到今天 (B-6 的補跑漏洞)，
+    // 補漏檢查改用下方的 findTopByDateLessThanOrderByDateDesc。
 
     /**
      * [B-6 新增] 系統用：取得「早於指定日期」的最新一筆紀錄。
@@ -80,10 +78,10 @@ public interface DailyStoreStatsJpaRepository extends JpaRepository<DailyStoreSt
     @Query(value = "INSERT INTO daily_store_stats (" +
             "daily_store_stats_id, store_id, brand_id, date, " +
             "total_orders, total_revenue, total_discount, final_revenue, cancelled_orders, " +
-            "cash_total, line_pay_total, credit_card_total, third_party_total, created_at) " +
+            "cash_total, line_pay_total, credit_card_total, third_party_total, unspecified_total, created_at) " +
             "VALUES (:id, :storeId, :brandId, :statDate, " +
             "1, :totalRevenue, :totalDiscount, :finalRevenue, 0, " +
-            ":cashTotal, 0, :creditCardTotal, :thirdPartyTotal, CURRENT_TIMESTAMP) " +
+            ":cashTotal, 0, :creditCardTotal, :thirdPartyTotal, :unspecifiedTotal, CURRENT_TIMESTAMP) " +
             "ON CONFLICT (store_id, date) DO UPDATE SET " +
             "total_orders = daily_store_stats.total_orders + 1, " +
             "total_revenue = daily_store_stats.total_revenue + EXCLUDED.total_revenue, " +
@@ -91,7 +89,8 @@ public interface DailyStoreStatsJpaRepository extends JpaRepository<DailyStoreSt
             "final_revenue = daily_store_stats.final_revenue + EXCLUDED.final_revenue, " +
             "cash_total = COALESCE(daily_store_stats.cash_total, 0) + EXCLUDED.cash_total, " +
             "credit_card_total = daily_store_stats.credit_card_total + EXCLUDED.credit_card_total, " +
-            "third_party_total = daily_store_stats.third_party_total + EXCLUDED.third_party_total",
+            "third_party_total = daily_store_stats.third_party_total + EXCLUDED.third_party_total, " +
+            "unspecified_total = daily_store_stats.unspecified_total + EXCLUDED.unspecified_total",
             nativeQuery = true)
     void upsertRealtimeStats(@Param("id") Long id,
                              @Param("storeId") Long storeId,
@@ -102,7 +101,8 @@ public interface DailyStoreStatsJpaRepository extends JpaRepository<DailyStoreSt
                              @Param("finalRevenue") BigDecimal finalRevenue,
                              @Param("cashTotal") BigDecimal cashTotal,
                              @Param("creditCardTotal") BigDecimal creditCardTotal,
-                             @Param("thirdPartyTotal") BigDecimal thirdPartyTotal);
+                             @Param("thirdPartyTotal") BigDecimal thirdPartyTotal,
+                             @Param("unspecifiedTotal") BigDecimal unspecifiedTotal);
 
     /**
      * 系統用：檢查是否已存在該日報表 (避免重複執行)

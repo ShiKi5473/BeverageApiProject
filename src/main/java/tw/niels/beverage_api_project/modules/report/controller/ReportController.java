@@ -35,21 +35,22 @@ import java.util.stream.Collectors;
 @Tag(name = "Report APIs", description = "報表與統計數據查詢介面")
 public class ReportController {
 
-    private final DailyStoreStatsJpaRepository DailyStoreStatsJpaRepository;
-    private final DailyProductStatsJpaRepository DailyProductStatsJpaRepository; //
+    // [命名修正] 欄位名稱原本與型別同名 (批次改名殘留)，改為 lowerCamelCase
+    private final DailyStoreStatsJpaRepository dailyStoreStatsRepository;
+    private final DailyProductStatsJpaRepository dailyProductStatsRepository;
     private final ReportAggregationService reportAggregationService;
     private final ControllerHelperService helperService;
     private final StoreJpaRepository storeRepository;
     private final InventoryReportService inventoryReportService;
 
-    public ReportController(DailyStoreStatsJpaRepository DailyStoreStatsJpaRepository,
-                            DailyProductStatsJpaRepository DailyProductStatsJpaRepository,
+    public ReportController(DailyStoreStatsJpaRepository dailyStoreStatsRepository,
+                            DailyProductStatsJpaRepository dailyProductStatsRepository,
                             ReportAggregationService reportAggregationService,
                             ControllerHelperService helperService,
                             StoreJpaRepository storeRepository,
                             InventoryReportService inventoryReportService) {
-        this.DailyStoreStatsJpaRepository = DailyStoreStatsJpaRepository;
-        this.DailyProductStatsJpaRepository = DailyProductStatsJpaRepository;
+        this.dailyStoreStatsRepository = dailyStoreStatsRepository;
+        this.dailyProductStatsRepository = dailyProductStatsRepository;
         this.reportAggregationService = reportAggregationService;
         this.helperService = helperService;
         this.storeRepository = storeRepository;
@@ -62,7 +63,8 @@ public class ReportController {
      * URL: GET /api/v1/reports/store-daily?storeId=1&startDate=2023-10-01&endDate=2023-10-31
      */
     @GetMapping("/store-daily")
-    @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
+    // 修改：TESTER（測試人員）比照 STAFF 權限（使用者決策）
+    @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF', 'TESTER')")
     @Operation(
             summary = "查詢分店日結明細",
             description = "取得指定分店在特定日期區間內的每日營收統計 (權限: 該分店員工或品牌管理員)"
@@ -76,7 +78,7 @@ public class ReportController {
         helperService.validateStoreAccess(storeId);
 
         // [P0-10] 回傳 DTO（ID 為字串），不再直接把 JPA Entity 序列化給前端
-        List<DailyStoreStatsResponseDto> stats = DailyStoreStatsJpaRepository
+        List<DailyStoreStatsResponseDto> stats = dailyStoreStatsRepository
                 .findByStoreIdAndDateBetweenOrderByDateAsc(storeId, startDate, endDate)
                 .stream()
                 .map(DailyStoreStatsResponseDto::from)
@@ -85,31 +87,32 @@ public class ReportController {
         return ResponseEntity.ok(stats);
     }
 
-        /**
-         * 【分店端】查詢熱銷商品排行 (指定區間)
-         * 用途：查詢某段時間內，賣得最好的商品 (依照金額排序)
-         * URL: GET /api/v1/reports/product-sales?storeId=1&startDate=...&endDate=...
-         */
-        @GetMapping("/product-sales")
-        @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
-        @Operation(
-                summary = "查詢熱銷商品排行",
-                description = "取得指定分店在區間內的商品銷售統計，依銷售總額排序 (用於繪製熱銷排行榜)"
-        )
-        public ResponseEntity<List<ProductSalesStatsDto>> getProductSalesRanking(
-                @RequestParam Long storeId,
-                @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-                @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+    /**
+     * 【分店端】查詢熱銷商品排行 (指定區間)
+     * 用途：查詢某段時間內，賣得最好的商品 (依照金額排序)
+     * URL: GET /api/v1/reports/product-sales?storeId=1&startDate=...&endDate=...
+     */
+    @GetMapping("/product-sales")
+    // 修改：TESTER（測試人員）比照 STAFF 權限（使用者決策）
+    @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF', 'TESTER')")
+    @Operation(
+            summary = "查詢熱銷商品排行",
+            description = "取得指定分店在區間內的商品銷售統計，依銷售總額排序 (用於繪製熱銷排行榜)"
+    )
+    public ResponseEntity<List<ProductSalesStatsDto>> getProductSalesRanking(
+            @RequestParam Long storeId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
 
-            // 1. 驗證權限
-            helperService.validateStoreAccess(storeId);
+        // 1. 驗證權限
+        helperService.validateStoreAccess(storeId);
 
-            // 2. 查詢資料庫
-            List<ProductSalesStatsDto> stats = DailyProductStatsJpaRepository
-                    .findProductSalesRanking(storeId, startDate, endDate);
+        // 2. 查詢資料庫
+        List<ProductSalesStatsDto> stats = dailyProductStatsRepository
+                .findProductSalesRanking(storeId, startDate, endDate);
 
-            return ResponseEntity.ok(stats);
-        }
+        return ResponseEntity.ok(stats);
+    }
 
     /**
      * 【品牌端】查詢全品牌總覽 (指定區間)
@@ -128,7 +131,7 @@ public class ReportController {
 
         Long brandId = helperService.getCurrentBrandId();
 
-        BrandSalesSummaryDto summary = DailyStoreStatsJpaRepository
+        BrandSalesSummaryDto summary = dailyStoreStatsRepository
                 .aggregateBrandSales(brandId, startDate, endDate);
 
         return ResponseEntity.ok(summary);
@@ -151,7 +154,7 @@ public class ReportController {
 
         Long brandId = helperService.getCurrentBrandId();
 
-        List<StoreRankingDto> ranking = DailyStoreStatsJpaRepository
+        List<StoreRankingDto> ranking = dailyStoreStatsRepository
                 .findTopStoresByRevenue(brandId, startDate, endDate);
 
         Set<Long> storeIds = ranking.stream()

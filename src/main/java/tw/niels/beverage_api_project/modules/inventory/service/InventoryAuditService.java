@@ -43,7 +43,8 @@ public class InventoryAuditService {
     private final InventorySnapshotJpaRepository snapshotRepository;
     private final InventoryTransactionJpaRepository transactionRepository;
     private final StoreJpaRepository storeRepository;
-    private final UserJpaRepository UserJpaRepository;
+    // [命名修正] 欄位名稱原本與型別同名 (批次改名殘留)，改為 userRepository
+    private final UserJpaRepository userRepository;
     private final ControllerHelperService helperService;
     private final InventoryDeductionService deductionService;
     // [B-7] 使用營業時區的 Clock，盤盈批次的生產日 / 預設效期不再依賴 JVM 預設時區
@@ -54,7 +55,7 @@ public class InventoryAuditService {
                                  InventorySnapshotJpaRepository snapshotRepository,
                                  InventoryTransactionJpaRepository transactionRepository,
                                  StoreJpaRepository storeRepository,
-                                 UserJpaRepository UserJpaRepository,
+                                 UserJpaRepository userRepository,
                                  ControllerHelperService helperService,
                                  InventoryDeductionService deductionService,
                                  Clock clock) {
@@ -64,7 +65,7 @@ public class InventoryAuditService {
         this.snapshotRepository = snapshotRepository;
         this.transactionRepository = transactionRepository;
         this.storeRepository = storeRepository;
-        this.UserJpaRepository = UserJpaRepository;
+        this.userRepository = userRepository;
         this.helperService = helperService;
         this.deductionService = deductionService;
     }
@@ -79,9 +80,10 @@ public class InventoryAuditService {
     @Transactional
     public void performAudit(Long brandId, Long storeId, InventoryAuditRequestDto request) {
         // 1. 準備基礎資料
-        StoreEntity StoreEntity = storeRepository.findByBrand_IdAndId(brandId, storeId)
+        // [命名修正] 區域變數原本與型別同名 (StoreEntity StoreEntity)，改為 store
+        StoreEntity store = storeRepository.findByBrand_IdAndId(brandId, storeId)
                 .orElseThrow(() -> new ResourceNotFoundException(MSG_STORE_NOT_FOUND));
-        UserEntity operator = UserJpaRepository.findByBrand_IdAndId(brandId, helperService.getCurrentUserId())
+        UserEntity operator = userRepository.findByBrand_IdAndId(brandId, helperService.getCurrentUserId())
                 .orElse(null);
 
         Set<Long> itemIds = request.getItems().stream()
@@ -116,7 +118,7 @@ public class InventoryAuditService {
         Map<Long, BigDecimal> pendingDeductions = new HashMap<>(); // 收集需要扣庫存的項目 (ItemId -> Qty)
 
         // 3. 記憶體內計算差異 (包含盤盈/盤損判斷)
-        calculateAuditDifferences(request, StoreEntity, operator, itemMap, snapshotMap, systemQtyMap,
+        calculateAuditDifferences(request, store, operator, itemMap, snapshotMap, systemQtyMap,
                 transactionsToSave, snapshotsToSave, pendingDeductions);
 
         // 4. 批次寫入 Transaction 與 Snapshot
@@ -132,7 +134,7 @@ public class InventoryAuditService {
     /**
      * 計算盤點差異：比較實際數量與系統數量，分流處理盤盈與盤損
      */
-    private void calculateAuditDifferences(InventoryAuditRequestDto request, StoreEntity StoreEntity, UserEntity operator,
+    private void calculateAuditDifferences(InventoryAuditRequestDto request, StoreEntity store, UserEntity operator,
                                            Map<Long, InventoryItemEntity> itemMap, Map<Long, InventorySnapshotEntity> snapshotMap,
                                            Map<Long, BigDecimal> systemQtyMap,
                                            List<InventoryTransactionEntity> transactionsToSave, List<InventorySnapshotEntity> snapshotsToSave,
@@ -145,7 +147,7 @@ public class InventoryAuditService {
             // 處理新 Snapshot
             if (snapshot == null) {
                 snapshot = new InventorySnapshotEntity();
-                snapshot.setStore(StoreEntity);
+                snapshot.setStore(store);
                 snapshot.setInventoryItem(item);
                 snapshot.setQuantity(BigDecimal.ZERO);
                 // [B-5] 放回 Map：同一品項若在請求中重複出現，才不會建立兩筆快照而違反唯一約束
@@ -160,7 +162,7 @@ public class InventoryAuditService {
             // 只有當數量有變化時才產生 Transaction
             if (diff.compareTo(BigDecimal.ZERO) != 0) {
                 InventoryTransactionEntity trx = new InventoryTransactionEntity();
-                trx.setStore(StoreEntity);
+                trx.setStore(store);
                 trx.setInventoryItem(item);
                 trx.setChangeAmount(diff);
                 trx.setBalanceAfter(actualQty);
@@ -173,7 +175,8 @@ public class InventoryAuditService {
             // [B-5 修正] 無論有無差異，盤點後 Snapshot 一律對齊實盤數量並更新盤點時間
             // (舊版 Snapshot 與批次脫節時，即使 diff 為 0 也能藉由盤點修正回來)
             snapshot.setQuantity(actualQty);
-            snapshot.setLastCheckedAt(Instant.now());
+            // [B-7] 使用營業時區的 Clock 取得盤點時間，方便測試時固定時鐘
+            snapshot.setLastCheckedAt(Instant.now(clock));
             if (!snapshotsToSave.contains(snapshot)) {
                 snapshotsToSave.add(snapshot);
             }
@@ -181,7 +184,7 @@ public class InventoryAuditService {
             // 分流處理：盤盈 vs 盤損
             if (diff.compareTo(BigDecimal.ZERO) > 0) {
                 // 盤盈 (Gain): 立即建立新批次
-                handleInventoryGain(StoreEntity, item, diff, itemDto.getGainedItemExpiryDate());
+                handleInventoryGain(store, item, diff, itemDto.getGainedItemExpiryDate());
             } else if (diff.compareTo(BigDecimal.ZERO) < 0) {
                 // 盤損 (Loss): 收集起來，稍後批次扣減 (重複品項時累加)
                 pendingDeductions.merge(itemId, diff.abs(), BigDecimal::add);
@@ -245,10 +248,10 @@ public class InventoryAuditService {
     /**
      * 處理盤盈：建立新批次並更新 InventoryItemEntity 的 TotalQuantity
      */
-    private void handleInventoryGain(StoreEntity StoreEntity, InventoryItemEntity item, BigDecimal quantityToGain, LocalDate manualExpiryDate) {
+    private void handleInventoryGain(StoreEntity store, InventoryItemEntity item, BigDecimal quantityToGain, LocalDate manualExpiryDate) {
         // 1. 建立新批次
         InventoryBatchEntity newBatch = new InventoryBatchEntity();
-        newBatch.setStore(StoreEntity);
+        newBatch.setStore(store);
         newBatch.setInventoryItem(item);
         newBatch.setQuantityReceived(quantityToGain);
         newBatch.setCurrentQuantity(quantityToGain);
@@ -261,7 +264,7 @@ public class InventoryAuditService {
         } else {
             // 若未指定到期日，取最近一筆批次的到期日作為預設值
             LocalDate estimatedExpiry = batchRepository
-                    .findTopByStore_IdAndInventoryItem_IdOrderByExpiryDateDesc(StoreEntity.getId(), item.getId())
+                    .findTopByStore_IdAndInventoryItem_IdOrderByExpiryDateDesc(store.getId(), item.getId())
                     .map(InventoryBatchEntity::getExpiryDate)
                     .orElse(today.plusDays(7)); // TODO: 建議改讀取 Item 的預設效期設定
             newBatch.setExpiryDate(estimatedExpiry);
@@ -269,6 +272,9 @@ public class InventoryAuditService {
         batchRepository.save(newBatch);
 
         // 2. 更新 InventoryItemEntity 總量以保持一致性
-        itemRepository.increaseTotalQuantity(item.getId(), quantityToGain);
+        // [B-5 修正] 品項已被 findByBrandIdAndIdInForUpdate 鎖定且是受管實體，直接在記憶體累加。
+        // 原本用 JPQL bulk UPDATE 會讓受管實體的 totalQuantity 變成過期值：同一次盤點若稍後又對同品項盤損
+        // (processBatchDeductions 會重用這個受管實體再扣減)，過期值會把剛累加的盤盈覆蓋掉。
+        item.setTotalQuantity(item.getTotalQuantity().add(quantityToGain));
     }
 }

@@ -62,6 +62,11 @@ public class DailyStoreStatsEntity extends BaseTsidEntity {
     @Column(name = "third_party_total", nullable = false, precision = 12, scale = 2)
     private BigDecimal thirdPartyTotal = BigDecimal.ZERO;
 
+    // [B-6 新增] 對應 V20：沒有付款方式 (payment_method_id 為 NULL) 的已完成訂單實收金額，
+    // 讓 cash + credit_card + third_party + unspecified 能對上 final_revenue
+    @Column(name = "unspecified_total", nullable = false, precision = 12, scale = 2)
+    private BigDecimal unspecifiedTotal = BigDecimal.ZERO;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private Instant createdAt;

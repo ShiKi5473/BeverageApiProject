@@ -79,7 +79,9 @@ public class OrderClosedInventoryHandler {
      *
      * @param event 訂單完成事件，攜帶 orderId、brandId、storeId
      */
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    // [B-5 補強] fallbackExecution = true：萬一事件是在「沒有交易」的情境下發布 (例如非交易式的呼叫端)，
+    // 預設的 AFTER_COMMIT 監聽器會被靜默略過而漏扣庫存；開啟後會改為立即執行 (本方法自己會開新交易)。
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void handle(OrderClosedEvent event) {
         try {
             newTransaction.executeWithoutResult(status -> deductForOrder(event));

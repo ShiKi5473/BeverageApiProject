@@ -67,14 +67,10 @@ public class InventoryRepositoryImpl implements InventoryRepository {
     public void saveItem(InventoryItem item) {
         tw.niels.beverage_api_project.modules.inventory.entity.InventoryItemEntity jpaEntity = InventoryMapper.toItemEntity(item);
         tw.niels.beverage_api_project.modules.inventory.entity.InventoryItemEntity saved = itemJpaRepo.save(jpaEntity);
+        // [程式碼品質] 原本用反射呼叫不存在的 setId (必定失敗，只會印 System.err)；
+        // 改為 Domain Model 提供的 assignId，直接把儲存後的 ID 回填
         if (item.getId() == null && saved.getId() != null) {
-            try {
-                var setIdMethod = InventoryItem.class.getDeclaredMethod("setId", Long.class);
-                setIdMethod.setAccessible(true);
-                setIdMethod.invoke(item, saved.getId());
-            } catch (Exception e) {
-                System.err.println("警告：無法同步庫存品項 ID 回 Domain Model：" + e.getMessage());
-            }
+            item.assignId(saved.getId());
         }
     }
 
@@ -97,14 +93,9 @@ public class InventoryRepositoryImpl implements InventoryRepository {
     public void saveBatch(InventoryBatch batch) {
         var jpaEntity = InventoryMapper.toBatchEntity(batch);
         var saved = batchJpaRepo.save(jpaEntity);
+        // [程式碼品質] 同上：移除反射與 System.err，改用 Domain Model 的 assignId 回填 ID
         if (batch.getId() == null && saved.getId() != null) {
-            try {
-                var setIdMethod = InventoryBatch.class.getDeclaredMethod("setId", Long.class);
-                setIdMethod.setAccessible(true);
-                setIdMethod.invoke(batch, saved.getId());
-            } catch (Exception e) {
-                System.err.println("警告：無法同步批次 ID 回 Domain Model：" + e.getMessage());
-            }
+            batch.assignId(saved.getId());
         }
     }
 

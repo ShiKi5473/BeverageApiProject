@@ -35,7 +35,8 @@ public class InventoryService {
     private final InventoryBatchJpaRepository batchRepository;
     private final PurchaseShipmentJpaRepository shipmentRepository;
     private final StoreJpaRepository storeRepository;
-    private final UserJpaRepository UserJpaRepository;
+    // [命名修正] 欄位名稱原本與型別同名 (批次改名殘留)，改為 userRepository
+    private final UserJpaRepository userRepository;
     private final InventorySnapshotJpaRepository snapshotRepository;
     private final InventoryTransactionJpaRepository transactionRepository;
     // [B-7] 使用營業時區的 Clock (TimeConfig)，不再依賴 JVM 預設時區
@@ -45,7 +46,7 @@ public class InventoryService {
                             InventoryBatchJpaRepository batchRepository,
                             PurchaseShipmentJpaRepository shipmentRepository,
                             StoreJpaRepository storeRepository,
-                            UserJpaRepository UserJpaRepository,
+                            UserJpaRepository userRepository,
                             InventorySnapshotJpaRepository snapshotRepository,
                             InventoryTransactionJpaRepository transactionRepository,
                             Clock clock) {
@@ -54,7 +55,7 @@ public class InventoryService {
         this.batchRepository = batchRepository;
         this.shipmentRepository = shipmentRepository;
         this.storeRepository = storeRepository;
-        this.UserJpaRepository = UserJpaRepository;
+        this.userRepository = userRepository;
         this.snapshotRepository = snapshotRepository;
         this.transactionRepository = transactionRepository;
     }
@@ -64,15 +65,16 @@ public class InventoryService {
      */
     @Transactional
     public PurchaseShipmentEntity addShipment(Long brandId, Long storeId, Long userId, AddShipmentRequestDto request) {
-        StoreEntity StoreEntity = storeRepository.findByBrand_IdAndId(brandId, storeId)
+        // [命名修正] 區域變數原本與型別同名 (StoreEntity StoreEntity)，改為 store
+        StoreEntity store = storeRepository.findByBrand_IdAndId(brandId, storeId)
                 .orElseThrow(() -> new ResourceNotFoundException(MSG_STORE_NOT_FOUND));
 
-        UserEntity staff = UserJpaRepository.findByBrand_IdAndId(brandId, userId)
+        UserEntity staff = userRepository.findByBrand_IdAndId(brandId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("找不到員工，ID：" + userId));
 
         // 1. 建立進貨單主檔
         PurchaseShipmentEntity shipment = new PurchaseShipmentEntity();
-        shipment.setStore(StoreEntity);
+        shipment.setStore(store);
         shipment.setStaff(staff);
         shipment.setShipmentDate(LocalDateTime.now(clock));
         shipment.setSupplier(request.getSupplier());
@@ -90,7 +92,12 @@ public class InventoryService {
                 .collect(Collectors.toSet());
 
         // 3. [優化] 批次查詢 InventoryItemEntity (Map<ItemId, Item>)
-        Map<Long, InventoryItemEntity> itemMap = itemRepository.findByBrand_IdAndIdIn(brandId, itemIds)
+        // [B-5 修正] 改用 findByBrandIdAndIdInForUpdate：依 id 由小到大一次鎖定所有相關品項 (PESSIMISTIC_WRITE)。
+        // 原本進貨不鎖品項，只在最後用 UPDATE 累加 totalQuantity，但會先寫入批次與 Snapshot：
+        // 與同時進行的訂單扣減 (先鎖品項，commit 時才寫 Snapshot) 交錯時，兩邊會互相等待對方的列鎖而死鎖，
+        // 且進貨讀到的 Snapshot 可能是扣減前的舊值而造成 Snapshot 與批次總和脫節。
+        // 先鎖品項讓「進貨 / 扣減 / 盤點」對同一品項完全序列化，加鎖順序一律依 id，亦避免死鎖。
+        Map<Long, InventoryItemEntity> itemMap = itemRepository.findByBrandIdAndIdInForUpdate(brandId, itemIds)
                 .stream()
                 .collect(Collectors.toMap(InventoryItemEntity::getId, Function.identity()));
 
@@ -116,7 +123,7 @@ public class InventoryService {
 
             // 建立 Batch
             InventoryBatchEntity batch = new InventoryBatchEntity();
-            batch.setStore(StoreEntity); // [修正] 記得設定 StoreEntity
+            batch.setStore(store); // [修正] 記得設定分店
             batch.setShipment(shipment);
             batch.setInventoryItem(item);
             batch.setQuantityReceived(itemDto.getQuantity());
@@ -130,7 +137,7 @@ public class InventoryService {
             // 更新或建立 Snapshot (從 Map 取得，如果沒有則建立新的並放入 Map)
             InventorySnapshotEntity snapshot = snapshotMap.computeIfAbsent(item.getId(), k -> {
                 InventorySnapshotEntity newSnap = new InventorySnapshotEntity();
-                newSnap.setStore(StoreEntity);
+                newSnap.setStore(store);
                 newSnap.setInventoryItem(item);
                 newSnap.setQuantity(BigDecimal.ZERO);
                 return newSnap;
@@ -143,7 +150,7 @@ public class InventoryService {
 
             // 建立 Transaction
             InventoryTransactionEntity trx = new InventoryTransactionEntity();
-            trx.setStore(StoreEntity);
+            trx.setStore(store);
             trx.setInventoryItem(item);
             trx.setChangeAmount(itemDto.getQuantity());
             trx.setBalanceAfter(newQuantity);
@@ -160,8 +167,13 @@ public class InventoryService {
 
         // 7. [B-5 修正] 進貨同步增加品牌層級 InventoryItem.totalQuantity
         // 原本只有盤盈會加 totalQuantity、進貨不加，導致三套庫存數字逐漸分歧。
-        // 使用原子的 UPDATE ... SET total = total + :amount，不必先鎖定品項即可安全累加。
-        receivedByItem.forEach(itemRepository::increaseTotalQuantity);
+        // 品項已在上方被鎖定且為受管實體，直接在記憶體累加即可 (交易提交時一併寫入)；
+        // 不再用 JPQL bulk UPDATE，避免受管實體的 totalQuantity 變成過期值，被後續同交易的邏輯覆蓋。
+        receivedByItem.forEach((itemId, amount) -> {
+            InventoryItemEntity item = itemMap.get(itemId);
+            item.setTotalQuantity(item.getTotalQuantity().add(amount));
+        });
+        itemRepository.saveAll(itemMap.values());
 
         return shipment;
     }

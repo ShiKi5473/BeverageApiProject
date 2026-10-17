@@ -7,6 +7,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,34 +24,36 @@ import tw.niels.beverage_api_project.modules.inventory.repository.InventoryItemJ
 import tw.niels.beverage_api_project.modules.inventory.repository.InventoryTransactionJpaRepository;
 import tw.niels.beverage_api_project.modules.order.entity.OrderEntity;
 import tw.niels.beverage_api_project.modules.order.entity.OrderItemEntity;
-import tw.niels.beverage_api_project.modules.order.enums.OrderStatus;
-import tw.niels.beverage_api_project.modules.order.repository.OrderJpaRepository;
 import tw.niels.beverage_api_project.modules.product.entity.ProductOptionEntity;
 import tw.niels.beverage_api_project.modules.product.entity.ProductVariantEntity;
 import tw.niels.beverage_api_project.modules.product.entity.RecipeEntity;
 import tw.niels.beverage_api_project.modules.product.repository.RecipeJpaRepository;
 import tw.niels.beverage_api_project.modules.report.dto.InventoryVarianceReportDto;
+import tw.niels.beverage_api_project.modules.report.repository.OrderReportQueryRepository;
 
 @Service
 public class InventoryReportService {
 
     private final InventoryItemJpaRepository itemRepository;
     private final InventoryTransactionJpaRepository transactionRepository;
-    private final OrderJpaRepository orderRepository;
-    private final RecipeJpaRepository RecipeJpaRepository;
+    // [B-5 / 效能] 改用報表模組自己的訂單查詢（以 completedTime 篩出區間並一次抓回品項 / 規格 / 選項），
+    // 不再相依訂單核心的 OrderJpaRepository，也不用先撈出該店全部歷史訂單
+    private final OrderReportQueryRepository orderReportQueryRepository;
+    // [命名修正] 欄位名稱原本與型別同名 (批次改名殘留)，改為 recipeRepository
+    private final RecipeJpaRepository recipeRepository;
     // [B-7] 報表區間以營業時區計算，不使用 ZoneId.systemDefault() (Docker 預設 UTC 會偏移 8 小時)
     private final ZoneId businessZoneId;
 
     public InventoryReportService(InventoryItemJpaRepository itemRepository,
                                   InventoryTransactionJpaRepository transactionRepository,
-                                  OrderJpaRepository orderRepository,
-                                  RecipeJpaRepository RecipeJpaRepository,
+                                  OrderReportQueryRepository orderReportQueryRepository,
+                                  RecipeJpaRepository recipeRepository,
                                   ZoneId businessZoneId) {
         this.businessZoneId = businessZoneId;
         this.itemRepository = itemRepository;
         this.transactionRepository = transactionRepository;
-        this.orderRepository = orderRepository;
-        this.RecipeJpaRepository = RecipeJpaRepository;
+        this.orderReportQueryRepository = orderReportQueryRepository;
+        this.recipeRepository = recipeRepository;
     }
 
     @Transactional(readOnly = true)
@@ -63,7 +66,7 @@ public class InventoryReportService {
 
         // 2. 準備配方對照表 (Cache Recipes)
         // --- 處理 Variant Recipes ---
-        List<RecipeEntity> variantRecipes = RecipeJpaRepository.findAllVariantRecipeEntitys();
+        List<RecipeEntity> variantRecipes = recipeRepository.findAllVariantRecipeEntitys();
         Map<Long, List<RecipeEntity>> variantRecipeMap = Optional.ofNullable(variantRecipes)
                 .orElse(Collections.emptyList())
                 .stream()
@@ -72,7 +75,7 @@ public class InventoryReportService {
                 .collect(Collectors.groupingBy(r -> r.getVariant().getId()));
 
         // --- 處理 Option Recipes ---
-        List<RecipeEntity> optionRecipes = RecipeJpaRepository.findAllOptionRecipeEntitys();
+        List<RecipeEntity> optionRecipes = recipeRepository.findAllOptionRecipeEntitys();
         Map<Long, List<RecipeEntity>> optionRecipeMap = Optional.ofNullable(optionRecipes)
                 .orElse(Collections.emptyList())
                 .stream()
@@ -82,23 +85,22 @@ public class InventoryReportService {
 
         // 3. 計算理論消耗 (Theoretical Usage)
         // 撈出區間內該店所有已完成訂單
-        List<OrderEntity> orders = orderRepository.findAllByBrand_IdAndStore_IdAndStatus(brandId, storeId, OrderStatus.CLOSED);
-
-        orders = orders.stream()
-                .filter(o -> !o.getCompletedTime().toInstant().isBefore(startInstant) &&
-                        !o.getCompletedTime().toInstant().isAfter(endInstant))
-                .toList();
+        // [B-5 / 效能] 直接在資料庫以 completedTime 篩選區間（java.util.Date 參數），一次抓回品項、規格、選項；
+        // 原本是載入該店「全部歷史」已完成訂單後才在記憶體過濾，且品項 / 規格 / 選項逐筆延遲載入。
+        List<OrderEntity> orders = orderReportQueryRepository.findClosedOrdersWithItems(
+                brandId, storeId, Date.from(startInstant), Date.from(endInstant));
 
         // Map<ItemId, TheoreticalUsage>
         Map<Long, BigDecimal> theoreticalUsageMap = new HashMap<>();
 
-        for (OrderEntity OrderEntity : orders) {
-            for (OrderItemEntity OrderItemEntity : OrderEntity.getItems()) {
-                int qty = OrderItemEntity.getQuantity();
+        // [命名修正] 迴圈變數原本與型別同名 (OrderEntity OrderEntity / OrderItemEntity OrderItemEntity)，改為 order / orderItem
+        for (OrderEntity order : orders) {
+            for (OrderItemEntity orderItem : order.getItems()) {
+                int qty = orderItem.getQuantity();
 
                 // A. 飲品本體配方 (已修正：支援規格)
                 // 從 OrderItemEntity 直接取得 ProductVariantEntity，不再猜測
-                ProductVariantEntity variant = OrderItemEntity.getProductVariant();
+                ProductVariantEntity variant = orderItem.getProductVariant();
 
                 if (variant != null && variant.getId() != null) {
                     Long variantId = variant.getId();
@@ -116,15 +118,15 @@ public class InventoryReportService {
                     // 當訂單已完成卻沒有規格資訊，視為資料嚴重異常，拋出 Exception 中斷報表
                     throw new ResourceNotFoundException(String.format(
                             "庫存報表生成失敗：訂單號碼 %s 的品項 (ID: %d, 商品: %s) 缺少規格(Variant)資訊，無法計算配方消耗。",
-                            OrderEntity.getOrderNumber(),
-                            OrderItemEntity.getId(),
-                            OrderItemEntity.getProduct() != null ? OrderItemEntity.getProduct().getName() : "Unknown"
+                            order.getOrderNumber(),
+                            orderItem.getId(),
+                            orderItem.getProduct() != null ? orderItem.getProduct().getName() : "Unknown"
                     ));
                 }
 
                 // B. 加料選項配方
-                if (OrderItemEntity.getOptions() != null) {
-                    for (ProductOptionEntity opt : OrderItemEntity.getOptions()) {
+                if (orderItem.getOptions() != null) {
+                    for (ProductOptionEntity opt : orderItem.getOptions()) {
                         List<RecipeEntity> optRecipes = optionRecipeMap.getOrDefault(opt.getId(), Collections.emptyList());
                         for (RecipeEntity r : optRecipes) {
                             if (r.getInventoryItem() != null) {

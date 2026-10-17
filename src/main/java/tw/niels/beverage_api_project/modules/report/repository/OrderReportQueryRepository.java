@@ -30,7 +30,7 @@ import java.util.List;
  *       這裡的時間參數一律綁定 {@code Date}（由營業時區計算），舊查詢綁 LocalDateTime 型別不一致。</li>
  *   <li>已完成 (CLOSED) 訂單以 completedTime 為準；已取消 (CANCELLED) 訂單從不寫入 completedTime，
  *       改以 orderTime 判斷是哪一天的取消單，否則取消數永遠是 0。</li>
- *   <li>付款統計只算有付款方式的 CLOSED 訂單（沒有付款方式的不列入細分）。</li>
+ *   <li>付款統計包含沒有付款方式的 CLOSED 訂單（LEFT JOIN，paymentCode 為 null，視為「未指定」）。</li>
  * </ul>
  */
 public interface OrderReportQueryRepository extends Repository<OrderEntity, Long> {
@@ -73,13 +73,14 @@ public interface OrderReportQueryRepository extends Repository<OrderEntity, Long
     }
 
     /**
-     * 付款方式統計：只統計「有付款方式」的 CLOSED 訂單（INNER JOIN，沒有付款方式的訂單自然被忽略）。
-     * 結果依付款方式代碼分組（CASH / CREDIT_CARD / THIRD_PARTY）。
+     * 付款方式統計：統計 CLOSED 訂單，依付款方式代碼分組（CASH / CREDIT_CARD / THIRD_PARTY）。
+     * <p>[B-6] 使用 LEFT JOIN：沒有付款方式的訂單會形成一組 paymentCode = null 的結果（呼叫端視為「未指定」），
+     * 不再被 INNER JOIN 默默漏掉，這樣各付款欄位加總才能對上實收金額。</p>
      */
     @Query("SELECT new tw.niels.beverage_api_project.modules.report.dto.PaymentStatsDto(" +
             "pm.code, SUM(o.finalAmount)) " +
             "FROM OrderEntity o " +
-            "JOIN o.paymentMethod pm " +
+            "LEFT JOIN o.paymentMethod pm " +
             "WHERE o.store.id = :storeId " +
             "AND o.status = :status " +
             "AND o.completedTime BETWEEN :start AND :end " +
@@ -109,5 +110,29 @@ public interface OrderReportQueryRepository extends Repository<OrderEntity, Long
 
     default List<ProductSalesStatsDto> findClosedProductStats(Long storeId, Date start, Date end) {
         return findProductStats(storeId, OrderStatus.CLOSED, start, end);
+    }
+
+    /**
+     * 庫存耗損報表用：某店在區間內「已完成」訂單，連同品項、規格、商品與加料選項一次抓回（單一 SQL）。
+     * <p>[B-5 / 效能] 原本 InventoryReportService 呼叫 OrderJpaRepository 載入該店「全部歷史」CLOSED 訂單再用記憶體過濾，
+     * 且品項、規格、選項都是延遲載入（N+1）。現在直接在資料庫以 completedTime 篩出區間，
+     * 並避免對 OrderJpaRepository（訂單核心維護）的相依。items 與 options 皆為 Set，不會有 MultipleBagFetchException。</p>
+     */
+    @Query("SELECT DISTINCT o FROM OrderEntity o " +
+            "LEFT JOIN FETCH o.items i " +
+            "LEFT JOIN FETCH i.productVariant " +
+            "LEFT JOIN FETCH i.product " +
+            "LEFT JOIN FETCH i.options " +
+            "WHERE o.brand.id = :brandId AND o.store.id = :storeId " +
+            "AND o.status = :status " +
+            "AND o.completedTime BETWEEN :start AND :end")
+    List<OrderEntity> findOrdersWithItemsByCompletedTime(@Param("brandId") Long brandId,
+                                                         @Param("storeId") Long storeId,
+                                                         @Param("status") OrderStatus status,
+                                                         @Param("start") Date start,
+                                                         @Param("end") Date end);
+
+    default List<OrderEntity> findClosedOrdersWithItems(Long brandId, Long storeId, Date start, Date end) {
+        return findOrdersWithItemsByCompletedTime(brandId, storeId, OrderStatus.CLOSED, start, end);
     }
 }

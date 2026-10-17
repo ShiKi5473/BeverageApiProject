@@ -42,7 +42,8 @@ public class InventoryController {
     }
 
     @PostMapping("/shipments")
-    @PreAuthorize("hasAnyRole('MANAGER', 'STAFF')")
+    // 修改：TESTER（測試人員）比照 STAFF 權限（使用者決策）
+    @PreAuthorize("hasAnyRole('MANAGER', 'STAFF', 'TESTER')")
     @Operation(summary = "進貨 (Add Stock)")
     @Audit(action = "INVENTORY_ADD_SHIPMENT")
     public ResponseEntity<?> addShipment(@Valid @RequestBody AddShipmentRequestDto request) {
@@ -55,7 +56,8 @@ public class InventoryController {
     }
 
     @GetMapping("/{itemId}")
-    @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
+    // 修改：TESTER（測試人員）比照 STAFF 權限（使用者決策）
+    @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF', 'TESTER')")
     @Operation(summary = "查詢庫存量")
     public ResponseEntity<Map<String, BigDecimal>> checkStock(@PathVariable Long itemId) {
         Long storeId = helperService.getSafeCurrentUserStore().getId();
@@ -66,7 +68,8 @@ public class InventoryController {
     }
 
     @PostMapping("/audit")
-    @PreAuthorize("hasAnyRole('MANAGER', 'STAFF')")
+    // 修改：TESTER（測試人員）比照 STAFF 權限（使用者決策）
+    @PreAuthorize("hasAnyRole('MANAGER', 'STAFF', 'TESTER')")
     @Operation(summary = "提交盤點結果")
     @Audit(action = "INVENTORY_AUDIT")
     public ResponseEntity<?> performAudit(@Valid @RequestBody InventoryAuditRequestDto request) {
@@ -91,7 +94,8 @@ public class InventoryController {
     }
 
     @GetMapping("/audit-list")
-    @PreAuthorize("hasAnyRole('MANAGER', 'STAFF')")
+    // 修改：TESTER（測試人員）比照 STAFF 權限（使用者決策）
+    @PreAuthorize("hasAnyRole('MANAGER', 'STAFF', 'TESTER')")
     @Operation(summary = "取得盤點清單")
     public ResponseEntity<List<InventoryAuditItemResponseDto>> getAuditList() {
         StoreEntity store = helperService.getSafeCurrentUserStore();

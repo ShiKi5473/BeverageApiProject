@@ -55,6 +55,16 @@ public class InventoryItem {
     public Money getCostPerUnit() { return costPerUnit; }
     public boolean isActive() { return isActive; }
 
+    /**
+     * 儲存後回填 ID（僅在尚未有 ID 時有效）。
+     * 供 Infrastructure 層的 Repository 實作使用，取代原本的反射 setId。
+     */
+    public void assignId(Long id) {
+        if (this.id == null) {
+            this.id = id;
+        }
+    }
+
     // ─── 業務方法 ──────────────────────────────────────────────────────────
 
     /**

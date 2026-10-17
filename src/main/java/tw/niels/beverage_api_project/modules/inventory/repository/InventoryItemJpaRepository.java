@@ -2,12 +2,10 @@ package tw.niels.beverage_api_project.modules.inventory.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 import tw.niels.beverage_api_project.modules.inventory.entity.InventoryItemEntity;
 import jakarta.persistence.LockModeType;
-import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -28,9 +26,8 @@ public interface InventoryItemJpaRepository extends JpaRepository<InventoryItemE
 
     List<InventoryItemEntity> findByBrand_IdAndIdIn(Long brandId, Collection<Long> ids);
 
-    @Modifying
-    @Query("UPDATE InventoryItemEntity i SET i.totalQuantity = i.totalQuantity + :amount WHERE i.id = :id")
-    void increaseTotalQuantity(Long id, BigDecimal amount);
+    // [B-5] 已移除 increaseTotalQuantity (JPQL bulk UPDATE)：進貨與盤盈改為「先鎖定品項，再於記憶體累加」，
+    // bulk UPDATE 不會同步受管實體，容易讓同一交易內的 totalQuantity 變成過期值。
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT i FROM InventoryItemEntity i WHERE i.brand.id = :brandId AND i.id = :id")

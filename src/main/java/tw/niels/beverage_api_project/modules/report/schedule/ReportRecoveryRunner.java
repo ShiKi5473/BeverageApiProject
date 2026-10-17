@@ -17,6 +17,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
 
 @Component
 public class ReportRecoveryRunner implements ApplicationRunner {
@@ -24,17 +25,18 @@ public class ReportRecoveryRunner implements ApplicationRunner {
     private static final Logger logger = LoggerFactory.getLogger(ReportRecoveryRunner.class);
 
     private final ReportAggregationService reportAggregationService;
-    private final DailyStoreStatsJpaRepository DailyStoreStatsJpaRepository;
+    // [命名修正] 欄位名稱原本與型別同名 (批次改名殘留)，改為 dailyStoreStatsRepository
+    private final DailyStoreStatsJpaRepository dailyStoreStatsRepository;
     private final LockProvider lockProvider; // 注入 LockProvider
     // [B-7] 以營業時區 (TimeConfig) 的 Clock 判斷「今天 / 昨天」，不依賴 JVM 預設時區
     private final Clock clock;
 
     public ReportRecoveryRunner(ReportAggregationService reportAggregationService,
-                                DailyStoreStatsJpaRepository DailyStoreStatsJpaRepository,
+                                DailyStoreStatsJpaRepository dailyStoreStatsRepository,
                                 LockProvider lockProvider,
                                 Clock clock) {
         this.reportAggregationService = reportAggregationService;
-        this.DailyStoreStatsJpaRepository = DailyStoreStatsJpaRepository;
+        this.dailyStoreStatsRepository = dailyStoreStatsRepository;
         this.lockProvider = lockProvider;
         this.clock = clock;
     }
@@ -59,6 +61,10 @@ public class ReportRecoveryRunner implements ApplicationRunner {
             try {
                 logger.info("【報表補漏檢查】已獲取分散式鎖，開始檢查...");
                 performRecoveryLogic();
+            } catch (RuntimeException e) {
+                // 補漏只是輔助作業：失敗時記錄錯誤即可，不可讓例外往外傳而中斷整個應用程式啟動
+                // (ApplicationRunner 拋出例外會使 Spring Boot 啟動失敗)
+                logger.error("【報表補漏檢查】補漏作業發生未預期的錯誤，已略過 (不影響應用程式啟動)", e);
             } finally {
                 // 釋放鎖
                 lock.get().unlock();
@@ -78,7 +84,7 @@ public class ReportRecoveryRunner implements ApplicationRunner {
         // [B-6 修正] 即時統計 Handler 會寫入「今天」的資料列；若用全域最新日期，
         // 只要今天有任何訂單完成，startDate 就會是明天而永遠略過補跑。
         // 因此只找「嚴格早於今天」的最新一筆，才是真正的最後一次完整日結。
-        Optional<DailyStoreStatsEntity> lastStatOpt = DailyStoreStatsJpaRepository.findTopByDateLessThanOrderByDateDesc(today);
+        Optional<DailyStoreStatsEntity> lastStatOpt = dailyStoreStatsRepository.findTopByDateLessThanOrderByDateDesc(today);
         LocalDate startDate;
 
         if (lastStatOpt.isPresent()) {
@@ -102,7 +108,7 @@ public class ReportRecoveryRunner implements ApplicationRunner {
         // 這確保了在鎖釋放前，所有補跑作業都已完成。
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             // 限制同時只有 8 個任務在執行 (保護資料庫連線池)
-            java.util.concurrent.Semaphore semaphore = new java.util.concurrent.Semaphore(8);
+            Semaphore semaphore = new Semaphore(8);
 
             // 【修正 2】 使用 !isAfter 確保「昨天」也會被執行
             while (!processingDate.isAfter(yesterday)) {

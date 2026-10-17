@@ -61,6 +61,9 @@ public record DailyStoreStatsResponseDto(
         @Schema(description = "第三方支付實收")
         BigDecimal thirdPartyTotal,
 
+        @Schema(description = "未指定付款方式的實收 (訂單沒有付款方式時)")
+        BigDecimal unspecifiedTotal,
+
         @Schema(description = "建立時間")
         Instant createdAt
 ) {
@@ -80,6 +83,7 @@ public record DailyStoreStatsResponseDto(
                 e.getLinePayTotal(),
                 e.getCreditCardTotal(),
                 e.getThirdPartyTotal(),
+                e.getUnspecifiedTotal(),
                 e.getCreatedAt());
     }
 }
