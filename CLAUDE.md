@@ -80,14 +80,12 @@ modules/order/
 ├── entity/              # JPA Entity（後綴 Entity）
 ├── enums/               # 枚舉
 ├── event/               # 領域事件
-├── facade/              # Facade（跨 BC 協調，舊架構保留中）
 ├── infrastructure/
 │   ├── mapper/          # JPA Entity ↔ Domain Model 轉換
 │   └── persistence/
 │       └── repository/  # Domain Repository 介面的 JPA 實現
 ├── repository/          # Spring Data JPA Repository 介面（後綴 JpaRepository）
-├── service/             # Application Service（舊架構保留中）
-├── state/               # 訂單狀態機（State Pattern）
+├── service/             # 少數仍保留的 Application/Domain 輔助服務（如 OrderNumberService）
 └── vo/                  # Value Object（舊架構，逐步移至 domain/model）
 ```
 
@@ -120,7 +118,7 @@ HTTP Request
 | JPA ↔ Domain 轉換工具 | 後綴 `Mapper` | `OrderMapper` |
 | Controller | 後綴 `Controller` | `OrderController` |
 | Application Handler | 後綴 `Handler` | `PosCheckoutHandler` |
-| Application Service | 後綴 `Service` | `OrderService` |
+| Application Service | 後綴 `Service` | `OrderNumberService` |
 | Request DTO | 後綴 `RequestDto` | `CreateOrderRequestDto` |
 | Response DTO | 後綴 `ResponseDto` | `OrderResponseDto` |
 | Command 物件 | 後綴 `Command` | `PosCheckoutCommand` |
@@ -176,14 +174,16 @@ tw.niels.beverage_api_project.modules.{bc_name}.{layer}
 ### 6.1 Controller 規則
 
 ```java
-// ✅ 正確：Controller 只負責 HTTP 轉換
+// ✅ 正確：Controller 只負責 HTTP 轉換，一律回傳 DTO（不回傳 JPA Entity 或裸 ID）
 @PostMapping("/pos-checkout")
-@PreAuthorize("hasAuthority('STAFF')")
+@Idempotent // 前端帶 Idempotency-Key；重送時重放第一次的 2xx 結果
+@PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
 @Operation(summary = "POS 快速結帳")
-public ResponseEntity<Long> posCheckout(@Valid @RequestBody PosCheckoutRequestDto dto) {
+public ResponseEntity<OrderResponseDto> posCheckout(@Valid @RequestBody PosCheckoutRequestDto dto) {
     PosCheckoutCommand command = new PosCheckoutCommand(...);
     Long orderId = posCheckoutHandler.handle(command);
-    return ResponseEntity.ok(orderId);
+    // 讀取端（CQRS）直接由 OrderEntity 組出回應 DTO
+    return new ResponseEntity<>(orderQueryHandler.handle(new GetOrderQuery(brandId, orderId)), HttpStatus.CREATED);
 }
 
 // ❌ 禁止：在 Controller 寫業務邏輯
@@ -233,7 +233,9 @@ src/main/resources/db/migration/
 ├── V2__add_report_tables.sql
 ...
 ├── V17__add_order_version_column.sql
-└── V18__online_order_fields_and_indexes.sql  ← 目前最新版本（下一個請用 V19 以上）
+├── V18__online_order_fields_and_indexes.sql   # 線上訂單 guest_ref / request_id、訂單索引
+├── V19__add_payment_breakdown_to_daily_store_stats.sql  # 日結付款方式拆分欄位
+└── V20__add_unspecified_total_to_daily_store_stats.sql  ← 目前最新版本（下一個請用 V21 以上）
 ```
 
 **規則**：
@@ -261,8 +263,8 @@ src/main/resources/db/migration/
 
 ### 8.3 修改資料庫 Schema
 
-1. 確認最新 Flyway 版本號（目前最新：V18）
-2. 建立 `V19__{描述}.sql`（版本號 = 目前最新 + 1），只用 `snake_case` 命名
+1. 確認最新 Flyway 版本號（目前最新：V20）
+2. 建立 `V21__{描述}.sql`（版本號 = 目前最新 + 1），只用 `snake_case` 命名
 3. 若有新欄位，同步更新對應的 JPA Entity（`@Column`）
 
 ### 8.4 除錯編譯錯誤
@@ -283,17 +285,25 @@ src/main/resources/db/migration/
 - JWT 解析出 `brandId` 後由 `BrandContextHolder`（ThreadLocal）傳遞
 - Domain Repository 方法簽名通常為 `findXxx(Long brandId, ...)`
 - Controller 從 `@AuthenticationPrincipal` 或 Path Variable 取得 `brandId`，以參數明確傳遞給 Service/Handler
+- **分店隔離**：已綁定分店的員工（MANAGER／STAFF／TESTER）只能操作自己分店的訂單。訂單寫入 Command 必帶 `StoreScope`（由 `ControllerHelperService.getAccessibleStoreId()` 建立，未綁店的品牌管理員為 brand-wide），Handler 載入訂單後於交易內呼叫 `storeScope().verifyAccess(order.getStoreId())`；不符一律回 403（`AccessDeniedException`）
+- TESTER 角色權限比照 STAFF：新增端點時，凡允許 `'STAFF'` 的 `@PreAuthorize` 一併加上 `'TESTER'`
 
 ### 訪客（GUEST）與線上點餐
 
 - 角色除員工（`ROLE_BRAND_ADMIN|MANAGER|STAFF|TESTER`）、會員（`ROLE_MEMBER`）、平台（`ROLE_PLATFORM_ADMIN`）外，新增 `ROLE_GUEST`：由 `POST /api/v1/auth/guest`（body 含 `brandId`、`displayName`）簽發，JWT claims `type=GUEST`、`brandId`，principal 為 `GuestPrincipal`。
 - `AppUserDetails` 與 `GuestPrincipal` 共用 `TenantPrincipal` 介面；取得品牌請用 `ControllerHelperService.getCurrentBrandId()`（訪客也可用），`getCurrentUserDetails()` 對訪客會拋例外。
 - 訪客／會員可用的 API：唯讀的商品（`/brands/products/pos`）、分類、分店（`/stores`，僅回傳自己品牌），以及線上下單 `POST /api/v1/online-orders`（需 `Idempotency-Key`，有速率限制；非同步經 RabbitMQ 處理，初始狀態 `AWAITING_ACCEPTANCE`，由 KDS 接單後變 `PREPARING`）。以 ticketId 輪詢 `GET /api/v1/online-orders/{ticketId}`。
-- 所有回應中的實體 ID 一律輸出為**字串**（`ToStringSerializer`），因 TSID 超過 JS 安全整數範圍。
+- 線上訂單細節：建立時套用與 POS／`/orders/preview` 相同的促銷折扣（`OrderCheckoutService.calculate`，不可折抵點數）。消費者使用 `onlineOrderListenerContainerFactory`：業務／驗證例外（`AppException`、`DomainException`）不重試，暫時性錯誤依 `spring.rabbitmq.listener.simple.retry.*` 重試；ticket 只在最終失敗時標記 FAILED（不會覆寫 CREATED），訊息再進 DLQ。發送端以 `CorrelationData(ticketId)` 處理 broker nack／退回並標記 FAILED。
+- 訂單號碼 `{storeId}-{yyyyMMdd}-{seq:04d}` 由 Redis 計數；計數 key 遺失時會先以資料庫當日最大序號原子性地重新播種，不會從 1 重來。
+- 所有回應中的實體 ID 一律輸出為**字串**（`ToStringSerializer`），因 TSID 超過 JS 安全整數範圍；請求端 Jackson 可把字串或數字轉成 `Long`。Controller 一律回傳 DTO，不可直接回傳 JPA Entity。
+- 「今天／現在」一律注入 `java.time.Clock`（`config/TimeConfig`，時區由 `app.timezone` 決定，預設 Asia/Taipei），使用 `LocalDate.now(clock)`；不可用 `LocalDate.now()` 或 `ZoneId.systemDefault()`。Dockerfile 已設 `TZ=Asia/Taipei`。
+- 稽核日誌 `AuditLogService.saveLog` 以 `@Async("auditExecutor")` 非同步寫入 MongoDB；KDS 推播使用 `kdsExecutor`（兩者定義於 `AsyncConfig`）。
+- 聚合更新原則：Repository 實作對既有資料要先載入受管 Entity 再套用欄位（BaseTsidEntity 的 `isNew` 預設 true，直接 `new Entity()+setId()` 再 save 會 persist 失敗）；關聯用 `EntityManager.getReference()`。
 
 ### Profile 與機密設定
 
 - `application.properties` **不再預設啟用 dev profile**。本機開發請在 `.env` 設定 `SPRING_PROFILES_ACTIVE=dev`（dev 會執行 `DataSeeder`，重設已知密碼的測試帳號，**絕不可用於正式環境**）；正式環境使用 `SPRING_PROFILES_ACTIVE=prod`（關閉 Swagger、取樣率 0.1、不輸出 SQL）。
+- 本機 `docker compose` 的密碼可用 `.env` 的 `DB_PASSWORD`、`MINIO_ACCESS_KEY`/`MINIO_SECRET_KEY`、`MONGO_USER`/`MONGO_PASSWORD`、`POSTGRES_PORT`（預設 5473）覆寫。
 - `app.jwt.secret` 沒有預設值，必須由環境變數 `JWT_SECRET`（512-bit Base64）提供，缺少時啟動失敗。
 - 整合測試（`AbstractIntegrationTest`）自行啟用 `dev` profile 並提供測試專用 JWT 密鑰。
 

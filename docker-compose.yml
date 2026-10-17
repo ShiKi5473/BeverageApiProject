@@ -12,12 +12,15 @@ services:
       - TZ=Asia/Taipei
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/BeverageApiDatabase
       - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=password
+      # 密碼一律由環境變數 / .env 提供（未設定時僅本機開發用預設值），不再寫死
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-password}
       - SPRING_DATA_REDIS_HOST=redis
       - SPRING_RABBITMQ_HOST=rabbitmq
       - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-minioadmin}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-minioadmin}
       - ZIPKIN_ENDPOINT=http://zipkin:9411/api/v2/spans
-      - SPRING_DATA_MONGODB_URI=mongodb://mongoadmin:mongoadmin@mongo:27017/beverage_audit_db?authSource=admin
+      - SPRING_DATA_MONGODB_URI=mongodb://${MONGO_USER:-mongoadmin}:${MONGO_PASSWORD:-mongoadmin}@mongo:27017/beverage_audit_db?authSource=admin
     depends_on:
       - postgres
       - redis
@@ -28,10 +31,11 @@ services:
   postgres:
     image: postgres:17.5
     ports:
-      - "5474:5432"
+      # 對外埠與 application-dev.properties 一致（POSTGRES_PORT，預設 5473）
+      - "${POSTGRES_PORT:-5473}:5432"
     environment:
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-password}
       - POSTGRES_DB=BeverageApiDatabase
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -47,8 +51,8 @@ services:
       - "9000:9000"
       - "9001:9001"
     environment:
-      - MINIO_ROOT_USER=minioadmin
-      - MINIO_ROOT_PASSWORD=minioadmin
+      - MINIO_ROOT_USER=${MINIO_ACCESS_KEY:-minioadmin}
+      - MINIO_ROOT_PASSWORD=${MINIO_SECRET_KEY:-minioadmin}
     command: server /data --console-address ":9001"
 
   rabbitmq:
@@ -67,8 +71,8 @@ services:
     ports:
       - "27017:27017"
     environment:
-      - MONGO_INITDB_ROOT_USERNAME=mongoadmin
-      - MONGO_INITDB_ROOT_PASSWORD=mongoadmin
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USER:-mongoadmin}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD:-mongoadmin}
     volumes:
       - mongo_data:/data/db
 
