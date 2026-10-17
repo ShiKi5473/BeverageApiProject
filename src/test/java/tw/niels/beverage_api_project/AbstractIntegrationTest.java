@@ -13,6 +13,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.RabbitMQContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
@@ -34,16 +35,17 @@ public abstract class AbstractIntegrationTest {
             .withStartupTimeout(Duration.ofMinutes(3))
             .withReuse(true);
 
-    // 鎖定固定的 MinIO 映像（不用 latest），避免上游更新造成測試結果不可重現。
+    // 物件儲存（S3 相容）。
     // 修正：MinIO 官方已停止在 Docker Hub / quay.io 公開提供映像（pull 會回 access denied / 401），
-    // 原本的 release tag 無法下載；改以 digest 鎖定（RELEASE.2025-09-07T16-13-09Z），
-    // 可使用本機已快取的映像。新環境或 CI 需先將此映像匯入或改用自有 registry 的鏡像。
-    static final GenericContainer<?> minio = new GenericContainer<>(DockerImageName.parse(
-            "minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e"))
-            .withEnv("MINIO_ROOT_USER", "minioadmin")
-            .withEnv("MINIO_ROOT_PASSWORD", "minioadmin")
-            .withCommand("server /data")
+    // 新環境與 CI 都拉不到；改用公開、相容 S3 / MinIO API 的 RustFS（Apache-2.0），
+    // 應用程式仍以 MinIO Java SDK 連線，設定鍵（minio.*）不變。
+    // 鎖定固定版本（不用 latest），避免上游更新造成測試結果不可重現。
+    static final GenericContainer<?> objectStorage = new GenericContainer<>(DockerImageName.parse("rustfs/rustfs:1.0.1"))
+            .withEnv("RUSTFS_ACCESS_KEY", "minioadmin")
+            .withEnv("RUSTFS_SECRET_KEY", "minioadmin")
             .withExposedPorts(9000)
+            // 等到 S3 API 的健康檢查端點回 200 才視為啟動完成，避免 MinioConfig 建立 bucket 時連線失敗
+            .waitingFor(Wait.forHttp("/health").forPort(9000).forStatusCode(200))
             .withStartupTimeout(Duration.ofMinutes(3))
             .withReuse(true);
 
@@ -58,7 +60,7 @@ public abstract class AbstractIntegrationTest {
         // 這裡我們採用依序啟動最保險
         postgres.start();
         redis.start();
-        minio.start();
+        objectStorage.start();
         rabbitmq.start();
     }
 
@@ -86,8 +88,8 @@ public abstract class AbstractIntegrationTest {
         registry.add("spring.rabbitmq.username", rabbitmq::getAdminUsername);
         registry.add("spring.rabbitmq.password", rabbitmq::getAdminPassword);
 
-        // MinIO Config
-        registry.add("minio.endpoint", () -> "http://" + minio.getHost() + ":" + minio.getMappedPort(9000));
+        // 物件儲存設定（RustFS，沿用 minio.* 設定鍵）
+        registry.add("minio.endpoint", () -> "http://" + objectStorage.getHost() + ":" + objectStorage.getMappedPort(9000));
         registry.add("minio.access-key", () -> "minioadmin");
         registry.add("minio.secret-key", () -> "minioadmin");
         registry.add("minio.bucket-name", () -> "test-bucket");

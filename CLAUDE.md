@@ -10,7 +10,7 @@
 多租戶飲料店 POS / KDS 後端 API 系統，支援多品牌（Brand）資料隔離。
 核心功能：POS 點餐結帳、廚房顯示系統 (KDS)、庫存管理（週期性盤點+配方扣減）、會員積點、促銷折扣、報表。
 
-**技術堆疊**：Java 21、Spring Boot 3.x、PostgreSQL、Flyway、RabbitMQ、MongoDB（稽核日誌）、MinIO（檔案）、Redis（快取）
+**技術堆疊**：Java 21、Spring Boot 3.x、PostgreSQL、Flyway、RabbitMQ、MongoDB（稽核日誌）、S3 相容物件儲存（檔案；以 MinIO Java SDK 存取，本機 compose 與整合測試使用 RustFS `rustfs/rustfs:1.0.1`，因 MinIO 已停止公開提供 Docker 映像）、Redis（快取）
 
 ---
 

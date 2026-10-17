@@ -16,7 +16,8 @@ services:
       - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-password}
       - SPRING_DATA_REDIS_HOST=redis
       - SPRING_RABBITMQ_HOST=rabbitmq
-      - MINIO_ENDPOINT=http://minio:9000
+      # 物件儲存改用 RustFS（S3 相容），應用程式仍以 MinIO SDK 連線，環境變數名稱不變
+      - MINIO_ENDPOINT=http://rustfs:9000
       - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-minioadmin}
       - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-minioadmin}
       - ZIPKIN_ENDPOINT=http://zipkin:9411/api/v2/spans
@@ -25,7 +26,7 @@ services:
       - postgres
       - redis
       - rabbitmq
-      - minio
+      - rustfs
       - mongo
 
   postgres:
@@ -45,15 +46,19 @@ services:
     ports:
       - "6379:6379"
 
-  minio:
-    image: minio/minio
+  # 修改：MinIO 官方已停止公開提供 Docker 映像（minio/minio 無法再拉取），
+  # 改用公開、相容 S3 / MinIO API 的 RustFS，鎖定版本；
+  # 帳密沿用 MINIO_ACCESS_KEY / MINIO_SECRET_KEY，管理介面在 http://localhost:9001/rustfs/console/
+  rustfs:
+    image: rustfs/rustfs:1.0.1
     ports:
       - "9000:9000"
       - "9001:9001"
     environment:
-      - MINIO_ROOT_USER=${MINIO_ACCESS_KEY:-minioadmin}
-      - MINIO_ROOT_PASSWORD=${MINIO_SECRET_KEY:-minioadmin}
-    command: server /data --console-address ":9001"
+      - RUSTFS_ACCESS_KEY=${MINIO_ACCESS_KEY:-minioadmin}
+      - RUSTFS_SECRET_KEY=${MINIO_SECRET_KEY:-minioadmin}
+      - RUSTFS_CONSOLE_ENABLE=true
+      - RUSTFS_CONSOLE_ADDRESS=:9001
 
   rabbitmq:
     image: rabbitmq:3-management
