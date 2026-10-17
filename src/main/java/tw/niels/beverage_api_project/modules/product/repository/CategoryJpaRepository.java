@@ -23,13 +23,14 @@ public interface CategoryJpaRepository extends JpaRepository<CategoryEntity, Lon
      */
     Set<CategoryEntity> findByBrand_IdAndIdIn(Long brandId, Set<Long> categoryIds);
     /**
-     * 禁用預設的 findById，強迫使用 findByBrand_BrandIdAndCategoryId()。
+     * 禁用預設的 findById，強迫使用 findByBrand_IdAndId()。
+     * （修改：訊息中的方法名原為改名前的 findByBrand_BrandIdAndXxxId，已更正為實際存在的方法）
      */
     @Deprecated
     @Override
     @NonNull
     default Optional<CategoryEntity> findById(@NonNull Long id) {
-        throw new UnsupportedOperationException("禁止呼叫預設的 findById()，請改用 findByBrand_BrandIdAndCategoryId() 以確保資料隔離");
+        throw new UnsupportedOperationException("禁止呼叫預設的 findById()，請改用 findByBrand_IdAndId() 以確保資料隔離");
     }
 
     /**
@@ -39,7 +40,7 @@ public interface CategoryJpaRepository extends JpaRepository<CategoryEntity, Lon
     @Override
     @NonNull
     default List<CategoryEntity> findAll() {
-        throw new UnsupportedOperationException("禁止呼叫預設的 findAll()，請改用 findByBrand_BrandId() 以確保資料隔離");
+        throw new UnsupportedOperationException("禁止呼叫預設的 findAll()，請改用 findByBrand_Id() 以確保資料隔離");
     }
 
     /**

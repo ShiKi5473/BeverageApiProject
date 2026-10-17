@@ -1,13 +1,20 @@
 package tw.niels.beverage_api_project.modules.promotion.strategy;
 
 import org.springframework.stereotype.Component;
-import tw.niels.beverage_api_project.modules.order.entity.OrderEntity;
-import tw.niels.beverage_api_project.modules.promotion.entity.PromotionEntity;
+import tw.niels.beverage_api_project.modules.promotion.dto.PromotionContext;
+import tw.niels.beverage_api_project.modules.promotion.dto.PromotionRule;
 import tw.niels.beverage_api_project.modules.promotion.enums.PromotionType;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
+/**
+ * 百分比折扣：滿 minSpend 打 value 折（0.85 = 85 折）。
+ * <p>
+ * 修改（B-3）：改吃 {@link PromotionContext}；指定商品的活動只對適用品項小計打折
+ * （舊版忽略適用商品清單，會把整張訂單都打折）。
+ * </p>
+ */
 @Component
 public class PercentageCalculator implements PromotionCalculator {
 
@@ -17,22 +24,17 @@ public class PercentageCalculator implements PromotionCalculator {
     }
 
     @Override
-    public BigDecimal calculateDiscount(OrderEntity OrderEntity, PromotionEntity promotion) {
-        BigDecimal orderTotal = OrderEntity.getTotalAmount();
-        BigDecimal minSpend = promotion.getMinSpend();
+    public BigDecimal calculateDiscount(PromotionContext context, PromotionRule rule) {
+        BigDecimal base = PromotionLines.discountBase(context, rule);
+        BigDecimal rate = rule.value();
 
-        if (minSpend != null && orderTotal.compareTo(minSpend) < 0) {
+        // 折數必須介於 0 與 1 之間（不含）；1 以上代表不打折或設定錯誤，一律不折扣
+        if (base.signum() <= 0 || rate == null || rate.signum() <= 0 || rate.compareTo(BigDecimal.ONE) >= 0
+                || !PromotionLines.meetsMinSpend(base, rule)) {
             return BigDecimal.ZERO;
         }
 
-        // promotion.getValue() 是折數 (例如 0.85 代表 85 折)
-        // 折扣金額 = 總金額 * (1 - 折數)
-        // 例如：100 * (1 - 0.85) = 15 元折扣
-        BigDecimal discountRate = BigDecimal.ONE.subtract(promotion.getValue());
-
-        // 防呆：折數不能負數
-        if (discountRate.compareTo(BigDecimal.ZERO) < 0) return BigDecimal.ZERO;
-
-        return orderTotal.multiply(discountRate).setScale(2, RoundingMode.HALF_UP);
+        // 折扣金額 = 計算基準 × (1 - 折數)，例如：100 × (1 - 0.85) = 15 元
+        return base.multiply(BigDecimal.ONE.subtract(rate)).setScale(2, RoundingMode.HALF_UP);
     }
 }

@@ -12,15 +12,14 @@ import tw.niels.beverage_api_project.common.constants.ApiPaths;
 import tw.niels.beverage_api_project.common.service.ControllerHelperService;
 import tw.niels.beverage_api_project.modules.promotion.dto.CreatePromotionRequestDto;
 import tw.niels.beverage_api_project.modules.promotion.dto.PromotionResponseDto;
-import tw.niels.beverage_api_project.modules.promotion.entity.PromotionEntity;
 import tw.niels.beverage_api_project.modules.promotion.service.PromotionService;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping(ApiPaths.API_V1 + "/brands/promotions")
-@Tag(name = "PromotionEntity Management", description = "促銷活動管理 API")
+// 修改：Tag 名稱原為批次改名殘留的 "PromotionEntity Management"
+@Tag(name = "Promotion Management", description = "促銷活動管理 API")
 public class PromotionController {
 
     private final PromotionService promotionService;
@@ -39,22 +38,19 @@ public class PromotionController {
             @Valid @RequestBody CreatePromotionRequestDto requestDto) {
 
         Long brandId = helperService.getCurrentBrandId();
-        PromotionEntity promotion = promotionService.createPromotion(brandId, requestDto);
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(PromotionResponseDto.fromEntity(promotion));
+        // 修改：Service 直接回傳 DTO（在交易內轉換），Controller 不再接觸 JPA Entity
+        PromotionResponseDto promotion = promotionService.createPromotion(brandId, requestDto);
+        return ResponseEntity.status(HttpStatus.CREATED).body(promotion);
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF')")
+    // 修改：TESTER（測試人員）比照 STAFF 權限（使用者決策）
+    @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER', 'STAFF', 'TESTER')")
     @Operation(summary = "查詢促銷活動列表", description = "列出該品牌所有活動 (含已過期/停用)")
     public ResponseEntity<List<PromotionResponseDto>> getPromotions() {
         Long brandId = helperService.getCurrentBrandId();
-        List<PromotionEntity> list = promotionService.getPromotionsByBrand(brandId);
-
-        List<PromotionResponseDto> dtos = list.stream()
-                .map(PromotionResponseDto::fromEntity)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(dtos);
+        // 修改：Service 直接回傳 DTO（含適用商品，已在交易內載入）
+        return ResponseEntity.ok(promotionService.getPromotionsByBrand(brandId));
     }
 
     @DeleteMapping("/{promotionId}")

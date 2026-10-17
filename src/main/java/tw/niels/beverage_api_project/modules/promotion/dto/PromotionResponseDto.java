@@ -1,5 +1,7 @@
 package tw.niels.beverage_api_project.modules.promotion.dto;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import tw.niels.beverage_api_project.modules.product.dto.ProductSummaryDto;
@@ -15,6 +17,9 @@ import java.util.stream.Collectors;
 @Schema(description = "促銷活動回應資料")
 public class PromotionResponseDto {
 
+    // 修改（P0-10）：TSID 超過 JS Number 安全整數範圍，JSON 回應改以字串輸出
+    @Schema(description = "促銷活動 ID", type = "string")
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long promotionId;
     private String name;
     private String description;
@@ -28,6 +33,11 @@ public class PromotionResponseDto {
     // 使用 Set 確保不重複 (對應 Entity 的 ManyToMany Set)
     private Set<ProductSummaryDto> applicableProducts;
 
+    /**
+     * 由 Entity 轉換。
+     * 修改：呼叫端（PromotionService）必須在交易內呼叫，或已預先載入 applicableProducts，
+     * Controller 不再接觸 JPA Entity。
+     */
     public static PromotionResponseDto fromEntity(PromotionEntity entity) {
         if (entity == null) return null; // 防呆
 
@@ -40,7 +50,7 @@ public class PromotionResponseDto {
         dto.setMinSpend(entity.getMinSpend());
         dto.setStartDate(entity.getStartDate());
         dto.setEndDate(entity.getEndDate());
-        dto.setActive(entity.getIsActive());
+        dto.setActive(Boolean.TRUE.equals(entity.getIsActive()));
 
         // 【修正 2】改用明確的 Lambda 表達式，並確保 null check
         if (entity.getApplicableProducts() != null) {

@@ -1,19 +1,29 @@
 package tw.niels.beverage_api_project.modules.promotion.strategy;
 
 import org.springframework.stereotype.Component;
-import tw.niels.beverage_api_project.modules.order.entity.OrderEntity;
-import tw.niels.beverage_api_project.modules.order.entity.OrderItemEntity;
-import tw.niels.beverage_api_project.modules.product.entity.ProductEntity;
-import tw.niels.beverage_api_project.modules.promotion.entity.PromotionEntity;
+import tw.niels.beverage_api_project.modules.promotion.dto.PromotionContext;
+import tw.niels.beverage_api_project.modules.promotion.dto.PromotionRule;
 import tw.niels.beverage_api_project.modules.promotion.enums.PromotionType;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
+/**
+ * 買 X 送 Y：適用商品每湊滿 (X + Y) 件，最便宜的 Y 件免費。
+ * <p>
+ * 參數沿用既有設定方式：X = minSpend（需購買數，未設定為 1），Y = value（贈送數）。
+ * </p>
+ * <p>
+ * 修改（B-3）：
+ * <ul>
+ *   <li>改吃 {@link PromotionContext}，不再讀取 OrderEntity。</li>
+ *   <li>不再把每一件展開成單價清單（數量很大時會產生大量物件），
+ *       改為依單價由低到高排序品項後，直接累加最便宜的 Y × 組數 件。</li>
+ *   <li>X &lt; 1 時視為 1（避免 X = 0 造成「每件都免費」），Y &lt; 1 時不折扣。</li>
+ * </ul>
+ * </p>
+ */
 @Component
 public class BuyXGetYCalculator implements PromotionCalculator {
 
@@ -23,81 +33,47 @@ public class BuyXGetYCalculator implements PromotionCalculator {
     }
 
     @Override
-    public BigDecimal calculateDiscount(OrderEntity OrderEntity, PromotionEntity promotion) {
-        // 1. 解析 X (需購買數) 和 Y (贈送數)
-        int buyCount = promotion.getMinSpend() != null ? promotion.getMinSpend().intValue() : 1;
-        int freeCount = promotion.getValue() != null ? promotion.getValue().intValue() : 1;
-        int groupSize = buyCount + freeCount;
-
-        if (groupSize <= 0) return BigDecimal.ZERO;
-
-        // 2. 取得符合資格的商品單價列表 (已抽離方法)
-        List<BigDecimal> eligibleItemPrices = collectEligibleItemPrices(OrderEntity, promotion);
-
-        // 3. 計算折扣
-        return calculateGroupDiscount(eligibleItemPrices, groupSize, freeCount);
-    }
-
-    /**
-     * 從訂單中篩選出適用於此活動的商品，並將每個數量展開為獨立的單價
-     * @param OrderEntity     訂單
-     * @param promotion 促銷活動設定
-     * @return 符合資格的單價列表 (未排序)
-     */
-    private List<BigDecimal> collectEligibleItemPrices(OrderEntity OrderEntity, PromotionEntity promotion) {
-        // 找出適用此活動的 ProductEntity IDs
-        Set<Long> applicableProductIds = promotion.getApplicableProducts().stream()
-                .map(ProductEntity::getId)
-                .collect(Collectors.toSet());
-
-        List<BigDecimal> prices = new ArrayList<>();
-
-        for (OrderItemEntity item : OrderEntity.getItems()) {
-            // 如果活動沒指定商品 (全館適用) 或者 商品在適用列表中
-            // 注意：這裡假設活動是綁定 ProductEntity 層級，若是綁定 Variant 層級需修改此處邏輯
-            boolean isApplicable = applicableProductIds.isEmpty() ||
-                    applicableProductIds.contains(item.getProduct().getId());
-
-            if (isApplicable) {
-                // 將每個單品 (考慮數量) 的單價加入列表
-                // 例如：珍珠奶茶 x 3 (單價 50)，則加入 [50, 50, 50]
-                // 這裡的 getUnitPrice() 應該已經包含了 Variant 的價格邏輯
-                for (int i = 0; i < item.getQuantity(); i++) {
-                    prices.add(item.getUnitPrice());
-                }
-            }
-        }
-        return prices;
-    }
-
-    /**
-     * 計算分組優惠折扣 (買 X 送 Y 核心邏輯)
-     * @param prices    符合資格的商品價格列表
-     * @param groupSize 每組大小 (X + Y)
-     * @param freeCount 每組贈送數量 (Y)
-     * @return 總折扣金額
-     */
-    private BigDecimal calculateGroupDiscount(List<BigDecimal> prices, int groupSize, int freeCount) {
-        if (prices.isEmpty()) {
+    public BigDecimal calculateDiscount(PromotionContext context, PromotionRule rule) {
+        // 1. 解析 X（需購買數）與 Y（贈送數）
+        int buyCount = rule.minSpend() != null ? Math.max(1, rule.minSpend().intValue()) : 1;
+        int freeCount = rule.value() != null ? rule.value().intValue() : 1;
+        if (freeCount < 1) {
             return BigDecimal.ZERO;
         }
+        long groupSize = (long) buyCount + freeCount;
 
-        // 1. 排序：由低到高 (因為通常是送最低價的)
-        prices.sort(Comparator.naturalOrder());
-
-        BigDecimal totalDiscount = BigDecimal.ZERO;
-        int totalItems = prices.size();
-
-        // 2. 計算可以湊成幾組
-        int sets = totalItems / groupSize;
-
-        // 3. 取前 (sets * freeCount) 個最低價的商品總和作為折扣
-        int freeItemsCount = sets * freeCount;
-
-        for (int i = 0; i < freeItemsCount; i++) {
-            totalDiscount = totalDiscount.add(prices.get(i));
+        // 2. 取得適用品項，依單價由低到高排序（贈送最便宜的）
+        List<PromotionContext.Line> lines = PromotionLines.eligibleLines(context, rule);
+        if (lines.isEmpty()) {
+            return BigDecimal.ZERO;
         }
+        lines.sort(Comparator.comparing(PromotionLines::unitPriceOf));
 
+        // 3. 計算可湊成的組數與免費件數
+        long totalUnits = 0;
+        for (PromotionContext.Line line : lines) {
+            totalUnits += line.quantity();
+        }
+        long freeUnits = (totalUnits / groupSize) * freeCount;
+
+        // 4. 從最便宜的品項開始累加免費件數的金額
+        return sumCheapestUnits(lines, freeUnits);
+    }
+
+    /**
+     * 從已排序（單價由低到高）的品項中，累加最便宜的 freeUnits 件金額。
+     */
+    private BigDecimal sumCheapestUnits(List<PromotionContext.Line> sortedLines, long freeUnits) {
+        BigDecimal totalDiscount = BigDecimal.ZERO;
+        long remaining = freeUnits;
+        for (PromotionContext.Line line : sortedLines) {
+            if (remaining <= 0) {
+                break;
+            }
+            long take = Math.min(remaining, line.quantity());
+            totalDiscount = totalDiscount.add(PromotionLines.unitPriceOf(line).multiply(BigDecimal.valueOf(take)));
+            remaining -= take;
+        }
         return totalDiscount;
     }
 }

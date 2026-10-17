@@ -26,13 +26,14 @@ public interface OptionGroupJpaRepository extends JpaRepository<OptionGroupEntit
     List<OptionGroupEntity> findByBrand_IdAndIdIn(Long brandId, Collection<Long> groupIds);
 
     /**
-     * 禁用預設的 findById，強迫使用 findByBrand_BrandIdAndGroupId()。
+     * 禁用預設的 findById，強迫使用 findByBrand_IdAndId()。
+     * （修改：訊息中的方法名原為改名前的 findByBrand_BrandIdAndXxxId，已更正為實際存在的方法）
      */
     @Deprecated
     @Override
     @NonNull
     default Optional<OptionGroupEntity> findById(@NonNull Long id) {
-        throw new UnsupportedOperationException("禁止呼叫預設的 findById()，請改用 findByBrand_BrandIdAndGroupId() 以確保資料隔離");
+        throw new UnsupportedOperationException("禁止呼叫預設的 findById()，請改用 findByBrand_IdAndId() 以確保資料隔離");
     }
 
     /**
@@ -42,7 +43,7 @@ public interface OptionGroupJpaRepository extends JpaRepository<OptionGroupEntit
     @Override
     @NonNull
     default List<OptionGroupEntity> findAll() {
-        throw new UnsupportedOperationException("禁止呼叫預設的 findAll()，請改用 findByBrand_BrandId() 以確保資料隔離");
+        throw new UnsupportedOperationException("禁止呼叫預設的 findAll()，請改用 findByBrand_Id() 以確保資料隔離");
     }
 
     /**

@@ -1,7 +1,6 @@
 package tw.niels.beverage_api_project.modules.product.controller;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,13 +22,21 @@ import tw.niels.beverage_api_project.modules.product.dto.CreateOptionGroupReques
 import tw.niels.beverage_api_project.modules.product.dto.CreateProductOptionRequestDto;
 import tw.niels.beverage_api_project.modules.product.dto.OptionGroupResponseDto;
 import tw.niels.beverage_api_project.modules.product.dto.ProductOptionResponseDto;
-import tw.niels.beverage_api_project.modules.product.entity.OptionGroupEntity;
-import tw.niels.beverage_api_project.modules.product.entity.ProductOptionEntity;
 import tw.niels.beverage_api_project.modules.product.service.OptionGroupService;
 
+/**
+ * 商品客製化選項 API
+ * <p>
+ * 修改說明：
+ * - S-1：POST /option-groups/{groupId}/options 原本沒有 @PreAuthorize（MEMBER 也能新增選項與加價），
+ *   改為與「建立選項群組」一致，只允許 BRAND_ADMIN、MANAGER。
+ * - OptionGroupService 已改為回傳 DTO（在交易內轉換），Controller 不再接觸 JPA Entity。
+ * - Tag 名稱原為批次改名殘留的 "ProductEntity Options"。
+ * </p>
+ */
 @RestController
 @RequestMapping(value = ApiPaths.API_V1 + ApiPaths.BRANDS, produces = MediaType.APPLICATION_JSON_VALUE)
-@Tag(name = "ProductEntity Options", description = "商品客製化選項管理 (甜度、冰塊、加料)")
+@Tag(name = "Product Options", description = "商品客製化選項管理 (甜度、冰塊、加料)")
 public class OptionGroupController {
 
     private final OptionGroupService optionGroupService;
@@ -48,8 +55,9 @@ public class OptionGroupController {
     public ResponseEntity<OptionGroupResponseDto> createOptionGroup(
             @Valid @RequestBody CreateOptionGroupRequestDto requestDto) {
         Long brandId = this.helperService.getCurrentBrandId();
-        OptionGroupEntity newGroup = optionGroupService.createOptionGroup(brandId, requestDto);
-        return new ResponseEntity<>(OptionGroupResponseDto.fromEntity(newGroup), HttpStatus.CREATED);
+        // 修改：Service 直接回傳 DTO
+        OptionGroupResponseDto newGroup = optionGroupService.createOptionGroup(brandId, requestDto);
+        return new ResponseEntity<>(newGroup, HttpStatus.CREATED);
     }
 
     // 取得品牌的所有選項群組
@@ -57,21 +65,20 @@ public class OptionGroupController {
     @Operation(summary = "取得品牌所有選項群組", description = "列出該品牌下定義的所有客製化選項群組及其內容")
     public ResponseEntity<List<OptionGroupResponseDto>> getOptionGroupsByBrand() {
         Long brandId = this.helperService.getCurrentBrandId();
-        List<OptionGroupEntity> groups = optionGroupService.getOptionGroupsByBrand(brandId);
-        List<OptionGroupResponseDto> dtos = groups.stream()
-                .map(OptionGroupResponseDto::fromEntity)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(dtos);
+        // 修改：Service 已在交易內轉成 DTO 並排序
+        return ResponseEntity.ok(optionGroupService.getOptionGroupsByBrand(brandId));
     }
 
     // 在群組下建立選項 (例如: "半糖")
     @PostMapping("/option-groups/{groupId}/options")
+    @PreAuthorize("hasAnyRole('BRAND_ADMIN', 'MANAGER')") // S-1：補上授權，與建立選項群組一致
     @Operation(summary = "新增選項項目", description = "在特定群組下新增選項，例如在「甜度」下新增「半糖」") // 【新增】
     public ResponseEntity<ProductOptionResponseDto> createProductOption(
             @PathVariable Long groupId,
             @Valid @RequestBody CreateProductOptionRequestDto requestDto) {
         Long brandId = this.helperService.getCurrentBrandId();
-        ProductOptionEntity newOption = optionGroupService.createProductOption(groupId, brandId, requestDto);
-        return new ResponseEntity<>(ProductOptionResponseDto.fromEntity(newOption), HttpStatus.CREATED);
+        // 修改：Service 直接回傳 DTO
+        ProductOptionResponseDto newOption = optionGroupService.createProductOption(groupId, brandId, requestDto);
+        return new ResponseEntity<>(newOption, HttpStatus.CREATED);
     }
 }
